@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<toolkitModel xmlns="http://www.ibm.com/xmlns/prod/streams/spl/toolkit" productVersion="3.2.0.0" xmlns:common="http://www.ibm.com/xmlns/prod/streams/spl/common" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <toolkit name="com.ibm.streamsx.dps" requiredProductVersion="2.0.0" version="1.0.8">
+    <description/>
+    <uriTable>
+      <uri index="1" value="com.ibm.streamsx/lock/distributed/native.function/function.xml"/>
+      <uri index="2" value="com.ibm.streamsx/store/distributed/native.function/function.xml"/>
+    </uriTable>
+    <namespace name="com.ibm.streamsx.lock.distributed">
+      <function modelUriIndex="1" name="dlCreateOrGetLock" native="true" public="true" returnType="uint64" uriIndex="0">
+        <description>Create a new lock with a given name or get it if
+        it already exists. Return the lock handle.</description>
+        <prototype>public stateful uint64 dlCreateOrGetLock(rstring name, mutable uint64 err)</prototype>
+        <parameter name="name" type="rstring"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="1" name="dlRemoveLock" native="true" public="true" returnType="boolean" uriIndex="0">
+        <description>Remove lock. Return the true if the lock was there.</description>
+        <prototype>public stateful boolean dlRemoveLock(uint64 lock, mutable uint64 err)</prototype>
+        <parameter name="lock" type="uint64"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="1" name="dlAcquireLock" native="true" public="true" returnType="void" uriIndex="0">
+        <description>Acquire lock.</description>
+        <prototype>public stateful void dlAcquireLock(uint64 lock, mutable uint64 err)</prototype>
+        <parameter name="lock" type="uint64"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="1" name="dlAcquireLock" native="true" public="true" returnType="void" uriIndex="0">
+        <description>Acquire lock, with an explicit lease time in seconds.</description>
+        <prototype>public stateful void dlAcquireLock(uint64 lock, float64 leaseTime, float64 maxWaitTimeToAcquireLock, mutable uint64 err)</prototype>
+        <parameter name="lock" type="uint64"/>
+        <parameter name="leaseTime" type="float64"/>
+        <parameter name="maxWaitTimeToAcquireLock" type="float64"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="1" name="dlReleaseLock" native="true" public="true" returnType="void" uriIndex="0">
+        <description>Release lock.</description>
+        <prototype>public stateful void dlReleaseLock(uint64 lock, mutable uint64 err)</prototype>
+        <parameter name="lock" type="uint64"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="1" name="dlGetPidForLock" native="true" public="true" returnType="uint32" uriIndex="0">
+        <description>Get the process id that is currently holding a given lock.</description>
+        <prototype>public stateful uint32 dlGetPidForLock(rstring name, mutable uint64 err)</prototype>
+        <parameter name="name" type="rstring"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="1" name="dlGetLastDistributedLockErrorString" native="true" public="true" returnType="rstring" uriIndex="0">
+        <description>Get the description of the last DB error.</description>
+        <prototype>public stateful rstring dlGetLastDistributedLockErrorString()</prototype>
+      </function>
+      <function modelUriIndex="1" name="dlGetLastDistributedLockErrorCode" native="true" public="true" returnType="uint64" uriIndex="0">
+        <description>Get the error code of the last DB error.</description>
+        <prototype>public stateful uint64 dlGetLastDistributedLockErrorCode()</prototype>
+      </function>
+    </namespace>
+    <namespace name="com.ibm.streamsx.store.distributed">
+      <function modelUriIndex="2" name="dpsCreateStore" native="true" public="true" returnType="uint64" uriIndex="0">
+        <description>Create a new process store with a given name. Return the
+        process store handle if created, 0 otherwise (a process store with the same name exists).</description>
+        <prototype>&lt;any T1, any T2&gt; public stateful uint64 dpsCreateStore(rstring name, T1 key, T2 value, mutable uint64 err)</prototype>
+        <parameter name="name" type="rstring"/>
+        <parameter name="key" type="T1"/>
+        <parameter name="value" type="T2"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsCreateOrGetStore" native="true" public="true" returnType="uint64" uriIndex="0">
+        <description>Create a new process store with a given name or get it if
+        it already exists. Return the process store handle.</description>
+        <prototype>&lt;any T1, any T2&gt; public stateful uint64 dpsCreateOrGetStore(rstring name, T1 key, T2 value, mutable uint64 err)</prototype>
+        <parameter name="name" type="rstring"/>
+        <parameter name="key" type="T1"/>
+        <parameter name="value" type="T2"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsFindStore" native="true" public="true" returnType="uint64" uriIndex="0">
+        <description>Find a process store given its name. Return the process
+        store handle if found, 0 otherwise.</description>
+        <prototype>public stateful uint64 dpsFindStore(rstring name, mutable uint64 err)</prototype>
+        <parameter name="name" type="rstring"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsRemoveStore" native="true" public="true" returnType="boolean" uriIndex="0">
+        <description>Remove a process store given its handle. Return true if the
+       store was there.</description>
+        <prototype>public stateful boolean dpsRemoveStore(uint64 store, mutable uint64 err)</prototype>
+        <parameter name="store" type="uint64"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsPut" native="true" public="true" returnType="boolean" uriIndex="0">
+        <description>Put an item into the given store. Returns true if the store did
+       not contain an item with the same key, false otherwise.
+        (A better performing version with no safety checks)</description>
+        <prototype>&lt;any T1, any T2&gt; public stateful boolean dpsPut(uint64 store, T1 key, T2 item, mutable uint64 err)</prototype>
+        <parameter name="store" type="uint64"/>
+        <parameter name="key" type="T1"/>
+        <parameter name="item" type="T2"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsPutSafe" native="true" public="true" returnType="boolean" uriIndex="0">
+        <description>Put an item into the given store. Returns true if the store did
+       not contain an item with the same key, false otherwise.
+        (A version with safety checks that will have performance overhead)</description>
+        <prototype>&lt;any T1, any T2&gt; public stateful boolean dpsPutSafe(uint64 store, T1 key, T2 item, mutable uint64 err)</prototype>
+        <parameter name="store" type="uint64"/>
+        <parameter name="key" type="T1"/>
+        <parameter name="item" type="T2"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsPutTTL" native="true" public="true" returnType="boolean" uriIndex="0">
+        <description>Put an item with a TTL (Time To Live in seconds) value into the global area of the back-end data store.
+        Returns true if the operation is successful, false otherwise.</description>
+        <prototype>&lt;any T1, any T2&gt; public stateful boolean dpsPutTTL(T1 key, T2 item, uint32 ttl, mutable uint64 err)</prototype>
+        <parameter name="key" type="T1"/>
+        <parameter name="item" type="T2"/>
+        <parameter name="ttl" type="uint32"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsGet" native="true" public="true" returnType="boolean" uriIndex="0">
+        <description>Get an item from the given store. Returns true if the store did
+       contain an item with the given key and a matching type, false otherwise.
+       (A better performing version with no safety checks)</description>
+        <prototype>&lt;any T1, any T2&gt; public stateful boolean dpsGet(uint64 store, T1 key, mutable T2 item, mutable uint64 err)</prototype>
+        <parameter name="store" type="uint64"/>
+        <parameter name="key" type="T1"/>
+        <parameter mutable="true" name="item" type="T2"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsGetSafe" native="true" public="true" returnType="boolean" uriIndex="0">
+        <description>Get an item from the given store. Returns true if the store did
+       contain an item with the given key and a matching type, false otherwise.
+       (A version with safety checks that will have performance overhead)</description>
+        <prototype>&lt;any T1, any T2&gt; public stateful boolean dpsGetSafe(uint64 store, T1 key, mutable T2 item, mutable uint64 err)</prototype>
+        <parameter name="store" type="uint64"/>
+        <parameter name="key" type="T1"/>
+        <parameter mutable="true" name="item" type="T2"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsGetTTL" native="true" public="true" returnType="boolean" uriIndex="0">
+        <description>Get an item that was stored with a TTL (Time To Live in seconds) value into the global area of the back-end data store.
+        Returns true if the store did contain an item with the given key and a matching type, false otherwise.</description>
+        <prototype>&lt;any T1, any T2&gt; public stateful boolean dpsGetTTL(T1 key, mutable T2 item, mutable uint64 err)</prototype>
+        <parameter name="key" type="T1"/>
+        <parameter mutable="true" name="item" type="T2"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsRemove" native="true" public="true" returnType="boolean" uriIndex="0">
+        <description>Remove an item from the given store. Returns true if the store did
+       contain an item with the given key, false otherwise.</description>
+        <prototype>&lt;any T1&gt; public stateful boolean dpsRemove(uint64 store, T1 key, mutable uint64 err)</prototype>
+        <parameter name="store" type="uint64"/>
+        <parameter name="key" type="T1"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsRemoveTTL" native="true" public="true" returnType="boolean" uriIndex="0">
+        <description>Remove an item that was stored with a TTL (Time To Live in seconds) value into the global area of the back end data store.
+        Returns true if an item with the given key was removed, false otherwise.</description>
+        <prototype>&lt;any T1&gt; public stateful boolean dpsRemoveTTL(T1 key, mutable uint64 err)</prototype>
+        <parameter name="key" type="T1"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsHas" native="true" public="true" returnType="boolean" uriIndex="0">
+        <description>Check if an item exists. Returns true if the given store does
+       contain an item with the given key, false otherwise.</description>
+        <prototype>&lt;any T1&gt; public stateful boolean dpsHas(uint64 store, T1 key, mutable uint64 err)</prototype>
+        <parameter name="store" type="uint64"/>
+        <parameter name="key" type="T1"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsHasTTL" native="true" public="true" returnType="boolean" uriIndex="0">
+        <description>Check if an item exists that was store with a TTL (Time To Live in seconds) value. 
+        Returns true if an TTL item with the given key exists, false otherwise.</description>
+        <prototype>&lt;any T1&gt; public stateful boolean dpsHasTTL(T1 key, mutable uint64 err)</prototype>
+        <parameter name="key" type="T1"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsClear" native="true" public="true" returnType="void" uriIndex="0">
+        <description>Clear the given store.</description>
+        <prototype>public stateful void dpsClear(uint64 store, mutable uint64 err)</prototype>
+        <parameter name="store" type="uint64"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsSize" native="true" public="true" returnType="uint64" uriIndex="0">
+        <description>Get the size of the given store.</description>
+        <prototype>public stateful uint64 dpsSize(uint64 store, mutable uint64 err)</prototype>
+        <parameter name="store" type="uint64"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsBeginIteration" native="true" public="true" returnType="uint64" uriIndex="0">
+        <description>Begin the iteration on a given store. No other operations that can modify
+        the state can be used until after a matching gsEndIteration()
+        call. Returns the iterator.</description>
+        <prototype>public stateful uint64 dpsBeginIteration(uint64 store, mutable uint64 err)</prototype>
+        <parameter name="store" type="uint64"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsGetNext" native="true" public="true" returnType="boolean" uriIndex="0">
+        <description>Get the next key and value of given types in the given store. Returns true if an item was
+        found, false otherwise.</description>
+        <prototype>&lt;any T1, any T2&gt; public stateful boolean dpsGetNext(uint64 store, uint64 iterator, mutable T1 key, mutable T2 value, mutable uint64 err)</prototype>
+        <parameter name="store" type="uint64"/>
+        <parameter name="iterator" type="uint64"/>
+        <parameter mutable="true" name="key" type="T1"/>
+        <parameter mutable="true" name="value" type="T2"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsEndIteration" native="true" public="true" returnType="void" uriIndex="0">
+        <description>End the iteration on the given store.</description>
+        <prototype>public stateful void dpsEndIteration(uint64 store, uint64 iterator, mutable uint64 err)</prototype>
+        <parameter name="store" type="uint64"/>
+        <parameter name="iterator" type="uint64"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsSerialize" native="true" public="true" returnType="void" uriIndex="0">
+        <description>Serialize all the items in the given store.</description>
+        <prototype>&lt;any T1, any T2&gt; public stateful void dpsSerialize(uint64 store, mutable blob data, T1 dummyKey, T2 dummyValue, mutable uint64 err)</prototype>
+        <parameter name="store" type="uint64"/>
+        <parameter mutable="true" name="data" type="blob"/>
+        <parameter name="dummyKey" type="T1"/>
+        <parameter name="dummyValue" type="T2"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsDeserialize" native="true" public="true" returnType="void" uriIndex="0">
+        <description>Deserialize the items from the serialized store.</description>
+        <prototype>&lt;any T1, any T2&gt; public stateful void dpsDeserialize(uint64 store, blob data, T1 dummyKey, T2 dummyValue, mutable uint64 err)</prototype>
+        <parameter name="store" type="uint64"/>
+        <parameter name="data" type="blob"/>
+        <parameter name="dummyKey" type="T1"/>
+        <parameter name="dummyValue" type="T2"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsGetLastStoreErrorString" native="true" public="true" returnType="rstring" uriIndex="0">
+        <description>Get the description of the last store error.</description>
+        <prototype>public stateful rstring dpsGetLastStoreErrorString()</prototype>
+      </function>
+      <function modelUriIndex="2" name="dpsGetLastErrorStringTTL" native="true" public="true" returnType="rstring" uriIndex="0">
+        <description>Get the description of the last error occurred for a TTL data item.</description>
+        <prototype>public stateful rstring dpsGetLastErrorStringTTL()</prototype>
+      </function>
+      <function modelUriIndex="2" name="dpsGetLastStoreErrorCode" native="true" public="true" returnType="uint64" uriIndex="0">
+        <description>Get the error code of the last store error.</description>
+        <prototype>public stateful uint64 dpsGetLastStoreErrorCode()</prototype>
+      </function>
+      <function modelUriIndex="2" name="dpsGetLastErrorCodeTTL" native="true" public="true" returnType="uint64" uriIndex="0">
+        <description>Get the error code of the last error ocuured for a TTL data item.</description>
+        <prototype>public stateful uint64 dpsGetLastErrorCodeTTL()</prototype>
+      </function>
+      <function modelUriIndex="2" name="dpsGetStoreName" native="true" public="true" returnType="rstring" uriIndex="0">
+        <description>Get the store name for a given store id.</description>
+        <prototype>public stateful rstring dpsGetStoreName(uint64 store)</prototype>
+        <parameter name="store" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsGetSplTypeNameForKey" native="true" public="true" returnType="rstring" uriIndex="0">
+        <description>Get the SPl type name for the key of a given store id.</description>
+        <prototype>public stateful rstring dpsGetSplTypeNameForKey(uint64 store)</prototype>
+        <parameter name="store" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsGetSplTypeNameForValue" native="true" public="true" returnType="rstring" uriIndex="0">
+        <description>Get the SPl type name for the value of a given store id.</description>
+        <prototype>public stateful rstring dpsGetSplTypeNameForValue(uint64 store)</prototype>
+        <parameter name="store" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsGetNoSqlDbProductName" native="true" public="true" returnType="rstring" uriIndex="0">
+        <description>Get the name of the NoSQL DB product being used.</description>
+        <prototype>public stateful rstring dpsGetNoSqlDbProductName()</prototype>
+      </function>
+      <function modelUriIndex="2" name="dpsGetDetailsAboutThisMachine" native="true" public="true" returnType="void" uriIndex="0">
+        <description>Get the name of the machine and its CPU architecture where this operator is running.</description>
+        <prototype>public stateful void dpsGetDetailsAboutThisMachine(mutable rstring machineName, mutable rstring osVersion, mutable rstring cpuArchitecture)</prototype>
+        <parameter mutable="true" name="machineName" type="rstring"/>
+        <parameter mutable="true" name="osVersion" type="rstring"/>
+        <parameter mutable="true" name="cpuArchitecture" type="rstring"/>
+      </function>
+      <function modelUriIndex="2" name="dpsRunDataStoreCommand" native="true" public="true" returnType="boolean" uriIndex="0">
+        <description>
+           If users want to execute simple arbitrary back-end data store (fire and forget)
+           native commands, this API can be used. This covers any Redis or Cassandra(CQL)
+           native commands that don't have to fetch and return K/V pairs or return size of the db etc.
+           (Insert and Delete are the more suitable ones here. However, key and value can only
+            have string types.)
+        </description>
+        <prototype>public stateful boolean dpsRunDataStoreCommand(rstring cmd, mutable uint64 err)</prototype>
+        <parameter name="cmd" type="rstring"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsRunDataStoreCommand" native="true" public="true" returnType="boolean" uriIndex="0">
+        <description>
+           If users want to execute arbitrary back-end data store two way
+           native commands, this API can be used. This is a variation of the previous API with
+           overloaded function arguments. As of Nov/2014, this API is supported in the dps toolkit only
+           when Cloudant or HBase NoSQL DB is used as a back-end data store. It covers any Cloudant HTTP/JSON based
+           native commands that can perform both database and document related Cloudant APIs that are very
+           well documented for reference on the web or it covers the HBase related REST APIs.
+        </description>
+        <prototype>public stateful boolean dpsRunDataStoreCommand(uint32 cmdType, rstring httpVerb, rstring baseUrl, rstring apiEndpoint, rstring queryParams, rstring jsonRequest, mutable rstring jsonResponse, mutable uint64 err)</prototype>
+        <parameter name="cmdType" type="uint32"/>
+        <parameter name="httpVerb" type="rstring"/>
+        <parameter name="baseUrl" type="rstring"/>
+        <parameter name="apiEndpoint" type="rstring"/>
+        <parameter name="queryParams" type="rstring"/>
+        <parameter name="jsonRequest" type="rstring"/>
+        <parameter mutable="true" name="jsonResponse" type="rstring"/>
+        <parameter mutable="true" name="err" type="uint64"/>
+      </function>
+      <function modelUriIndex="2" name="dpsBase64Encode" native="true" public="true" returnType="void" uriIndex="0">
+        <description>
+           Base64 encode a given string. Encoded result will be returned in a
+           user provided mutable string passed as a second function argument.
+        </description>
+        <prototype>public stateful void dpsBase64Encode(rstring str, mutable rstring encodedResultStr)</prototype>
+        <parameter name="str" type="rstring"/>
+        <parameter mutable="true" name="encodedResultStr" type="rstring"/>
+      </function>
+      <function modelUriIndex="2" name="dpsBase64Decode" native="true" public="true" returnType="void" uriIndex="0">
+        <description>
+           Base64 decode a given string. Decoded result will be returned in a
+           user provided mutable string passed as a second function argument.
+        </description>
+        <prototype>public stateful void dpsBase64Decode(rstring str, mutable rstring decodedResultStr)</prototype>
+        <parameter name="str" type="rstring"/>
+        <parameter mutable="true" name="decodedResultStr" type="rstring"/>
+      </function>
+    </namespace>
+    <namespace name="com.ibm.streamsx"/>
+  </toolkit>
+
+</toolkitModel>

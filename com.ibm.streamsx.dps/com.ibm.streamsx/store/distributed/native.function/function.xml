@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<functionModel xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.ibm.com/xmlns/prod/streams/spl/function" xmlns:cmn="http://www.ibm.com/xmlns/prod/streams/spl/common" xsi:schemaLocation="http://www.ibm.com/xmlns/prod/streams/spl/function functionModel.xsd">
+  <functionSet>
+    <headerFileName>DistributedProcessStoreWrappers.h</headerFileName>
+    <functions>
+      <function>
+        <description>Create a new process store with a given name. Return the
+        process store handle if created, 0 otherwise (a process store with the same name exists).</description>
+        <prototype>&lt;any T1, any T2> public stateful uint64 dpsCreateStore(rstring name, T1 key, T2 value, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Create a new process store with a given name or get it if
+        it already exists. Return the process store handle.</description>
+        <prototype>&lt;any T1, any T2> public stateful uint64 dpsCreateOrGetStore(rstring name, T1 key, T2 value, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Find a process store given its name. Return the process
+        store handle if found, 0 otherwise.</description>
+        <prototype>public stateful uint64 dpsFindStore(rstring name, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Remove a process store given its handle. Return true if the
+       store was there.</description>
+        <prototype>public stateful boolean dpsRemoveStore(uint64 store, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Put an item into the given store. Returns true if the store did
+       not contain an item with the same key, false otherwise.
+        (A better performing version with no safety checks)</description>
+        <prototype>&lt;any T1, any T2> public stateful boolean dpsPut(uint64 store, T1 key, T2 item, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Put an item into the given store. Returns true if the store did
+       not contain an item with the same key, false otherwise.
+        (A version with safety checks that will have performance overhead)</description>
+        <prototype>&lt;any T1, any T2> public stateful boolean dpsPutSafe(uint64 store, T1 key, T2 item, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Put an item with a TTL (Time To Live in seconds) value into the global area of the back-end data store.
+        Returns true if the operation is successful, false otherwise.</description>
+        <prototype>&lt;any T1, any T2> public stateful boolean dpsPutTTL(T1 key, T2 item, uint32 ttl, mutable uint64 err)</prototype>
+      </function>           
+      <function>
+        <description>Get an item from the given store. Returns true if the store did
+       contain an item with the given key and a matching type, false otherwise.
+       (A better performing version with no safety checks)</description>
+        <prototype>&lt;any T1, any T2> public stateful boolean dpsGet(uint64 store, T1 key, mutable T2 item, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Get an item from the given store. Returns true if the store did
+       contain an item with the given key and a matching type, false otherwise.
+       (A version with safety checks that will have performance overhead)</description>
+        <prototype>&lt;any T1, any T2> public stateful boolean dpsGetSafe(uint64 store, T1 key, mutable T2 item, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Get an item that was stored with a TTL (Time To Live in seconds) value into the global area of the back-end data store.
+        Returns true if the store did contain an item with the given key and a matching type, false otherwise.</description>
+        <prototype>&lt;any T1, any T2> public stateful boolean dpsGetTTL(T1 key, mutable T2 item, mutable uint64 err)</prototype>
+      </function>      
+      <function>
+        <description>Remove an item from the given store. Returns true if the store did
+       contain an item with the given key, false otherwise.</description>
+        <prototype>&lt;any T1> public stateful boolean dpsRemove(uint64 store, T1 key, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Remove an item that was stored with a TTL (Time To Live in seconds) value into the global area of the back end data store.
+        Returns true if an item with the given key was removed, false otherwise.</description>
+        <prototype>&lt;any T1> public stateful boolean dpsRemoveTTL(T1 key, mutable uint64 err)</prototype>
+      </function>        
+      <function>
+        <description>Check if an item exists. Returns true if the given store does
+       contain an item with the given key, false otherwise.</description>
+        <prototype>&lt;any T1> public stateful boolean dpsHas(uint64 store, T1 key, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Check if an item exists that was store with a TTL (Time To Live in seconds) value. 
+        Returns true if an TTL item with the given key exists, false otherwise.</description>
+        <prototype>&lt;any T1> public stateful boolean dpsHasTTL(T1 key, mutable uint64 err)</prototype>
+      </function>        
+      <function>
+        <description>Clear the given store.</description>
+        <prototype>public stateful void dpsClear(uint64 store, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Get the size of the given store.</description>
+        <prototype>public stateful uint64 dpsSize(uint64 store, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Begin the iteration on a given store. No other operations that can modify
+        the state can be used until after a matching gsEndIteration()
+        call. Returns the iterator.</description>
+        <prototype>public stateful uint64 dpsBeginIteration(uint64 store, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Get the next key and value of given types in the given store. Returns true if an item was
+        found, false otherwise.</description>
+        <prototype>&lt;any T1, any T2> public stateful boolean dpsGetNext(uint64 store, uint64 iterator, mutable T1 key, mutable T2 value, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>End the iteration on the given store.</description>
+        <prototype>public stateful void dpsEndIteration(uint64 store, uint64 iterator, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Serialize all the items in the given store.</description>
+        <prototype>&lt;any T1, any T2> public stateful void dpsSerialize(uint64 store, mutable blob data, T1 dummyKey, T2 dummyValue, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Deserialize the items from the serialized store.</description>
+        <prototype>&lt;any T1, any T2> public stateful void dpsDeserialize(uint64 store, blob data, T1 dummyKey, T2 dummyValue, mutable uint64 err)</prototype>
+      </function>
+      <function>
+        <description>Get the description of the last store error.</description>
+        <prototype>public stateful rstring dpsGetLastStoreErrorString()</prototype>
+      </function>
+      <function>
+        <description>Get the description of the last error occurred for a TTL data item.</description>
+        <prototype>public stateful rstring dpsGetLastErrorStringTTL()</prototype>
+      </function>  
+      <function>
+        <description>Get the error code of the last store error.</description>
+        <prototype>public stateful uint64 dpsGetLastStoreErrorCode()</prototype>
+      </function>
+      <function>
+        <description>Get the error code of the last error ocuured for a TTL data item.</description>
+        <prototype>public stateful uint64 dpsGetLastErrorCodeTTL()</prototype>
+      </function>  
+      <function>
+        <description>Get the store name for a given store id.</description>
+        <prototype>public stateful rstring dpsGetStoreName(uint64 store)</prototype>
+      </function>
+      <function>
+        <description>Get the SPl type name for the key of a given store id.</description>
+        <prototype>public stateful rstring dpsGetSplTypeNameForKey(uint64 store)</prototype>
+      </function>
+      <function>
+        <description>Get the SPl type name for the value of a given store id.</description>
+        <prototype>public stateful rstring dpsGetSplTypeNameForValue(uint64 store)</prototype>
+      </function>
+      <function>
+        <description>Get the name of the NoSQL DB product being used.</description>
+        <prototype>public stateful rstring dpsGetNoSqlDbProductName()</prototype>
+      </function>
+      <function>
+        <description>Get the name of the machine and its CPU architecture where this operator is running.</description>
+        <prototype>public stateful void dpsGetDetailsAboutThisMachine(mutable rstring machineName, mutable rstring osVersion, mutable rstring cpuArchitecture)</prototype>
+      </function>      
+      <function>
+        <description>
+           If users want to execute simple arbitrary back-end data store (fire and forget)
+           native commands, this API can be used. This covers any Redis or Cassandra(CQL)
+           native commands that don't have to fetch and return K/V pairs or return size of the db etc.
+           (Insert and Delete are the more suitable ones here. However, key and value can only
+            have string types.)
+        </description>
+        <prototype>public stateful boolean dpsRunDataStoreCommand(rstring cmd, mutable uint64 err)</prototype>
+      </function> 
+      <function>
+        <description>
+           If users want to execute arbitrary back-end data store two way
+           native commands, this API can be used. This is a variation of the previous API with
+           overloaded function arguments. As of Nov/2014, this API is supported in the dps toolkit only
+           when Cloudant or HBase NoSQL DB is used as a back-end data store. It covers any Cloudant HTTP/JSON based
+           native commands that can perform both database and document related Cloudant APIs that are very
+           well documented for reference on the web or it covers the HBase related REST APIs.
+        </description>
+        <prototype>public stateful boolean dpsRunDataStoreCommand(uint32 cmdType, rstring httpVerb,
+        	rstring baseUrl, rstring apiEndpoint, rstring queryParams, rstring jsonRequest,
+        	mutable rstring jsonResponse, mutable uint64 err)</prototype>
+      </function>   
+      <function>
+        <description>
+           Base64 encode a given string. Encoded result will be returned in a
+           user provided mutable string passed as a second function argument.
+        </description>
+        <prototype>public stateful void dpsBase64Encode(rstring str, mutable rstring encodedResultStr)</prototype>
+      </function>
+      <function>
+        <description>
+           Base64 decode a given string. Decoded result will be returned in a
+           user provided mutable string passed as a second function argument.
+        </description>
+        <prototype>public stateful void dpsBase64Decode(rstring str, mutable rstring decodedResultStr)</prototype>
+      </function>       
+    </functions>
+    <dependencies>
+      <library>
+        <cmn:description>Distributed process store library</cmn:description>
+        <cmn:managedLibrary>
+		  <cmn:lib>DistributedProcessStoreLib</cmn:lib>
+          <cmn:lib>memcached</cmn:lib>
+          <cmn:lib>hiredis</cmn:lib>
+          <cmn:lib>uv</cmn:lib>
+          <cmn:lib>crypto</cmn:lib>
+          <cmn:lib>ssl</cmn:lib>
+          <cmn:lib>cassandra</cmn:lib>
+          <cmn:lib>curl</cmn:lib>
+          <cmn:lib>json-c</cmn:lib>
+          <cmn:lib>bson</cmn:lib>
+          <cmn:lib>mongoc</cmn:lib>
+          <cmn:lib>couchbase</cmn:lib>
+          <cmn:lib>lua</cmn:lib>
+          <cmn:lib>aerospike</cmn:lib>
+          <cmn:command>../../../../impl/bin/archLevel</cmn:command>
+        </cmn:managedLibrary>
+      </library>
+    </dependencies>
+  </functionSet>
+</functionModel>

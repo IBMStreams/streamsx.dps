@@ -1,0 +1,66 @@
+<functionModel
+       xmlns="http://www.ibm.com/xmlns/prod/streams/spl/function"
+       xmlns:cmn="http://www.ibm.com/xmlns/prod/streams/spl/common"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.ibm.com/xmlns/prod/streams/spl/function functionModel.xsd">
+  <functionSet>
+    <headerFileName>DistributedLockWrappers.h</headerFileName>
+    <functions>
+      <function>
+        <description>Create a new lock with a given name or get it if
+        it already exists. Return the lock handle.</description>
+        <prototype><![CDATA[ public stateful uint64 dlCreateOrGetLock(rstring name, mutable uint64 err) ]]></prototype>
+      </function>
+      <function>
+        <description>Remove lock. Return the true if the lock was there.</description>
+        <prototype><![CDATA[ public stateful boolean dlRemoveLock(uint64 lock, mutable uint64 err) ]]></prototype>
+      </function>
+      <function>
+        <description>Acquire lock.</description>
+        <prototype><![CDATA[ public stateful void dlAcquireLock(uint64 lock, mutable uint64 err) ]]></prototype>
+      </function>
+      <function>
+        <description>Acquire lock, with an explicit lease time in seconds.</description>
+        <prototype><![CDATA[ public stateful void dlAcquireLock(uint64 lock, float64 leaseTime, float64 maxWaitTimeToAcquireLock, mutable uint64 err) ]]></prototype>
+      </function>
+      <function>
+        <description>Release lock.</description>
+        <prototype><![CDATA[ public stateful void dlReleaseLock(uint64 lock, mutable uint64 err) ]]></prototype>
+      </function>
+      <function>
+        <description>Get the process id that is currently holding a given lock.</description>
+        <prototype><![CDATA[ public stateful uint32 dlGetPidForLock(rstring name, mutable uint64 err) ]]></prototype>
+      </function>
+      <function>
+        <description>Get the description of the last DB error.</description>
+        <prototype><![CDATA[ public stateful rstring dlGetLastDistributedLockErrorString() ]]></prototype>
+      </function>
+      <function>
+        <description>Get the error code of the last DB error.</description>
+        <prototype><![CDATA[ public stateful uint64 dlGetLastDistributedLockErrorCode() ]]></prototype>
+      </function> 
+    </functions>
+    <dependencies>
+      <library>
+        <cmn:description>Distributed process store library</cmn:description>
+        <cmn:managedLibrary>
+          <cmn:lib>DistributedProcessStoreLib</cmn:lib>
+          <cmn:lib>memcached</cmn:lib>
+          <cmn:lib>hiredis</cmn:lib>
+          <cmn:lib>uv</cmn:lib>
+          <cmn:lib>crypto</cmn:lib>
+          <cmn:lib>ssl</cmn:lib>
+          <cmn:lib>cassandra</cmn:lib>
+          <cmn:lib>curl</cmn:lib>
+          <cmn:lib>json-c</cmn:lib>
+          <cmn:lib>bson</cmn:lib>
+          <cmn:lib>mongoc</cmn:lib>
+          <cmn:lib>couchbase</cmn:lib>
+          <cmn:lib>lua</cmn:lib>
+          <cmn:lib>aerospike</cmn:lib>
+          <cmn:command>../../../../impl/bin/archLevel</cmn:command>
+        </cmn:managedLibrary>
+      </library>        
+    </dependencies>
+  </functionSet>
+</functionModel>

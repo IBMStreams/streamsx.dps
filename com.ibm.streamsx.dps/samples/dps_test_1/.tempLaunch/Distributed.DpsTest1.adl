@@ -1,0 +1,1151 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns3:applicationSet xmlns="http://www.ibm.com/xmlns/prod/streams/spl/tupleType" xmlns:ns2="http://www.ibm.com/xmlns/prod/streams/runtime/sam" xmlns:ns3="http://www.ibm.com/xmlns/prod/streams/application" xmlns:ns4="http://www.ibm.com/xmlns/prod/streams/application/augmented" xmlns:ns5="http://www.ibm.com/xmlns/prod/streams/runtime/utils" xmlns:ns6="http://www.ibm.com/xmlns/prod/streams/runtime/utils/mr" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" productVersion="3.1.0.0" name="DpsTest1.appset" xsi:noNamespaceSchemaLocation="http://www.ibm.com/xmlns/prod/streams/application">
+    <ns3:description>DpsTest1 application set</ns3:description>
+    <ns3:application version="1.0.0" outputDirectory="/home/streamsadmin/SPL-Examples-For-Beginners/com.ibm.streamsx.dps/samples/dps_test_1/output/DpsTest1/Distributed" name="DpsTest1" dataDirectory="../../../data" checkpointDirectory="../../../data/ckpt" applicationScope="Default" applicationDirectory="../../../.">
+        <ns3:libraries/>
+        <ns3:hostpools>
+            <ns3:hostpool name="$default" membershipMode="shared" index="0"/>
+        </ns3:hostpools>
+        <ns3:tupleTypes>
+            <ns3:tupleType index="0">
+                <ns3:attribute type="int8" name="dummy"/>
+                <ns3:tuple>
+                    <attr type="int8" name="dummy"/>
+                </ns3:tuple>
+            </ns3:tupleType>
+            <ns3:tupleType index="1">
+                <ns3:attribute type="int8" name="a"/>
+                <ns3:tuple>
+                    <attr type="int8" name="a"/>
+                </ns3:tuple>
+            </ns3:tupleType>
+        </ns3:tupleTypes>
+        <ns3:pes>
+            <ns3:pe restartable="false" relocatable="false" optimized="true" language="C++" index="0" class="BeJwzCc7MyzZxSk0siQcAFhMDDZ">
+                <ns3:envVars>
+                    <ns3:envVar value="/opt/ibm/java-x86_64-60/" name="STREAMS_JAVA_HOME"/>
+                </ns3:envVars>
+                <ns3:executable dynamicLoad="true" digest="VYxD+/kgUIcmEMh7coc47IdJHfs=">
+                    <ns3:wrapper>none</ns3:wrapper>
+                    <ns3:executableUri>bin/DpsTest1-a.dpe</ns3:executableUri>
+                    <ns3:arguments></ns3:arguments>
+                    <ns3:dependencies/>
+                </ns3:executable>
+                <ns3:operInstances>
+                    <ns3:operInstance singleThreadedOnOutputs="true" singleThreadedOnInputs="true" name="Sink.Beat" index="0" definitionIndex="0" class="Sink::Beat">
+                        <ns3:resources>
+                            <ns3:poolLocation poolIndex="0"/>
+                        </ns3:resources>
+                        <ns3:runtimeConstants>
+                            <ns3:runtimeConstant value="1" name="lit$0"/>
+                            <ns3:runtimeConstant value="4" name="lit$1"/>
+                        </ns3:runtimeConstants>
+                        <ns3:inputPorts/>
+                        <ns3:outputPorts>
+                            <ns3:outputPort viewable="true" streamName="Sink.Beat" tupleTypeIndex="0" name="Beat" isMutable="false" index="0">
+<ns3:interPeConnection operInstanceIndex="1" iportIndex="0"/>
+                            </ns3:outputPort>
+                        </ns3:outputPorts>
+                    </ns3:operInstance>
+                </ns3:operInstances>
+                <ns3:tracing level="error"/>
+                <ns3:inputPorts/>
+                <ns3:outputPorts>
+                    <ns3:outputPort tupleTypeIndex="0" transport="TCP" singleThreadedOnOutput="true" index="0" encoding="LE">
+                        <ns3:staticConnections>
+                            <ns3:staticConnection peIndex="1" iportIndex="0"/>
+                        </ns3:staticConnections>
+                        <ns3:operInstanceConnection oportIndex="0" operInstanceIndex="0"/>
+                    </ns3:outputPort>
+                </ns3:outputPorts>
+            </ns3:pe>
+            <ns3:pe restartable="false" relocatable="false" optimized="true" language="C++" index="1" class="BeJwzCc7My7bwS60ocUpNLIkHACoZAV8">
+                <ns3:envVars>
+                    <ns3:envVar value="/opt/ibm/java-x86_64-60/" name="STREAMS_JAVA_HOME"/>
+                </ns3:envVars>
+                <ns3:executable dynamicLoad="true" digest="0APH06OqlQ2GhW+dupyFer06m9M=">
+                    <ns3:wrapper>none</ns3:wrapper>
+                    <ns3:executableUri>bin/DpsTest1-b.dpe</ns3:executableUri>
+                    <ns3:arguments></ns3:arguments>
+                    <ns3:dependencies/>
+                </ns3:executable>
+                <ns3:operInstances>
+                    <ns3:operInstance singleThreadedOnOutputs="true" singleThreadedOnInputs="true" name="Sink.NextBeat" index="1" definitionIndex="1" class="Sink::NextBeat">
+                        <ns3:resources>
+                            <ns3:poolLocation poolIndex="0"/>
+                        </ns3:resources>
+                        <ns3:runtimeConstants>
+                            <ns3:runtimeConstant value="0" name="lit$0"/>
+                            <ns3:runtimeConstant value="false" name="lit$1"/>
+                            <ns3:runtimeConstant value="0" name="lit$2"/>
+                            <ns3:runtimeConstant value="0" name="lit$3"/>
+                            <ns3:runtimeConstant value="0" name="lit$4"/>
+                            <ns3:runtimeConstant value="0" name="lit$5"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$6"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$7"/>
+                            <ns3:runtimeConstant value="0" name="lit$8"/>
+                            <ns3:runtimeConstant value="&quot;myDBStore&quot;" name="lit$9"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$10"/>
+                            <ns3:runtimeConstant value="&quot; nanosecs&quot;" name="lit$11"/>
+                            <ns3:runtimeConstant value="&quot;Time taken for executing dpsCreateStore = &quot;" name="lit$12"/>
+                            <ns3:runtimeConstant value="0" name="lit$13"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$14"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in creating a store named myDBStore: rc = &quot;" name="lit$15"/>
+                            <ns3:runtimeConstant value="0" name="lit$16"/>
+                            <ns3:runtimeConstant value="0" name="lit$17"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$18"/>
+                            <ns3:runtimeConstant value="149" name="lit$19"/>
+                            <ns3:runtimeConstant value="&quot;myDBStore&quot;" name="lit$20"/>
+                            <ns3:runtimeConstant value="0" name="lit$21"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$22"/>
+                            <ns3:runtimeConstant value="&quot;Expected error in creating a duplicate store named myDBStore: rc = &quot;" name="lit$23"/>
+                            <ns3:runtimeConstant value="0" name="lit$24"/>
+                            <ns3:runtimeConstant value="0" name="lit$25"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$26"/>
+                            <ns3:runtimeConstant value="159" name="lit$27"/>
+                            <ns3:runtimeConstant value="[&quot;1&quot;, &quot;2&quot;]" name="lit$28"/>
+                            <ns3:runtimeConstant value="{&quot;a&quot; : 34, &quot;b&quot; : 45}" name="lit$29"/>
+                            <ns3:runtimeConstant value="&quot;My Mega Store1&quot;" name="lit$30"/>
+                            <ns3:runtimeConstant value="0" name="lit$31"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$32"/>
+                            <ns3:runtimeConstant value="&quot;Error in creating My Mega Store1. rc = &quot;" name="lit$33"/>
+                            <ns3:runtimeConstant value="&quot;My Mega Store1 was created with an id of &quot;" name="lit$34"/>
+                            <ns3:runtimeConstant value="&quot;My Mega Store1&quot;" name="lit$35"/>
+                            <ns3:runtimeConstant value="&quot;, which is same as s=&quot;" name="lit$36"/>
+                            <ns3:runtimeConstant value="&quot;Found store k=&quot;" name="lit$37"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$38"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$39"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 1: Original name of a store with an id &quot;" name="lit$40"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$41"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$42"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 2: SPL type name for the key of a store with an id &quot;" name="lit$43"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$44"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$45"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 3: SPL type name for the value of a store with an id &quot;" name="lit$46"/>
+                            <ns3:runtimeConstant value="55555" name="lit$47"/>
+                            <ns3:runtimeConstant value="&quot;My Mega Store1&quot;" name="lit$48"/>
+                            <ns3:runtimeConstant value="&quot;, which is same as s=&quot;" name="lit$49"/>
+                            <ns3:runtimeConstant value="&quot;Got store k=&quot;" name="lit$50"/>
+                            <ns3:runtimeConstant value="&quot;My Mega Store1&quot;" name="lit$51"/>
+                            <ns3:runtimeConstant value="0" name="lit$52"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$53"/>
+                            <ns3:runtimeConstant value="&quot;Expected error in creating a store named My Mega Store1: rc = &quot;" name="lit$54"/>
+                            <ns3:runtimeConstant value="&quot;My Mega Store1&quot;" name="lit$55"/>
+                            <ns3:runtimeConstant value="&quot;, msg=&quot;" name="lit$56"/>
+                            <ns3:runtimeConstant value="&quot;, err=&quot;" name="lit$57"/>
+                            <ns3:runtimeConstant value="&quot;After store Removal, an attempt to find that store returned an error: store k=&quot;" name="lit$58"/>
+                            <ns3:runtimeConstant value="0" name="lit$59"/>
+                            <ns3:runtimeConstant value="&quot;My Sentinel Lock1&quot;" name="lit$60"/>
+                            <ns3:runtimeConstant value="0" name="lit$61"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$62"/>
+                            <ns3:runtimeConstant value="&quot;Error in creating My Sentinel Lock1. rc = &quot;" name="lit$63"/>
+                            <ns3:runtimeConstant value="&quot;My Sentinel Lock1 was created with an id of &quot;" name="lit$64"/>
+                            <ns3:runtimeConstant value="55555" name="lit$65"/>
+                            <ns3:runtimeConstant value="&quot;My Sentinel Lock1&quot;" name="lit$66"/>
+                            <ns3:runtimeConstant value="&quot;, which is same as l=&quot;" name="lit$67"/>
+                            <ns3:runtimeConstant value="&quot;Got lock k=&quot;" name="lit$68"/>
+                            <ns3:runtimeConstant value="3" name="lit$69"/>
+                            <ns3:runtimeConstant value="0" name="lit$70"/>
+                            <ns3:runtimeConstant value="&quot;We acquired the lock My Sentinel Lock1 l=&quot;" name="lit$71"/>
+                            <ns3:runtimeConstant value="&quot;Failed to acquire the lock My Sentinel Lock1 l=&quot;" name="lit$72"/>
+                            <ns3:runtimeConstant value="0" name="lit$73"/>
+                            <ns3:runtimeConstant value="&quot;We released the lock My Sentinel Lock1 l=&quot;" name="lit$74"/>
+                            <ns3:runtimeConstant value="&quot;Failed to release the lock My Sentinel Lock1 l=&quot;" name="lit$75"/>
+                            <ns3:runtimeConstant value="true" name="lit$76"/>
+                            <ns3:runtimeConstant value="0" name="lit$77"/>
+                            <ns3:runtimeConstant value="&quot;We removed the lock My Sentinel Lock1 l=&quot;" name="lit$78"/>
+                            <ns3:runtimeConstant value="&quot;, msg=&quot;" name="lit$79"/>
+                            <ns3:runtimeConstant value="&quot;, err=&quot;" name="lit$80"/>
+                            <ns3:runtimeConstant value="&quot;Failed to remove the lock My Sentinel Lock1 l=&quot;" name="lit$81"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$82"/>
+                            <ns3:runtimeConstant value="&quot;myDBStore&quot;" name="lit$83"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$84"/>
+                            <ns3:runtimeConstant value="&quot; nanosecs&quot;" name="lit$85"/>
+                            <ns3:runtimeConstant value="&quot;Time taken for executing dpsFindStore = &quot;" name="lit$86"/>
+                            <ns3:runtimeConstant value="0" name="lit$87"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$88"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in finding a store named myDBStore: rc = &quot;" name="lit$89"/>
+                            <ns3:runtimeConstant value="0" name="lit$90"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$91"/>
+                            <ns3:runtimeConstant value="261" name="lit$92"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$93"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$94"/>
+                            <ns3:runtimeConstant value="&quot; nanosecs&quot;" name="lit$95"/>
+                            <ns3:runtimeConstant value="&quot;Time taken for executing dpsRemoveStore = &quot;" name="lit$96"/>
+                            <ns3:runtimeConstant value="0" name="lit$97"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$98"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in removing a store named myDBStore: rc = &quot;" name="lit$99"/>
+                            <ns3:runtimeConstant value="0" name="lit$100"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$101"/>
+                            <ns3:runtimeConstant value="276" name="lit$102"/>
+                            <ns3:runtimeConstant value="&quot;myDBStore&quot;" name="lit$103"/>
+                            <ns3:runtimeConstant value="0" name="lit$104"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$105"/>
+                            <ns3:runtimeConstant value="&quot;Expected error in finding an already removed store named myDBStore: rc = &quot;" name="lit$106"/>
+                            <ns3:runtimeConstant value="0" name="lit$107"/>
+                            <ns3:runtimeConstant value="0" name="lit$108"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$109"/>
+                            <ns3:runtimeConstant value="285" name="lit$110"/>
+                            <ns3:runtimeConstant value="0" name="lit$111"/>
+                            <ns3:runtimeConstant value="&quot;myDBStore&quot;" name="lit$112"/>
+                            <ns3:runtimeConstant value="0" name="lit$113"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$114"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in creating a new store named myDBStore: rc = &quot;" name="lit$115"/>
+                            <ns3:runtimeConstant value="0" name="lit$116"/>
+                            <ns3:runtimeConstant value="0" name="lit$117"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$118"/>
+                            <ns3:runtimeConstant value="294" name="lit$119"/>
+                            <ns3:runtimeConstant value="&quot;myDBStore&quot;" name="lit$120"/>
+                            <ns3:runtimeConstant value="0" name="lit$121"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$122"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in creating or getting a store named myDBStore: rc = &quot;" name="lit$123"/>
+                            <ns3:runtimeConstant value="0" name="lit$124"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$125"/>
+                            <ns3:runtimeConstant value="302" name="lit$126"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$127"/>
+                            <ns3:runtimeConstant value="&quot;abc&quot;" name="lit$128"/>
+                            <ns3:runtimeConstant value="10" name="lit$129"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$130"/>
+                            <ns3:runtimeConstant value="&quot; nanosecs&quot;" name="lit$131"/>
+                            <ns3:runtimeConstant value="&quot;Time taken for executing dpsPut = &quot;" name="lit$132"/>
+                            <ns3:runtimeConstant value="0" name="lit$133"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$134"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsPut(s, abc, 10): rc = &quot;" name="lit$135"/>
+                            <ns3:runtimeConstant value="0" name="lit$136"/>
+                            <ns3:runtimeConstant value="true" name="lit$137"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$138"/>
+                            <ns3:runtimeConstant value="317" name="lit$139"/>
+                            <ns3:runtimeConstant value="0" name="lit$140"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$141"/>
+                            <ns3:runtimeConstant value="&quot;abc&quot;" name="lit$142"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$143"/>
+                            <ns3:runtimeConstant value="&quot; nanosecs&quot;" name="lit$144"/>
+                            <ns3:runtimeConstant value="&quot;Time taken for executing dpsGet = &quot;" name="lit$145"/>
+                            <ns3:runtimeConstant value="0" name="lit$146"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$147"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsGet(s, abc, v): rc = &quot;" name="lit$148"/>
+                            <ns3:runtimeConstant value="0" name="lit$149"/>
+                            <ns3:runtimeConstant value="true" name="lit$150"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$151"/>
+                            <ns3:runtimeConstant value="333" name="lit$152"/>
+                            <ns3:runtimeConstant value="&quot;v=&quot;" name="lit$153"/>
+                            <ns3:runtimeConstant value="10" name="lit$154"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$155"/>
+                            <ns3:runtimeConstant value="335" name="lit$156"/>
+                            <ns3:runtimeConstant value="&quot;myDBStore&quot;" name="lit$157"/>
+                            <ns3:runtimeConstant value="0" name="lit$158"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$159"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsCreateOrGetStore('myDBStore', dummyRstring, dummyFunJoyTuple, err) rc = &quot;" name="lit$160"/>
+                            <ns3:runtimeConstant value="&quot;abc&quot;" name="lit$161"/>
+                            <ns3:runtimeConstant value="{fun = true, joy = [1, 2, 3]}" name="lit$162"/>
+                            <ns3:runtimeConstant value="0" name="lit$163"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$164"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsPut(s, abc, {fun=true, joy=[1,2,3]}): rc = &quot;" name="lit$165"/>
+                            <ns3:runtimeConstant value="0" name="lit$166"/>
+                            <ns3:runtimeConstant value="true" name="lit$167"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$168"/>
+                            <ns3:runtimeConstant value="356" name="lit$169"/>
+                            <ns3:runtimeConstant value="&quot;abc&quot;" name="lit$170"/>
+                            <ns3:runtimeConstant value="0" name="lit$171"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$172"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsGet(s, abc, funjoy): rc = &quot;" name="lit$173"/>
+                            <ns3:runtimeConstant value="0" name="lit$174"/>
+                            <ns3:runtimeConstant value="true" name="lit$175"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$176"/>
+                            <ns3:runtimeConstant value="363" name="lit$177"/>
+                            <ns3:runtimeConstant value="{fun = true, joy = [1, 2, 3]}" name="lit$178"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$179"/>
+                            <ns3:runtimeConstant value="364" name="lit$180"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$181"/>
+                            <ns3:runtimeConstant value="&quot;abc&quot;" name="lit$182"/>
+                            <ns3:runtimeConstant value="0" name="lit$183"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$184"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsHas(s): rc = &quot;" name="lit$185"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$186"/>
+                            <ns3:runtimeConstant value="&quot; nanosecs&quot;" name="lit$187"/>
+                            <ns3:runtimeConstant value="&quot;Time taken for executing dpsHas = &quot;" name="lit$188"/>
+                            <ns3:runtimeConstant value="0" name="lit$189"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$190"/>
+                            <ns3:runtimeConstant value="378" name="lit$191"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$192"/>
+                            <ns3:runtimeConstant value="&quot;abc&quot;" name="lit$193"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$194"/>
+                            <ns3:runtimeConstant value="&quot; nanosecs&quot;" name="lit$195"/>
+                            <ns3:runtimeConstant value="&quot;Time taken for executing dpsRemove = &quot;" name="lit$196"/>
+                            <ns3:runtimeConstant value="0" name="lit$197"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$198"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsRemove(s, abc): rc = &quot;" name="lit$199"/>
+                            <ns3:runtimeConstant value="0" name="lit$200"/>
+                            <ns3:runtimeConstant value="true" name="lit$201"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$202"/>
+                            <ns3:runtimeConstant value="394" name="lit$203"/>
+                            <ns3:runtimeConstant value="&quot;abc&quot;" name="lit$204"/>
+                            <ns3:runtimeConstant value="0" name="lit$205"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$206"/>
+                            <ns3:runtimeConstant value="396" name="lit$207"/>
+                            <ns3:runtimeConstant value="&quot;abc&quot;" name="lit$208"/>
+                            <ns3:runtimeConstant value="0" name="lit$209"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$210"/>
+                            <ns3:runtimeConstant value="&quot;Expected error in dpsRemove(s, abc): rc = &quot;" name="lit$211"/>
+                            <ns3:runtimeConstant value="0" name="lit$212"/>
+                            <ns3:runtimeConstant value="false" name="lit$213"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$214"/>
+                            <ns3:runtimeConstant value="402" name="lit$215"/>
+                            <ns3:runtimeConstant value="{0}" name="lit$216"/>
+                            <ns3:runtimeConstant value="&quot;myDBStore&quot;" name="lit$217"/>
+                            <ns3:runtimeConstant value="{3, 5, 6}" name="lit$218"/>
+                            <ns3:runtimeConstant value="10" name="lit$219"/>
+                            <ns3:runtimeConstant value="0" name="lit$220"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$221"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsput(s, {3,5,6}, 10): rc = &quot;" name="lit$222"/>
+                            <ns3:runtimeConstant value="0" name="lit$223"/>
+                            <ns3:runtimeConstant value="true" name="lit$224"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$225"/>
+                            <ns3:runtimeConstant value="414" name="lit$226"/>
+                            <ns3:runtimeConstant value="{3, 5, 6}" name="lit$227"/>
+                            <ns3:runtimeConstant value="11" name="lit$228"/>
+                            <ns3:runtimeConstant value="0" name="lit$229"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$230"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsput(s, {3,5,6}, 11): rc = &quot;" name="lit$231"/>
+                            <ns3:runtimeConstant value="0" name="lit$232"/>
+                            <ns3:runtimeConstant value="true" name="lit$233"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$234"/>
+                            <ns3:runtimeConstant value="420" name="lit$235"/>
+                            <ns3:runtimeConstant value="{3, 5, 6}" name="lit$236"/>
+                            <ns3:runtimeConstant value="0" name="lit$237"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$238"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsGet(s, {3,5,6}, 10): rc = &quot;" name="lit$239"/>
+                            <ns3:runtimeConstant value="0" name="lit$240"/>
+                            <ns3:runtimeConstant value="true" name="lit$241"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$242"/>
+                            <ns3:runtimeConstant value="426" name="lit$243"/>
+                            <ns3:runtimeConstant value="11" name="lit$244"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$245"/>
+                            <ns3:runtimeConstant value="427" name="lit$246"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$247"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$248"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$249"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 1_AXX: Original name of a store with an id &quot;" name="lit$250"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$251"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$252"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 2_AXX: SPL type name for the key of a store with an id &quot;" name="lit$253"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$254"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$255"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 3_AXX: SPL type name for the value of a store with an id &quot;" name="lit$256"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$257"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$258"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 1_AYY: Original name of a store with an id &quot;" name="lit$259"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$260"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$261"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 2_AYY: SPL type name for the key of a store with an id &quot;" name="lit$262"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$263"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$264"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 3_AYY: SPL type name for the value of a store with an id &quot;" name="lit$265"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$266"/>
+                            <ns3:runtimeConstant value="&quot; nanosecs&quot;" name="lit$267"/>
+                            <ns3:runtimeConstant value="&quot;Time taken for executing dpsClear = &quot;" name="lit$268"/>
+                            <ns3:runtimeConstant value="0" name="lit$269"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$270"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsClear(s): rc = &quot;" name="lit$271"/>
+                            <ns3:runtimeConstant value="0" name="lit$272"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$273"/>
+                            <ns3:runtimeConstant value="448" name="lit$274"/>
+                            <ns3:runtimeConstant value="0" name="lit$275"/>
+                            <ns3:runtimeConstant value="0" name="lit$276"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$277"/>
+                            <ns3:runtimeConstant value="450" name="lit$278"/>
+                            <ns3:runtimeConstant value="&quot;myDBStore&quot;" name="lit$279"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$280"/>
+                            <ns3:runtimeConstant value="&quot;a&quot;" name="lit$281"/>
+                            <ns3:runtimeConstant value="1" name="lit$282"/>
+                            <ns3:runtimeConstant value="0" name="lit$283"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$284"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsput(s, a, 1): rc = &quot;" name="lit$285"/>
+                            <ns3:runtimeConstant value="&quot;b&quot;" name="lit$286"/>
+                            <ns3:runtimeConstant value="2" name="lit$287"/>
+                            <ns3:runtimeConstant value="0" name="lit$288"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$289"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsput(s, b, 11): rc = &quot;" name="lit$290"/>
+                            <ns3:runtimeConstant value="&quot;c&quot;" name="lit$291"/>
+                            <ns3:runtimeConstant value="3" name="lit$292"/>
+                            <ns3:runtimeConstant value="0" name="lit$293"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$294"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsput(s, c, 3): rc = &quot;" name="lit$295"/>
+                            <ns3:runtimeConstant value="&quot;d&quot;" name="lit$296"/>
+                            <ns3:runtimeConstant value="4" name="lit$297"/>
+                            <ns3:runtimeConstant value="0" name="lit$298"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$299"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsput(s, d, 4): rc = &quot;" name="lit$300"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$301"/>
+                            <ns3:runtimeConstant value="&quot; nanosecs&quot;" name="lit$302"/>
+                            <ns3:runtimeConstant value="&quot;Time taken for executing dpsPut 4 times in a sequence = &quot;" name="lit$303"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$304"/>
+                            <ns3:runtimeConstant value="1000000000" name="lit$305"/>
+                            <ns3:runtimeConstant value="&quot; nanosecs&quot;" name="lit$306"/>
+                            <ns3:runtimeConstant value="&quot;Time taken for executing dpsSize = &quot;" name="lit$307"/>
+                            <ns3:runtimeConstant value="0" name="lit$308"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$309"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsSize(s): rc = &quot;" name="lit$310"/>
+                            <ns3:runtimeConstant value="0" name="lit$311"/>
+                            <ns3:runtimeConstant value="4" name="lit$312"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$313"/>
+                            <ns3:runtimeConstant value="495" name="lit$314"/>
+                            <ns3:runtimeConstant value="0" name="lit$315"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$316"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsRemoveStore(s): rc = &quot;" name="lit$317"/>
+                            <ns3:runtimeConstant value="0" name="lit$318"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$319"/>
+                            <ns3:runtimeConstant value="503" name="lit$320"/>
+                            <ns3:runtimeConstant value="345" name="lit$321"/>
+                            <ns3:runtimeConstant value="&quot;789&quot;" name="lit$322"/>
+                            <ns3:runtimeConstant value="0" name="lit$323"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$324"/>
+                            <ns3:runtimeConstant value="&quot;Expected error in dpsPut(s, 345, 789): rc = &quot;" name="lit$325"/>
+                            <ns3:runtimeConstant value="0" name="lit$326"/>
+                            <ns3:runtimeConstant value="false" name="lit$327"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$328"/>
+                            <ns3:runtimeConstant value="512" name="lit$329"/>
+                            <ns3:runtimeConstant value="&quot;Red&quot;" name="lit$330"/>
+                            <ns3:runtimeConstant value="&quot;Green&quot;" name="lit$331"/>
+                            <ns3:runtimeConstant value="0" name="lit$332"/>
+                            <ns3:runtimeConstant value="&quot;Blue&quot;" name="lit$333"/>
+                            <ns3:runtimeConstant value="&quot;Purple&quot;" name="lit$334"/>
+                            <ns3:runtimeConstant value="[0]" name="lit$335"/>
+                            <ns3:runtimeConstant value="{&quot;x&quot; : &quot;0&quot;}" name="lit$336"/>
+                            <ns3:runtimeConstant value="&quot;Brown&quot;" name="lit$337"/>
+                            <ns3:runtimeConstant value="&quot;Yellow&quot;" name="lit$338"/>
+                            <ns3:runtimeConstant value="&quot;Teal&quot;" name="lit$339"/>
+                            <ns3:runtimeConstant value="10" name="lit$340"/>
+                            <ns3:runtimeConstant value="&quot;New York&quot;" name="lit$341"/>
+                            <ns3:runtimeConstant value="0" name="lit$342"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$343"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsPut(s1, 10, New York): rc = &quot;" name="lit$344"/>
+                            <ns3:runtimeConstant value="&quot;att&quot;" name="lit$345"/>
+                            <ns3:runtimeConstant value="533" name="lit$346"/>
+                            <ns3:runtimeConstant value="0" name="lit$347"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$348"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsPut(s2, att, 533): rc = &quot;" name="lit$349"/>
+                            <ns3:runtimeConstant value="&quot;TR&quot;" name="lit$350"/>
+                            <ns3:runtimeConstant value="1.5" name="lit$351"/>
+                            <ns3:runtimeConstant value="0" name="lit$352"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$353"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsPut(s3, TR, 1.5): rc = &quot;" name="lit$354"/>
+                            <ns3:runtimeConstant value="45.47" name="lit$355"/>
+                            <ns3:runtimeConstant value="&quot;Yorktown&quot;" name="lit$356"/>
+                            <ns3:runtimeConstant value="0" name="lit$357"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$358"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsPut(s4, 45.47): rc = &quot;" name="lit$359"/>
+                            <ns3:runtimeConstant value="[12, 34, 16]" name="lit$360"/>
+                            <ns3:runtimeConstant value="{&quot;Research&quot; : &quot;Kelly&quot;, &quot;SWG&quot; : &quot;Mills&quot;}" name="lit$361"/>
+                            <ns3:runtimeConstant value="0" name="lit$362"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$363"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsPut(s5, [12, 34, 16], {SWG:Mills, Research:Kelly}): rc = &quot;" name="lit$364"/>
+                            <ns3:runtimeConstant value="&quot;Sprint&quot;" name="lit$365"/>
+                            <ns3:runtimeConstant value="7.6" name="lit$366"/>
+                            <ns3:runtimeConstant value="0" name="lit$367"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$368"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsPut(s6, Sprint, 7.6): rc = &quot;" name="lit$369"/>
+                            <ns3:runtimeConstant value="&quot;SPL&quot;" name="lit$370"/>
+                            <ns3:runtimeConstant value="&quot;Fantastic&quot;" name="lit$371"/>
+                            <ns3:runtimeConstant value="0" name="lit$372"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$373"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsPut(s7, SPL, Fantastic): rc = &quot;" name="lit$374"/>
+                            <ns3:runtimeConstant value="0" name="lit$375"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$376"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsSize(s4): rc = &quot;" name="lit$377"/>
+                            <ns3:runtimeConstant value="&quot; is &quot;" name="lit$378"/>
+                            <ns3:runtimeConstant value="&quot;Size of store id &quot;" name="lit$379"/>
+                            <ns3:runtimeConstant value="0" name="lit$380"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$381"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsSize(s7): rc = &quot;" name="lit$382"/>
+                            <ns3:runtimeConstant value="&quot; is &quot;" name="lit$383"/>
+                            <ns3:runtimeConstant value="&quot;Size of store id &quot;" name="lit$384"/>
+                            <ns3:runtimeConstant value="&quot;Programming_Languages_Credits&quot;" name="lit$385"/>
+                            <ns3:runtimeConstant value="0" name="lit$386"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$387"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsCreateOrGetStore(s8): rc = &quot;" name="lit$388"/>
+                            <ns3:runtimeConstant value="&quot;Fortran&quot;" name="lit$389"/>
+                            <ns3:runtimeConstant value="&quot;John W. Backus&quot;" name="lit$390"/>
+                            <ns3:runtimeConstant value="&quot;C&quot;" name="lit$391"/>
+                            <ns3:runtimeConstant value="&quot;Dennis MacAlistair Ritchie&quot;" name="lit$392"/>
+                            <ns3:runtimeConstant value="&quot;C++&quot;" name="lit$393"/>
+                            <ns3:runtimeConstant value="&quot;Bjarne Stroustrup&quot;" name="lit$394"/>
+                            <ns3:runtimeConstant value="&quot;Java&quot;" name="lit$395"/>
+                            <ns3:runtimeConstant value="&quot;James Arthur Gosling&quot;" name="lit$396"/>
+                            <ns3:runtimeConstant value="&quot;Perl&quot;" name="lit$397"/>
+                            <ns3:runtimeConstant value="&quot;Larry Wall&quot;" name="lit$398"/>
+                            <ns3:runtimeConstant value="&quot;PHP&quot;" name="lit$399"/>
+                            <ns3:runtimeConstant value="&quot;Rasmus Lerdorf&quot;" name="lit$400"/>
+                            <ns3:runtimeConstant value="&quot;Python&quot;" name="lit$401"/>
+                            <ns3:runtimeConstant value="&quot;Guido van Rossum &quot;" name="lit$402"/>
+                            <ns3:runtimeConstant value="&quot;Ruby&quot;" name="lit$403"/>
+                            <ns3:runtimeConstant value="&quot;Yukihiro Matsumoto&quot;" name="lit$404"/>
+                            <ns3:runtimeConstant value="&quot;SPL&quot;" name="lit$405"/>
+                            <ns3:runtimeConstant value="&quot;Martin Hirzel, Bugra Gedik&quot;" name="lit$406"/>
+                            <ns3:runtimeConstant value="&quot;notable-commander-in-chiefs&quot;" name="lit$407"/>
+                            <ns3:runtimeConstant value="0" name="lit$408"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$409"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsCreateOrGetStore(s9): rc = &quot;" name="lit$410"/>
+                            <ns3:runtimeConstant value="{potusName = &quot;Abraham Lincoln&quot;, spouseName = &quot;Mary Todd Lincoln&quot;, birthState = &quot;Kentucky&quot;, orderOfPresidency = &quot;16th&quot;, yearOfTakingOffice = 1861, party = &quot;Republican&quot;}" name="lit$411"/>
+                            <ns3:runtimeConstant value="&quot;Lincoln&quot;" name="lit$412"/>
+                            <ns3:runtimeConstant value="{potusName = &quot;Theodore Roosevelt&quot;, spouseName = &quot;Edith Roosevelt&quot;, birthState = &quot;New York&quot;, orderOfPresidency = &quot;26th&quot;, yearOfTakingOffice = 1901, party = &quot;Republican&quot;}" name="lit$413"/>
+                            <ns3:runtimeConstant value="&quot;Roosevelt&quot;" name="lit$414"/>
+                            <ns3:runtimeConstant value="{potusName = &quot;Woodrow Wilson&quot;, spouseName = &quot;Edith Wilson&quot;, birthState = &quot;Virginia&quot;, orderOfPresidency = &quot;28th&quot;, yearOfTakingOffice = 1913, party = &quot;Democratic&quot;}" name="lit$415"/>
+                            <ns3:runtimeConstant value="&quot;Wilson&quot;" name="lit$416"/>
+                            <ns3:runtimeConstant value="{potusName = &quot;Franklin D. Roosevelt&quot;, spouseName = &quot;Eleanor Roosevelt&quot;, birthState = &quot;New York&quot;, orderOfPresidency = &quot;32nd&quot;, yearOfTakingOffice = 1933, party = &quot;Democratic&quot;}" name="lit$417"/>
+                            <ns3:runtimeConstant value="&quot;FDR&quot;" name="lit$418"/>
+                            <ns3:runtimeConstant value="{potusName = &quot;John F. Kennedy&quot;, spouseName = &quot;Jacqueline Kennedy Onassis&quot;, birthState = &quot;Massachusetts&quot;, orderOfPresidency = &quot;35th&quot;, yearOfTakingOffice = 1961, party = &quot;Democratic&quot;}" name="lit$419"/>
+                            <ns3:runtimeConstant value="&quot;JFK&quot;" name="lit$420"/>
+                            <ns3:runtimeConstant value="{potusName = &quot;Richard Nixon&quot;, spouseName = &quot;Pat Ryan Nixon&quot;, birthState = &quot;California&quot;, orderOfPresidency = &quot;37th&quot;, yearOfTakingOffice = 1969, party = &quot;Republican&quot;}" name="lit$421"/>
+                            <ns3:runtimeConstant value="&quot;Nixon&quot;" name="lit$422"/>
+                            <ns3:runtimeConstant value="{potusName = &quot;Ronald Reagan&quot;, spouseName = &quot;Nancy Reagan&quot;, birthState = &quot;Illinois&quot;, orderOfPresidency = &quot;40th&quot;, yearOfTakingOffice = 1981, party = &quot;Republican&quot;}" name="lit$423"/>
+                            <ns3:runtimeConstant value="&quot;Reagan&quot;" name="lit$424"/>
+                            <ns3:runtimeConstant value="{potusName = &quot;Bill Clinton&quot;, spouseName = &quot;Hillary Clinton&quot;, birthState = &quot;Arkansas&quot;, orderOfPresidency = &quot;42nd&quot;, yearOfTakingOffice = 1993, party = &quot;Democratic&quot;}" name="lit$425"/>
+                            <ns3:runtimeConstant value="&quot;Clinton&quot;" name="lit$426"/>
+                            <ns3:runtimeConstant value="{potusName = &quot;George W. Bush&quot;, spouseName = &quot;Laura Bush&quot;, birthState = &quot;Connecticut&quot;, orderOfPresidency = &quot;43rd&quot;, yearOfTakingOffice = 2001, party = &quot;Republican&quot;}" name="lit$427"/>
+                            <ns3:runtimeConstant value="&quot;Bush&quot;" name="lit$428"/>
+                            <ns3:runtimeConstant value="{potusName = &quot;Barrack Obama&quot;, spouseName = &quot;Michelle Obama&quot;, birthState = &quot;Hawaii&quot;, orderOfPresidency = &quot;44th&quot;, yearOfTakingOffice = 2009, party = &quot;Democratic&quot;}" name="lit$429"/>
+                            <ns3:runtimeConstant value="&quot;Obama&quot;" name="lit$430"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$431"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$432"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 1: Original name of a store with an id &quot;" name="lit$433"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$434"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$435"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 2: SPL type name for the key of a store with an id &quot;" name="lit$436"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$437"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$438"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 3: SPL type name for the value of a store with an id &quot;" name="lit$439"/>
+                            <ns3:runtimeConstant value="&quot;Got_Travel_Quiz_Ideas?&quot;" name="lit$440"/>
+                            <ns3:runtimeConstant value="0" name="lit$441"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$442"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsCreateOrGetStore(s): rc = &quot;" name="lit$443"/>
+                            <ns3:runtimeConstant value="{&quot;Anitkabir&quot; : &quot;Turkey&quot;}" name="lit$444"/>
+                            <ns3:runtimeConstant value="&quot;Ankara&quot;" name="lit$445"/>
+                            <ns3:runtimeConstant value="{&quot;Taj Mahal&quot; : &quot;India&quot;}" name="lit$446"/>
+                            <ns3:runtimeConstant value="&quot;Agra&quot;" name="lit$447"/>
+                            <ns3:runtimeConstant value="{&quot;Big Ben&quot; : &quot;United Kingdom&quot;}" name="lit$448"/>
+                            <ns3:runtimeConstant value="&quot;London&quot;" name="lit$449"/>
+                            <ns3:runtimeConstant value="{&quot;Temple of Kukulkan&quot; : &quot;Mexico&quot;}" name="lit$450"/>
+                            <ns3:runtimeConstant value="&quot;Chichen Itza&quot;" name="lit$451"/>
+                            <ns3:runtimeConstant value="{&quot;Mount Rushmore&quot; : &quot;USA&quot;}" name="lit$452"/>
+                            <ns3:runtimeConstant value="&quot;Keystone, SD&quot;" name="lit$453"/>
+                            <ns3:runtimeConstant value="{&quot;Forbidden City&quot; : &quot;China&quot;}" name="lit$454"/>
+                            <ns3:runtimeConstant value="&quot;Beijing&quot;" name="lit$455"/>
+                            <ns3:runtimeConstant value="{&quot;Great Pyramid of Giza&quot; : &quot;Egypt&quot;}" name="lit$456"/>
+                            <ns3:runtimeConstant value="&quot;Cairo&quot;" name="lit$457"/>
+                            <ns3:runtimeConstant value="{&quot;Acropolis&quot; : &quot;Greece&quot;}" name="lit$458"/>
+                            <ns3:runtimeConstant value="&quot;Athens&quot;" name="lit$459"/>
+                            <ns3:runtimeConstant value="{&quot;Frauenkirche&quot; : &quot;Germany&quot;}" name="lit$460"/>
+                            <ns3:runtimeConstant value="&quot;Dresden&quot;" name="lit$461"/>
+                            <ns3:runtimeConstant value="{&quot;Golden Pavilion&quot; : &quot;Japan&quot;}" name="lit$462"/>
+                            <ns3:runtimeConstant value="&quot;Kyoto&quot;" name="lit$463"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$464"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$465"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 1: Original name of a store with an id &quot;" name="lit$466"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$467"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$468"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 2: SPL type name for the key of a store with an id &quot;" name="lit$469"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$470"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$471"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 3: SPL type name for the value of a store with an id &quot;" name="lit$472"/>
+                            <ns3:runtimeConstant value="[]" name="lit$473"/>
+                            <ns3:runtimeConstant value="&quot;Zip_Code_Lookup_ABC&quot;" name="lit$474"/>
+                            <ns3:runtimeConstant value="0" name="lit$475"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$476"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsCreateOrGetStore(Zip_Code_Lookup_ABC): rc = &quot;" name="lit$477"/>
+                            <ns3:runtimeConstant value="&quot;10514&quot;" name="lit$478"/>
+                            <ns3:runtimeConstant value="[&quot;Chappaqua&quot;, &quot;New York&quot;]" name="lit$479"/>
+                            <ns3:runtimeConstant value="&quot;10598&quot;" name="lit$480"/>
+                            <ns3:runtimeConstant value="[&quot;Yorktown Heights&quot;, &quot;New York&quot;]" name="lit$481"/>
+                            <ns3:runtimeConstant value="&quot;10801&quot;" name="lit$482"/>
+                            <ns3:runtimeConstant value="[&quot;New Rochelle&quot;, &quot;New York&quot;]" name="lit$483"/>
+                            <ns3:runtimeConstant value="&quot;10541&quot;" name="lit$484"/>
+                            <ns3:runtimeConstant value="[&quot;Mahopac&quot;, &quot;New York&quot;]" name="lit$485"/>
+                            <ns3:runtimeConstant value="&quot;10562&quot;" name="lit$486"/>
+                            <ns3:runtimeConstant value="[&quot;Ossining&quot;, &quot;New York&quot;]" name="lit$487"/>
+                            <ns3:runtimeConstant value="&quot;10549&quot;" name="lit$488"/>
+                            <ns3:runtimeConstant value="[&quot;Mount Kisco&quot;, &quot;New York&quot;]" name="lit$489"/>
+                            <ns3:runtimeConstant value="&quot;10506&quot;" name="lit$490"/>
+                            <ns3:runtimeConstant value="[&quot;White Plains&quot;, &quot;New York&quot;]" name="lit$491"/>
+                            <ns3:runtimeConstant value="&quot;10526&quot;" name="lit$492"/>
+                            <ns3:runtimeConstant value="[&quot;Goldens Bridge&quot;, &quot;New York&quot;]" name="lit$493"/>
+                            <ns3:runtimeConstant value="&quot;11577&quot;" name="lit$494"/>
+                            <ns3:runtimeConstant value="[&quot;Roslyn Heights&quot;, &quot;New York&quot;]" name="lit$495"/>
+                            <ns3:runtimeConstant value="&quot;10532&quot;" name="lit$496"/>
+                            <ns3:runtimeConstant value="[&quot;Hawthorne&quot;, &quot;New York&quot;]" name="lit$497"/>
+                            <ns3:runtimeConstant value="0" name="lit$498"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$499"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsSerialize(s, sData, dummyRstring, dummyRstringList): rc = &quot;" name="lit$500"/>
+                            <ns3:runtimeConstant value="&quot;Zip_Code_Lookup_XYZ&quot;" name="lit$501"/>
+                            <ns3:runtimeConstant value="0" name="lit$502"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$503"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsCreateOrGetStore(Zip_Code_Lookup_XYZ): rc = &quot;" name="lit$504"/>
+                            <ns3:runtimeConstant value="0" name="lit$505"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$506"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsDeserialize(s, sData, key, value): rc = &quot;" name="lit$507"/>
+                            <ns3:runtimeConstant value="&quot;Contents of a store named 'Zip_Code_Lookup_XYZ' that was populated via dpsDeserialize:&quot;" name="lit$508"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$509"/>
+                            <ns3:runtimeConstant value="[]" name="lit$510"/>
+                            <ns3:runtimeConstant value="&quot;' =&gt; &quot;" name="lit$511"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$512"/>
+                            <ns3:runtimeConstant value="0" name="lit$513"/>
+                        </ns3:runtimeConstants>
+                        <ns3:inputPorts>
+                            <ns3:inputPort tupleTypeIndex="0" name="Beat" isMutable="true" index="0">
+<ns3:interPeConnection oportIndex="0" operInstanceIndex="0"/>
+                            </ns3:inputPort>
+                        </ns3:inputPorts>
+                        <ns3:outputPorts>
+                            <ns3:outputPort viewable="true" streamName="Sink.NextBeat" tupleTypeIndex="0" name="NextBeat" isMutable="true" index="0">
+<ns3:interPeConnection operInstanceIndex="2" iportIndex="0"/>
+                            </ns3:outputPort>
+                        </ns3:outputPorts>
+                    </ns3:operInstance>
+                </ns3:operInstances>
+                <ns3:tracing level="error"/>
+                <ns3:inputPorts>
+                    <ns3:inputPort tupleTypeIndex="0" transport="TCP" index="0" encoding="LE">
+                        <ns3:staticConnections>
+                            <ns3:staticConnection peIndex="0" oportIndex="0"/>
+                        </ns3:staticConnections>
+                        <ns3:operInstanceConnection operInstanceIndex="1" iportIndex="0"/>
+                    </ns3:inputPort>
+                </ns3:inputPorts>
+                <ns3:outputPorts>
+                    <ns3:outputPort tupleTypeIndex="0" transport="TCP" singleThreadedOnOutput="true" index="0" encoding="LE">
+                        <ns3:staticConnections>
+                            <ns3:staticConnection peIndex="2" iportIndex="0"/>
+                        </ns3:staticConnections>
+                        <ns3:operInstanceConnection oportIndex="0" operInstanceIndex="1"/>
+                    </ns3:outputPort>
+                </ns3:outputPorts>
+            </ns3:pe>
+            <ns3:pe restartable="false" relocatable="false" optimized="true" language="C++" index="2" class="BeJwzCc7MyzYFEUbxABqLAQl">
+                <ns3:envVars>
+                    <ns3:envVar value="/opt/ibm/java-x86_64-60/" name="STREAMS_JAVA_HOME"/>
+                </ns3:envVars>
+                <ns3:executable dynamicLoad="true" digest="5bRvG6PmccL6N56iXPBJFxRe8Lg=">
+                    <ns3:wrapper>none</ns3:wrapper>
+                    <ns3:executableUri>bin/DpsTest1-c.dpe</ns3:executableUri>
+                    <ns3:arguments></ns3:arguments>
+                    <ns3:dependencies/>
+                </ns3:executable>
+                <ns3:operInstances>
+                    <ns3:operInstance singleThreadedOnOutputs="true" singleThreadedOnInputs="true" name="Sink.Sink2" index="2" definitionIndex="1" class="Sink::Sink2">
+                        <ns3:resources>
+                            <ns3:poolLocation poolIndex="0"/>
+                        </ns3:resources>
+                        <ns3:runtimeConstants>
+                            <ns3:runtimeConstant value="0" name="lit$0"/>
+                            <ns3:runtimeConstant value="0" name="lit$1"/>
+                            <ns3:runtimeConstant value="0" name="lit$2"/>
+                            <ns3:runtimeConstant value="0" name="lit$3"/>
+                            <ns3:runtimeConstant value="0" name="lit$4"/>
+                            <ns3:runtimeConstant value="0" name="lit$5"/>
+                            <ns3:runtimeConstant value="0" name="lit$6"/>
+                            <ns3:runtimeConstant value="false" name="lit$7"/>
+                            <ns3:runtimeConstant value="&quot;Brown&quot;" name="lit$8"/>
+                            <ns3:runtimeConstant value="0" name="lit$9"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$10"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsFindStore(Brown): rc = &quot;" name="lit$11"/>
+                            <ns3:runtimeConstant value="0" name="lit$12"/>
+                            <ns3:runtimeConstant value="0" name="lit$13"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$14"/>
+                            <ns3:runtimeConstant value="760" name="lit$15"/>
+                            <ns3:runtimeConstant value="&quot;0&quot;" name="lit$16"/>
+                            <ns3:runtimeConstant value="0" name="lit$17"/>
+                            <ns3:runtimeConstant value="&quot;Purple&quot;" name="lit$18"/>
+                            <ns3:runtimeConstant value="0" name="lit$19"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$20"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsCreateOrGetStore(Purple): rc = &quot;" name="lit$21"/>
+                            <ns3:runtimeConstant value="0" name="lit$22"/>
+                            <ns3:runtimeConstant value="0" name="lit$23"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$24"/>
+                            <ns3:runtimeConstant value="768" name="lit$25"/>
+                            <ns3:runtimeConstant value="{}" name="lit$26"/>
+                            <ns3:runtimeConstant value="[12, 34, 16]" name="lit$27"/>
+                            <ns3:runtimeConstant value="0" name="lit$28"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$29"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsGet(s5, [12, 34, 16], myMap): rc = &quot;" name="lit$30"/>
+                            <ns3:runtimeConstant value="&quot;myMap = &quot;" name="lit$31"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$32"/>
+                            <ns3:runtimeConstant value="45.47" name="lit$33"/>
+                            <ns3:runtimeConstant value="0" name="lit$34"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$35"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsGet(s4, 45.47, myLab): rc = &quot;" name="lit$36"/>
+                            <ns3:runtimeConstant value="&quot;myLab =&quot;" name="lit$37"/>
+                            <ns3:runtimeConstant value="&quot;Teal&quot;" name="lit$38"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$39"/>
+                            <ns3:runtimeConstant value="&quot;SPL&quot;" name="lit$40"/>
+                            <ns3:runtimeConstant value="0" name="lit$41"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$42"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsGet(s7, SPL, quality): rc = &quot;" name="lit$43"/>
+                            <ns3:runtimeConstant value="&quot;SPL is &quot;" name="lit$44"/>
+                            <ns3:runtimeConstant value="&quot;Prestigious place in IBM&quot;" name="lit$45"/>
+                            <ns3:runtimeConstant value="&quot;T.J.Watson Research Center&quot;" name="lit$46"/>
+                            <ns3:runtimeConstant value="0" name="lit$47"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$48"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsPut(s7, Prestigious place in IBM, T.J.Watson Research Center): rc = &quot;" name="lit$49"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$50"/>
+                            <ns3:runtimeConstant value="&quot;Prestigious place in IBM&quot;" name="lit$51"/>
+                            <ns3:runtimeConstant value="0" name="lit$52"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$53"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsGet(s, Prestigious place in IBM, prestigiousPlace): rc = &quot;" name="lit$54"/>
+                            <ns3:runtimeConstant value="&quot;Prestigious place in IBM = &quot;" name="lit$55"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$56"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$57"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 1_BXX: Original name of a store with an id &quot;" name="lit$58"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$59"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$60"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 2_BXX: SPL type name for the key of a store with an id &quot;" name="lit$61"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$62"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$63"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 3_BXX: SPL type name for the value of a store with an id &quot;" name="lit$64"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$65"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$66"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 1_BYY: Original name of a store with an id &quot;" name="lit$67"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$68"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$69"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 2_BYY: SPL type name for the key of a store with an id &quot;" name="lit$70"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$71"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$72"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 3_BYY: SPL type name for the value of a store with an id &quot;" name="lit$73"/>
+                            <ns3:runtimeConstant value="0" name="lit$74"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$75"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsClear(s7): rc = &quot;" name="lit$76"/>
+                            <ns3:runtimeConstant value="0" name="lit$77"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$78"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsSize(s7): rc = &quot;" name="lit$79"/>
+                            <ns3:runtimeConstant value="&quot; is &quot;" name="lit$80"/>
+                            <ns3:runtimeConstant value="&quot;Size of store id &quot;" name="lit$81"/>
+                            <ns3:runtimeConstant value="&quot;Empty Data Item&quot;" name="lit$82"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$83"/>
+                            <ns3:runtimeConstant value="0" name="lit$84"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$85"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsPut(s7, Empty Data Item, ''): rc = &quot;" name="lit$86"/>
+                            <ns3:runtimeConstant value="&quot;Babe Ruth&quot;" name="lit$87"/>
+                            <ns3:runtimeConstant value="&quot;Empty Data Item&quot;" name="lit$88"/>
+                            <ns3:runtimeConstant value="0" name="lit$89"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$90"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsGet(s7, Empty Data Item, tmpString): rc = &quot;" name="lit$91"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$92"/>
+                            <ns3:runtimeConstant value="0" name="lit$93"/>
+                            <ns3:runtimeConstant value="true" name="lit$94"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$95"/>
+                            <ns3:runtimeConstant value="837" name="lit$96"/>
+                            <ns3:runtimeConstant value="0" name="lit$97"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$98"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsRemoveStore(s7): rc = &quot;" name="lit$99"/>
+                            <ns3:runtimeConstant value="0" name="lit$100"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$101"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsRemoveStore(s4): rc = &quot;" name="lit$102"/>
+                            <ns3:runtimeConstant value="&quot;SPL&quot;" name="lit$103"/>
+                            <ns3:runtimeConstant value="0" name="lit$104"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$105"/>
+                            <ns3:runtimeConstant value="&quot;Expected error in dpsGet(s7, SPL, quality): rc = &quot;" name="lit$106"/>
+                            <ns3:runtimeConstant value="0" name="lit$107"/>
+                            <ns3:runtimeConstant value="false" name="lit$108"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.splmm&quot;" name="lit$109"/>
+                            <ns3:runtimeConstant value="855" name="lit$110"/>
+                            <ns3:runtimeConstant value="&quot;Programming_Languages_Credits&quot;" name="lit$111"/>
+                            <ns3:runtimeConstant value="0" name="lit$112"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$113"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsFindStore(Programming_Languages_Credits): rc = &quot;" name="lit$114"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$115"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$116"/>
+                            <ns3:runtimeConstant value="&quot;Contents of a store named 'Programming_Languages_Credits':&quot;" name="lit$117"/>
+                            <ns3:runtimeConstant value="&quot;' =&gt; &quot;" name="lit$118"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$119"/>
+                            <ns3:runtimeConstant value="&quot;notable-commander-in-chiefs&quot;" name="lit$120"/>
+                            <ns3:runtimeConstant value="0" name="lit$121"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$122"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsFindStore(notable-commander-in-chiefs): rc = &quot;" name="lit$123"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$124"/>
+                            <ns3:runtimeConstant value="&quot;Contents of a store named 'notable-commander-in-chiefs':&quot;" name="lit$125"/>
+                            <ns3:runtimeConstant value="&quot;' =&gt; &quot;" name="lit$126"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$127"/>
+                            <ns3:runtimeConstant value="&quot;Got_Travel_Quiz_Ideas?&quot;" name="lit$128"/>
+                            <ns3:runtimeConstant value="0" name="lit$129"/>
+                            <ns3:runtimeConstant value="&quot;, msg = &quot;" name="lit$130"/>
+                            <ns3:runtimeConstant value="&quot;Unexpected error in dpsFindStore(Got_Travel_Quiz_Ideas?): rc = &quot;" name="lit$131"/>
+                            <ns3:runtimeConstant value="{&quot;&quot; : &quot;&quot;}" name="lit$132"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$133"/>
+                            <ns3:runtimeConstant value="&quot;Contents of a store named 'Got_Travel_Quiz_Ideas?':&quot;" name="lit$134"/>
+                            <ns3:runtimeConstant value="&quot;' =&gt; &quot;" name="lit$135"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$136"/>
+                            <ns3:runtimeConstant value="&quot;All the DPS operations worked fine with correct assertions.&quot;" name="lit$137"/>
+                        </ns3:runtimeConstants>
+                        <ns3:inputPorts>
+                            <ns3:inputPort tupleTypeIndex="0" name="NextBeat" isMutable="false" index="0">
+<ns3:interPeConnection oportIndex="0" operInstanceIndex="1"/>
+                            </ns3:inputPort>
+                        </ns3:inputPorts>
+                        <ns3:outputPorts/>
+                    </ns3:operInstance>
+                </ns3:operInstances>
+                <ns3:tracing level="error"/>
+                <ns3:inputPorts>
+                    <ns3:inputPort tupleTypeIndex="0" transport="TCP" index="0" encoding="LE">
+                        <ns3:staticConnections>
+                            <ns3:staticConnection peIndex="1" oportIndex="0"/>
+                        </ns3:staticConnections>
+                        <ns3:operInstanceConnection operInstanceIndex="2" iportIndex="0"/>
+                    </ns3:inputPort>
+                </ns3:inputPorts>
+                <ns3:outputPorts/>
+            </ns3:pe>
+            <ns3:pe restartable="false" relocatable="false" optimized="true" language="C++" index="3" class="BeJwzDc7MyzYyBZGGxsFFyfEAMjcFCy">
+                <ns3:envVars>
+                    <ns3:envVar value="/opt/ibm/java-x86_64-60/" name="STREAMS_JAVA_HOME"/>
+                </ns3:envVars>
+                <ns3:executable dynamicLoad="true" digest="U5c++oWYiSF2KEUyLnRGKJcepCA=">
+                    <ns3:wrapper>none</ns3:wrapper>
+                    <ns3:executableUri>bin/DpsTest1-d.dpe</ns3:executableUri>
+                    <ns3:arguments></ns3:arguments>
+                    <ns3:dependencies/>
+                </ns3:executable>
+                <ns3:operInstances>
+                    <ns3:operInstance singleThreadedOnOutputs="true" singleThreadedOnInputs="true" name="Sink2.Sink1.Src" index="3" definitionIndex="0" class="Sink2::Sink1::Src">
+                        <ns3:resources>
+                            <ns3:poolLocation poolIndex="0"/>
+                        </ns3:resources>
+                        <ns3:runtimeConstants>
+                            <ns3:runtimeConstant value="1000" name="lit$0"/>
+                            <ns3:runtimeConstant value="7" name="lit$1"/>
+                        </ns3:runtimeConstants>
+                        <ns3:inputPorts/>
+                        <ns3:outputPorts>
+                            <ns3:outputPort viewable="true" streamName="Sink2.Sink1.Src" tupleTypeIndex="1" name="Src" isMutable="false" index="0">
+<ns3:interPeConnection operInstanceIndex="4" iportIndex="0"/>
+                            </ns3:outputPort>
+                        </ns3:outputPorts>
+                    </ns3:operInstance>
+                </ns3:operInstances>
+                <ns3:tracing level="error"/>
+                <ns3:inputPorts/>
+                <ns3:outputPorts>
+                    <ns3:outputPort tupleTypeIndex="1" transport="TCP" singleThreadedOnOutput="true" index="0" encoding="LE">
+                        <ns3:staticConnections>
+                            <ns3:staticConnection peIndex="4" iportIndex="0"/>
+                        </ns3:staticConnections>
+                        <ns3:operInstanceConnection oportIndex="0" operInstanceIndex="3"/>
+                    </ns3:outputPort>
+                </ns3:outputPorts>
+            </ns3:pe>
+            <ns3:pe restartable="false" relocatable="false" optimized="true" language="C++" index="4" class="BeJwzDc7MyzYyBZGGJiAyHgA4YwYg">
+                <ns3:envVars>
+                    <ns3:envVar value="/opt/ibm/java-x86_64-60/" name="STREAMS_JAVA_HOME"/>
+                </ns3:envVars>
+                <ns3:executable dynamicLoad="true" digest="St90CrKZuTEji5lqB4ZLGe2RfF4=">
+                    <ns3:wrapper>none</ns3:wrapper>
+                    <ns3:executableUri>bin/DpsTest1-e.dpe</ns3:executableUri>
+                    <ns3:arguments></ns3:arguments>
+                    <ns3:dependencies/>
+                </ns3:executable>
+                <ns3:operInstances>
+                    <ns3:operInstance singleThreadedOnOutputs="true" singleThreadedOnInputs="true" name="Sink2.Sink1.Sink" index="4" definitionIndex="1" class="Sink2::Sink1::Sink">
+                        <ns3:resources>
+                            <ns3:poolLocation poolIndex="0"/>
+                        </ns3:resources>
+                        <ns3:runtimeConstants>
+                            <ns3:runtimeConstant value="false" name="lit$0"/>
+                            <ns3:runtimeConstant value="0" name="lit$1"/>
+                            <ns3:runtimeConstant value="false" name="lit$2"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$3"/>
+                            <ns3:runtimeConstant value="0" name="lit$4"/>
+                            <ns3:runtimeConstant value="&quot;Super_Duper_Store&quot;" name="lit$5"/>
+                            <ns3:runtimeConstant value="0" name="lit$6"/>
+                            <ns3:runtimeConstant value="&quot;, msg=&quot;" name="lit$7"/>
+                            <ns3:runtimeConstant value="&quot;Error in dpsCreateOrGetStore(Super_Duper_Store) rc = &quot;" name="lit$8"/>
+                            <ns3:runtimeConstant value="&quot;My Super_Duper_Store id = &quot;" name="lit$9"/>
+                            <ns3:runtimeConstant value="0" name="lit$10"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.spl&quot;" name="lit$11"/>
+                            <ns3:runtimeConstant value="2379" name="lit$12"/>
+                            <ns3:runtimeConstant value="&quot;Super_Duper_Lock&quot;" name="lit$13"/>
+                            <ns3:runtimeConstant value="0" name="lit$14"/>
+                            <ns3:runtimeConstant value="&quot;, msg=&quot;" name="lit$15"/>
+                            <ns3:runtimeConstant value="&quot;Error in dlCreateOrGetLock(Super_Duper_Lock) rc = &quot;" name="lit$16"/>
+                            <ns3:runtimeConstant value="&quot;My distributed Super_Duper_Lock id = &quot;" name="lit$17"/>
+                            <ns3:runtimeConstant value="0" name="lit$18"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.spl&quot;" name="lit$19"/>
+                            <ns3:runtimeConstant value="2389" name="lit$20"/>
+                            <ns3:runtimeConstant value="2" name="lit$21"/>
+                            <ns3:runtimeConstant value="0" name="lit$22"/>
+                            <ns3:runtimeConstant value="&quot;Failed to acquire a lock. rc=&quot;" name="lit$23"/>
+                            <ns3:runtimeConstant value="0" name="lit$24"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.spl&quot;" name="lit$25"/>
+                            <ns3:runtimeConstant value="2406" name="lit$26"/>
+                            <ns3:runtimeConstant value="0" name="lit$27"/>
+                            <ns3:runtimeConstant value="&quot;myKey&quot;" name="lit$28"/>
+                            <ns3:runtimeConstant value="&quot;myKey&quot;" name="lit$29"/>
+                            <ns3:runtimeConstant value="1" name="lit$30"/>
+                            <ns3:runtimeConstant value="&quot;val=&quot;" name="lit$31"/>
+                            <ns3:runtimeConstant value="1999" name="lit$32"/>
+                            <ns3:runtimeConstant value="true" name="lit$33"/>
+                            <ns3:runtimeConstant value="&quot;'myKey' =&gt; 2000&quot;" name="lit$34"/>
+                            <ns3:runtimeConstant value="0" name="lit$35"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.spl&quot;" name="lit$36"/>
+                            <ns3:runtimeConstant value="2421" name="lit$37"/>
+                            <ns3:runtimeConstant value="0" name="lit$38"/>
+                            <ns3:runtimeConstant value="&quot;, msg=&quot;" name="lit$39"/>
+                            <ns3:runtimeConstant value="&quot;Lock release error. rc = &quot;" name="lit$40"/>
+                            <ns3:runtimeConstant value="0" name="lit$41"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.spl&quot;" name="lit$42"/>
+                            <ns3:runtimeConstant value="2431" name="lit$43"/>
+                            <ns3:runtimeConstant value="true" name="lit$44"/>
+                            <ns3:runtimeConstant value="0" name="lit$45"/>
+                            <ns3:runtimeConstant value="0" name="lit$46"/>
+                        </ns3:runtimeConstants>
+                        <ns3:inputPorts>
+                            <ns3:inputPort tupleTypeIndex="1" name="Src" isMutable="false" index="0">
+<ns3:interPeConnection oportIndex="0" operInstanceIndex="3"/>
+                            </ns3:inputPort>
+                        </ns3:inputPorts>
+                        <ns3:outputPorts/>
+                    </ns3:operInstance>
+                </ns3:operInstances>
+                <ns3:tracing level="error"/>
+                <ns3:inputPorts>
+                    <ns3:inputPort tupleTypeIndex="1" transport="TCP" index="0" encoding="LE">
+                        <ns3:staticConnections>
+                            <ns3:staticConnection peIndex="3" oportIndex="0"/>
+                        </ns3:staticConnections>
+                        <ns3:operInstanceConnection operInstanceIndex="4" iportIndex="0"/>
+                    </ns3:inputPort>
+                </ns3:inputPorts>
+                <ns3:outputPorts/>
+            </ns3:pe>
+            <ns3:pe restartable="false" relocatable="false" optimized="true" language="C++" index="5" class="BeJwzDc7MyzYyBZGGxsFFyfEAMjcFCy">
+                <ns3:envVars>
+                    <ns3:envVar value="/opt/ibm/java-x86_64-60/" name="STREAMS_JAVA_HOME"/>
+                </ns3:envVars>
+                <ns3:executable dynamicLoad="true" digest="U5c++oWYiSF2KEUyLnRGKJcepCA=">
+                    <ns3:wrapper>none</ns3:wrapper>
+                    <ns3:executableUri>bin/DpsTest1-d.dpe</ns3:executableUri>
+                    <ns3:arguments></ns3:arguments>
+                    <ns3:dependencies/>
+                </ns3:executable>
+                <ns3:operInstances>
+                    <ns3:operInstance singleThreadedOnOutputs="true" singleThreadedOnInputs="true" name="Sink2.Sink2.Src" index="5" definitionIndex="0" class="Sink2::Sink1::Src">
+                        <ns3:resources>
+                            <ns3:poolLocation poolIndex="0"/>
+                        </ns3:resources>
+                        <ns3:runtimeConstants>
+                            <ns3:runtimeConstant value="1000" name="lit$0"/>
+                            <ns3:runtimeConstant value="7" name="lit$1"/>
+                        </ns3:runtimeConstants>
+                        <ns3:inputPorts/>
+                        <ns3:outputPorts>
+                            <ns3:outputPort viewable="true" streamName="Sink2.Sink2.Src" tupleTypeIndex="1" name="Src" isMutable="false" index="0">
+<ns3:interPeConnection operInstanceIndex="6" iportIndex="0"/>
+                            </ns3:outputPort>
+                        </ns3:outputPorts>
+                    </ns3:operInstance>
+                </ns3:operInstances>
+                <ns3:tracing level="error"/>
+                <ns3:inputPorts/>
+                <ns3:outputPorts>
+                    <ns3:outputPort tupleTypeIndex="1" transport="TCP" singleThreadedOnOutput="true" index="0" encoding="LE">
+                        <ns3:staticConnections>
+                            <ns3:staticConnection peIndex="6" iportIndex="0"/>
+                        </ns3:staticConnections>
+                        <ns3:operInstanceConnection oportIndex="0" operInstanceIndex="5"/>
+                    </ns3:outputPort>
+                </ns3:outputPorts>
+            </ns3:pe>
+            <ns3:pe restartable="false" relocatable="false" optimized="true" language="C++" index="6" class="BeJwzDc7MyzYyBZGGJiAyHgA4YwYg">
+                <ns3:envVars>
+                    <ns3:envVar value="/opt/ibm/java-x86_64-60/" name="STREAMS_JAVA_HOME"/>
+                </ns3:envVars>
+                <ns3:executable dynamicLoad="true" digest="St90CrKZuTEji5lqB4ZLGe2RfF4=">
+                    <ns3:wrapper>none</ns3:wrapper>
+                    <ns3:executableUri>bin/DpsTest1-e.dpe</ns3:executableUri>
+                    <ns3:arguments></ns3:arguments>
+                    <ns3:dependencies/>
+                </ns3:executable>
+                <ns3:operInstances>
+                    <ns3:operInstance singleThreadedOnOutputs="true" singleThreadedOnInputs="true" name="Sink2.Sink2.Sink" index="6" definitionIndex="1" class="Sink2::Sink1::Sink">
+                        <ns3:resources>
+                            <ns3:poolLocation poolIndex="0"/>
+                        </ns3:resources>
+                        <ns3:runtimeConstants>
+                            <ns3:runtimeConstant value="false" name="lit$0"/>
+                            <ns3:runtimeConstant value="0" name="lit$1"/>
+                            <ns3:runtimeConstant value="false" name="lit$2"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$3"/>
+                            <ns3:runtimeConstant value="0" name="lit$4"/>
+                            <ns3:runtimeConstant value="&quot;Super_Duper_Store&quot;" name="lit$5"/>
+                            <ns3:runtimeConstant value="0" name="lit$6"/>
+                            <ns3:runtimeConstant value="&quot;, msg=&quot;" name="lit$7"/>
+                            <ns3:runtimeConstant value="&quot;Error in dpsCreateOrGetStore(Super_Duper_Store) rc = &quot;" name="lit$8"/>
+                            <ns3:runtimeConstant value="&quot;My Super_Duper_Store id = &quot;" name="lit$9"/>
+                            <ns3:runtimeConstant value="0" name="lit$10"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.spl&quot;" name="lit$11"/>
+                            <ns3:runtimeConstant value="2379" name="lit$12"/>
+                            <ns3:runtimeConstant value="&quot;Super_Duper_Lock&quot;" name="lit$13"/>
+                            <ns3:runtimeConstant value="0" name="lit$14"/>
+                            <ns3:runtimeConstant value="&quot;, msg=&quot;" name="lit$15"/>
+                            <ns3:runtimeConstant value="&quot;Error in dlCreateOrGetLock(Super_Duper_Lock) rc = &quot;" name="lit$16"/>
+                            <ns3:runtimeConstant value="&quot;My distributed Super_Duper_Lock id = &quot;" name="lit$17"/>
+                            <ns3:runtimeConstant value="0" name="lit$18"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.spl&quot;" name="lit$19"/>
+                            <ns3:runtimeConstant value="2389" name="lit$20"/>
+                            <ns3:runtimeConstant value="2" name="lit$21"/>
+                            <ns3:runtimeConstant value="0" name="lit$22"/>
+                            <ns3:runtimeConstant value="&quot;Failed to acquire a lock. rc=&quot;" name="lit$23"/>
+                            <ns3:runtimeConstant value="0" name="lit$24"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.spl&quot;" name="lit$25"/>
+                            <ns3:runtimeConstant value="2406" name="lit$26"/>
+                            <ns3:runtimeConstant value="0" name="lit$27"/>
+                            <ns3:runtimeConstant value="&quot;myKey&quot;" name="lit$28"/>
+                            <ns3:runtimeConstant value="&quot;myKey&quot;" name="lit$29"/>
+                            <ns3:runtimeConstant value="1" name="lit$30"/>
+                            <ns3:runtimeConstant value="&quot;val=&quot;" name="lit$31"/>
+                            <ns3:runtimeConstant value="1999" name="lit$32"/>
+                            <ns3:runtimeConstant value="true" name="lit$33"/>
+                            <ns3:runtimeConstant value="&quot;'myKey' =&gt; 2000&quot;" name="lit$34"/>
+                            <ns3:runtimeConstant value="0" name="lit$35"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.spl&quot;" name="lit$36"/>
+                            <ns3:runtimeConstant value="2421" name="lit$37"/>
+                            <ns3:runtimeConstant value="0" name="lit$38"/>
+                            <ns3:runtimeConstant value="&quot;, msg=&quot;" name="lit$39"/>
+                            <ns3:runtimeConstant value="&quot;Lock release error. rc = &quot;" name="lit$40"/>
+                            <ns3:runtimeConstant value="0" name="lit$41"/>
+                            <ns3:runtimeConstant value="&quot;DpsTest1.spl&quot;" name="lit$42"/>
+                            <ns3:runtimeConstant value="2431" name="lit$43"/>
+                            <ns3:runtimeConstant value="true" name="lit$44"/>
+                            <ns3:runtimeConstant value="0" name="lit$45"/>
+                            <ns3:runtimeConstant value="0" name="lit$46"/>
+                        </ns3:runtimeConstants>
+                        <ns3:inputPorts>
+                            <ns3:inputPort tupleTypeIndex="1" name="Src" isMutable="false" index="0">
+<ns3:interPeConnection oportIndex="0" operInstanceIndex="5"/>
+                            </ns3:inputPort>
+                        </ns3:inputPorts>
+                        <ns3:outputPorts/>
+                    </ns3:operInstance>
+                </ns3:operInstances>
+                <ns3:tracing level="error"/>
+                <ns3:inputPorts>
+                    <ns3:inputPort tupleTypeIndex="1" transport="TCP" index="0" encoding="LE">
+                        <ns3:staticConnections>
+                            <ns3:staticConnection peIndex="5" oportIndex="0"/>
+                        </ns3:staticConnections>
+                        <ns3:operInstanceConnection operInstanceIndex="6" iportIndex="0"/>
+                    </ns3:inputPort>
+                </ns3:inputPorts>
+                <ns3:outputPorts/>
+            </ns3:pe>
+        </ns3:pes>
+        <ns3:operDefinitions>
+            <ns3:operDefinition kind="spl.utility::Beacon" index="0"/>
+            <ns3:operDefinition kind="spl.utility::Custom" index="1"/>
+        </ns3:operDefinitions>
+        <ns3:composites>
+            <ns3:sourceUris>
+                <ns3:uri path="file:///home/streamsadmin/SPL-Examples-For-Beginners/com.ibm.streamsx.dps/samples/dps_test_1/DpsTest1.spl" index="0"/>
+            </ns3:sourceUris>
+            <ns3:compositeOpers>
+                <ns3:compositeOper toolkitIndex="0" numberOfOutputPorts="0" numberOfInputPorts="0" kind="DpsTest1" index="0" startLine="70" sourceIndex="0" endLine="83">
+                    <ns3:description>DpsTest1 Composite</ns3:description>
+                </ns3:compositeOper>
+                <ns3:compositeOper toolkitIndex="0" numberOfOutputPorts="0" numberOfInputPorts="0" kind="Test" index="1" startLine="85" sourceIndex="0" endLine="2323">
+                    <ns3:description>Test Composite</ns3:description>
+                </ns3:compositeOper>
+                <ns3:compositeOper toolkitIndex="0" numberOfOutputPorts="0" numberOfInputPorts="0" kind="LockTest" index="2" startLine="2340" sourceIndex="0" endLine="2345">
+                    <ns3:description>LockTest Composite</ns3:description>
+                </ns3:compositeOper>
+                <ns3:compositeOper toolkitIndex="0" numberOfOutputPorts="0" numberOfInputPorts="0" kind="StateUpdater" index="3" startLine="2347" sourceIndex="0" endLine="2438">
+                    <ns3:description>StateUpdater Composite</ns3:description>
+                </ns3:compositeOper>
+            </ns3:compositeOpers>
+            <ns3:compositeOperInstances>
+                <ns3:compositeOperInstance name="DpsTest1" index="7" compositeOperIndex="0" startLine="70" sourceIndex="0" endLine="83">
+                    <ns3:compositeOperInstance name="Sink" index="8" compositeOperIndex="1" startLine="74" sourceIndex="0" endLine="74">
+                        <ns3:primitiveOperInstance toolkitIndex="1" name="Sink.Beat" kind="spl.utility::Beacon" index="0" startLine="92" sourceIndex="0" endLine="96">
+                            <ns3:outputPorts>
+<ns3:port index="0">
+    <ns3:connections>
+        <ns3:connection portKind="input" portIndex="0" operName="Sink.NextBeat" operIndex="1"/>
+    </ns3:connections>
+</ns3:port>
+                            </ns3:outputPorts>
+                        </ns3:primitiveOperInstance>
+                        <ns3:primitiveOperInstance toolkitIndex="1" name="Sink.NextBeat" kind="spl.utility::Custom" index="1" startLine="112" sourceIndex="0" endLine="746">
+                            <ns3:inputPorts>
+<ns3:port index="0">
+    <ns3:connections>
+        <ns3:connection portKind="output" portIndex="0" operName="Sink.Beat" operIndex="0"/>
+    </ns3:connections>
+</ns3:port>
+                            </ns3:inputPorts>
+                            <ns3:outputPorts>
+<ns3:port index="0">
+    <ns3:connections>
+        <ns3:connection portKind="input" portIndex="0" operName="Sink.Sink2" operIndex="2"/>
+    </ns3:connections>
+</ns3:port>
+                            </ns3:outputPorts>
+                        </ns3:primitiveOperInstance>
+                        <ns3:primitiveOperInstance toolkitIndex="1" name="Sink.Sink2" kind="spl.utility::Custom" index="2" startLine="750" sourceIndex="0" endLine="925">
+                            <ns3:inputPorts>
+<ns3:port index="0">
+    <ns3:connections>
+        <ns3:connection portKind="output" portIndex="0" operName="Sink.NextBeat" operIndex="1"/>
+    </ns3:connections>
+</ns3:port>
+                            </ns3:inputPorts>
+                        </ns3:primitiveOperInstance>
+                    </ns3:compositeOperInstance>
+                    <ns3:compositeOperInstance name="Sink2" index="9" compositeOperIndex="2" startLine="82" sourceIndex="0" endLine="82">
+                        <ns3:compositeOperInstance name="Sink2.Sink1" index="10" compositeOperIndex="3" startLine="2343" sourceIndex="0" endLine="2343">
+                            <ns3:primitiveOperInstance toolkitIndex="1" name="Sink2.Sink1.Src" kind="spl.utility::Beacon" index="3" startLine="2349" sourceIndex="0" endLine="2353">
+<ns3:outputPorts>
+    <ns3:port index="0">
+        <ns3:connections>
+            <ns3:connection portKind="input" portIndex="0" operName="Sink2.Sink1.Sink" operIndex="4"/>
+        </ns3:connections>
+    </ns3:port>
+</ns3:outputPorts>
+                            </ns3:primitiveOperInstance>
+                            <ns3:primitiveOperInstance toolkitIndex="1" name="Sink2.Sink1.Sink" kind="spl.utility::Custom" index="4" startLine="2355" sourceIndex="0" endLine="2437">
+<ns3:inputPorts>
+    <ns3:port index="0">
+        <ns3:connections>
+            <ns3:connection portKind="output" portIndex="0" operName="Sink2.Sink1.Src" operIndex="3"/>
+        </ns3:connections>
+    </ns3:port>
+</ns3:inputPorts>
+                            </ns3:primitiveOperInstance>
+                        </ns3:compositeOperInstance>
+                        <ns3:compositeOperInstance name="Sink2.Sink2" index="11" compositeOperIndex="3" startLine="2344" sourceIndex="0" endLine="2344">
+                            <ns3:primitiveOperInstance toolkitIndex="1" name="Sink2.Sink2.Src" kind="spl.utility::Beacon" index="5" startLine="2349" sourceIndex="0" endLine="2353">
+<ns3:outputPorts>
+    <ns3:port index="0">
+        <ns3:connections>
+            <ns3:connection portKind="input" portIndex="0" operName="Sink2.Sink2.Sink" operIndex="6"/>
+        </ns3:connections>
+    </ns3:port>
+</ns3:outputPorts>
+                            </ns3:primitiveOperInstance>
+                            <ns3:primitiveOperInstance toolkitIndex="1" name="Sink2.Sink2.Sink" kind="spl.utility::Custom" index="6" startLine="2355" sourceIndex="0" endLine="2437">
+<ns3:inputPorts>
+    <ns3:port index="0">
+        <ns3:connections>
+            <ns3:connection portKind="output" portIndex="0" operName="Sink2.Sink2.Src" operIndex="5"/>
+        </ns3:connections>
+    </ns3:port>
+</ns3:inputPorts>
+                            </ns3:primitiveOperInstance>
+                        </ns3:compositeOperInstance>
+                    </ns3:compositeOperInstance>
+                </ns3:compositeOperInstance>
+            </ns3:compositeOperInstances>
+        </ns3:composites>
+        <ns3:toolkits>
+            <ns3:toolkit version="1.0.0" uri="file:///home/streamsadmin/SPL-Examples-For-Beginners/com.ibm.streamsx.dps/samples/dps_test_1" name="dps_test_1" index="0"/>
+            <ns3:toolkit version="1.1.0" uri="file:///home/streamsadmin/InfoSphereStreams/toolkits/spl" name="spl" index="1"/>
+            <ns3:toolkit version="1.0.0" uri="file:///home/streamsadmin/SPL-Examples-For-Beginners/com.ibm.streamsx.dps" name="com.ibm.streamsx.dps" index="2"/>
+        </ns3:toolkits>
+    </ns3:application>
+</ns3:applicationSet>
