@@ -8,14 +8,16 @@ operator code.
 Following are the external NoSQL K/V stores that can be configured to work with the
 DPS toolkit for the purpose of sharing application state in a distributed manner.
 
-1) Memcached
-2) Redis
-3) Cassandra
-4) IBM Cloudant
-5) HBase
-6) Mongo
-7) Couchbase
-8) Aerospike
+<ol>
+<li>Memcached</li>
+<li>Redis</li>
+<li>Cassandra</li>
+<li>IBM Cloudant</li>
+<li>HBase</li>
+<li>Mongo</li>
+<li>Couchbase</li>
+<li>Aerospike</li>
+</ol>
 
 There are plenty of details available about the installation, configuration, API description,
 built-in example etc. Please refer to the com.ibm.streamsx.dps/doc/dps-usage-tips.txt file
