@@ -21,13 +21,15 @@ multiple PEs (Processing Elements) running on one or more machines. In this impl
 we are using the following NoSQL databases as our distributed data stores
 
 1) memcached 1.4.15 or higher versions
-2) Redis 2.8.17 or higher versions
+2) Redis 2.8.17 or higher versions    [No Redis provided HA facility in these versions]
 3) Apache Cassandra 2.1.0 or higher versions
 4) IBM Cloudant DBaaS  [Database as a service on the cloud]
 5) Apache HBase 0.98.8 or higher versions for Hadoop2
 6) MongoDB 2.6.6 or higher versions
 7) Couchbase 3.0.2 or higher versions
 8) Aerospike 3.4.1 or higher versions
+9) Redis Cluster 3.0.0 or higher version  [With HA facility for automatic fail-over when
+   a Redis instance or the entire machine crashes] 
 
 Making this facility available for Streams opens up new possibilities to share data even among PEs
 belonging to different Streams applications. Streams application designers/developers will be able to do
@@ -1828,7 +1830,7 @@ composite RunNativeDataStoreCommands() {
 					// We will simply take your command string and run it. So, be sure of what
 					// command you are sending here.				
 					//					
-					if (dbProductName == "redis") {
+					if (dbProductName == "redis" || dbProductName == "redis-cluster") {
 						printStringLn("=== Start of the native data store command execution using Redis ===");
 						// Let us try some simple Redis native commands (one way calls that don't fetch anything from the DB)
 						// (You can't do get command using this technique. Similarly, no complex type keys or values.

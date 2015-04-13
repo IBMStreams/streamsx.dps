@@ -1,9 +1,12 @@
 #!/bin/sh
+#set -x
+
 # Output appropriate libPath information for toolkits  
 # that support multiple platforms.
 
 if [ "$1" == "libPath" ]; then
 
+  here=$( cd ${0%/*} ; pwd )
   OS=`uname -s`
   MACH=`uname -i`
   if [ "${MACH}" = "i386" ] ; then
@@ -11,36 +14,59 @@ if [ "$1" == "libPath" ]; then
   fi
 
   if [ "${OS}" = "Linux" ] ; then
-    if [ -f /etc/redhat-release ] ; then
-     OSDIST=`awk 'FNR == 1 {print substr($1, 0)}' /etc/redhat-release`
-     if [ "$OSDIST" == 'Red' ]; then
-      OSDIST='RHEL'
-     fi
 
+    # choose a library path for RedHat-based distributions
+    if [ -f /etc/redhat-release ] ; then
+
+     # parse the distribution name and version from its banner
+     OSDIST=`awk 'FNR == 1 {print substr($1, 0)}' /etc/redhat-release`
      OSVER=`cat /etc/redhat-release | sed s/.*release\ // | sed s/\ .*//`
+
+     # adjust name and version as necessary for derivatives of RedHat distribution
+     if [ "$OSDIST" == 'Red' ] ; then OSDIST='RHEL' ; fi
+     if [ "$OSDIST" == 'BluVector' ] ; then OSDIST='CentOS' ; OSVER=6 ; fi
+
+     # concatenate the name and version for use below in constructing a library pathname
      OSLVL=$OSDIST${OSVER}
+
     elif [ -f /etc/SuSE-release ] ; then
+
+     # parse the distribution name and version from its banner
      OSVER=`awk 'FNR == 2 {print $3}' /etc/SuSE-release`
+
+     # concatenate the name and version for use below in constructing a library pathname
      OSLVL=SLES${OSVER}
+
     else
+
+      # this should cause a link error on unsupported distributions
       OSLVL="unsupported Linux distribution"
+
     fi
 
-    OSSTR="../../../../impl/lib/${MACH}.${OSLVL%%.*}"
-
+    # construct a library pathname
+    OSSTR="$here/../lib/${MACH}.${OSLVL%%.*}"
+    
   else
+
+    # this should cause a link error on unsupported operating systems
     OSSTR="${MACH}.unsupported OS"
   fi
 
+  # return a library pathname, but warn if it does not exist
+  [ -d $OSSTR ] || echo warning: non-existant library path $OSSTR 1>&2
   echo ${OSSTR}
 
 elif [ "$1" == "includePath" ]; then
   # echo any computed include paths here, if needed
   echo ../../../../impl/include
+
 elif [ "$1" == "lib" ]; then
   # echo any computed library names here, if needed
   :
+
 else
   echo "unsupported option"
+
 fi
 # end of archLevel script

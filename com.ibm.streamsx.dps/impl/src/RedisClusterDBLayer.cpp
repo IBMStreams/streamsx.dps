@@ -1,20 +1,28 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2014
+# Copyright IBM Corp. 2011, 2015
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 */
 /*
 =====================================================================
-Here is the copyright statement for our use of the hiredis APIs:
+Here is the copyright statement for our use of the hiredis-cluster APIs:
 
-Hiredis was written by Salvatore Sanfilippo (antirez at gmail) and
+Hiredis-cluster was written by Salvatore Sanfilippo (antirez at gmail) and
 Pieter Noordhuis (pcnoordhuis at gmail) and is released under the
 BSD license.
 
 Copyright (c) 2009-2011, Salvatore Sanfilippo <antirez at gmail dot com>
 Copyright (c) 2010-2011, Pieter Noordhuis <pcnoordhuis at gmail dot com>
+
+hiredis-cluster include files provide wrappers on top of the hiredis library.
+This wrapper allows us to use the familiar hiredis APIs in the context of
+a Redis cluster (Version 3 and higher) to provide HA facility for automatic
+fail-over when a Redis instance or the entire machine crashes.
+This wrapper carries the copyright as shown in the following line.
+
+Copyright (c) 2015, Dmitrii Shinkevich <shinmail at gmail dot com>
 
 All rights reserved.
 
@@ -48,20 +56,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /*
 ==================================================================================================================
 This CPP file contains the source code for the distributed process store (dps) back-end activities such as
-insert, update, read, remove, etc. This dps implementation runs on top of the popular redis in-memory store.
-Redis is a simple, but a great open source effort that carries a BSD license.
+insert, update, read, remove, etc. This dps implementation runs on top of the popular redis-cluster in-memory store.
+Redis-Cluster is a simple, but a great open source effort that carries a BSD license.
 Thanks to Salvatore Sanfilippo, who created Redis, when he was 30 years old in 2009. What an amazing raw talent!!!
 In a (2011) interview, he nicely describes about the reason to start that marvelous project.
 
-http://www.thestartup.eu/2011/01/an-interview-with-salvatore-sanfilippo-creator-of-redis-working-out-of-sicily/
+http://www.thestartup.eu/2011/01/an-interview-with-salvatore-sanfilippo-creator-of-redis-cluster-working-out-of-sicily/
 
-Redis is a full fledged NoSQL data store with support for complex types such as list, set, and hash. It also has
-APIs to perform store commands within a transaction block. Its replication, persistence, and cluster features are
-far superior considering that its first release was done only in 2009. In our Redis store implementation for
-Streams, we are using APIs from the popular hiredis C library.
+Redis-Cluster (Version 3 and higher) is a full fledged NoSQL data store with support for complex types such as list,
+set, and hash. It also has APIs to perform store commands within a transaction block. Its replication, persistence,
+and cluster features are far superior considering that its first release was done only in April/2015. In our Redis-Cluster
+store implementation for Streams, we are using APIs from the popular hiredis-cluster C library.
 
 Any dpsXXXXX native function call made from a SPL composite will go through a serialization layer and then hit
-this CPP file. Here, the purpose of such SPL native function calls will be fulfilled using the redis APIs.
+this CPP file. Here, the purpose of such SPL native function calls will be fulfilled using the redis-cluster APIs.
 After that, the results will be sent to a deserialization layer. From there, results will be transformed using the
 correct SPL types and delivered back to the SPL composite. In general, our distributed process store provides
 a "global + distributed" in-memory cache for different processes (multiple PEs from one or more Streams applications).
@@ -74,14 +82,14 @@ what frequency from where etc.
 This C++ project has a companion SPL project (058_data_sharing_between_non_fused_spl_custom_and_cpp_primitive_operators).
 Please refer to the commentary in that SPL project file for learning about the procedure to do an
 end-to-end test run involving the SPL code, serialization/deserialization code,
-redis interface code (this file), and your redis infrastructure.
+redis-cluster interface code (this file), and your redis-cluster infrastructure.
 
 As a first step, you should run the ./mk script from the C++ project directory (DistributedProcessStoreLib).
 That will take care of building the .so file for the dps and copy it to the SPL project's impl/lib directory.
 ==================================================================================================================
 */
 
-#include "RedisDBLayer.h"
+#include "RedisClusterDBLayer.h"
 #include "DpsConstants.h"
 
 #include <SPL/Runtime/Common/RuntimeDebug.h>
@@ -118,44 +126,27 @@ namespace streamsx {
 namespace store {
 namespace distributed
 {
-  RedisDBLayer::RedisDBLayer()
+  RedisClusterDBLayer::RedisClusterDBLayer()
   {
-
+	  redis_cluster = NULL;
   }
 
-  RedisDBLayer::~RedisDBLayer()
+  RedisClusterDBLayer::~RedisClusterDBLayer()
   {
-	if (redisPartitionCnt == 0) {
-		// We are not using the client side Redis partitioning.
-		// Clear the single redis connection we opened.
-		// In this case of just a single Redis server instance being used,
-		// its context address is stored in the very first element of the redis partition array.
-		if (redisPartitions[0].rdsc != NULL) {
-			redisFree(redisPartitions[0].rdsc);
-			redisPartitions[0].rdsc = NULL;
-		}
-	} else {
-		// We are using the client side Redis partitioning.
-		// Let us clear all the connections we made.
-		for(int32_t cnt=0; cnt < redisPartitionCnt; cnt++) {
-			if (redisPartitions[cnt].rdsc != NULL) {
-				redisFree(redisPartitions[cnt].rdsc);
-				redisPartitions[cnt].rdsc = NULL;
-			}
-		}
-	}
+	  // Delete the cluster connection object.
+	  delete redis_cluster;
   }
         
-  void RedisDBLayer::connectToDatabase(std::set<std::string> const & dbServers, PersistenceError & dbError)
+  void RedisClusterDBLayer::connectToDatabase(std::set<std::string> const & dbServers, PersistenceError & dbError)
   {
-	  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase", "RedisDBLayer");
+	  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase", "RedisClusterDBLayer");
 
 	  // Get the name, OS version and CPU type of this machine.
 	  struct utsname machineDetails;
 
 	  if(uname(&machineDetails) < 0) {
 		  dbError.set("Unable to get the machine/os/cpu details.", DPS_INITIALIZE_ERROR);
-		  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed to get the machine/os/cpu details. " << DPS_INITIALIZE_ERROR, "RedisDBLayer");
+		  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed to get the machine/os/cpu details. " << DPS_INITIALIZE_ERROR, "RedisClusterDBLayer");
 		  return;
 	  } else {
 		  nameOfThisMachine = string(machineDetails.nodename);
@@ -163,218 +154,130 @@ namespace distributed
 		  cpuTypeOfThisMachine = string(machineDetails.machine);
 	  }
 
-	  string redisConnectionErrorMsg = "Unable to initialize the redis connection context.";
-	  // When the Redis cluster releases with support for the hiredis client, then change this logic to
-	  // take advantage of the Redis cluster features.
-	  //
-	  // If the user configured only one redis server, connect to it using unixsocket or TCP.
-	  // If the user configured multiple redis servers, then we are going to do the client side
-	  // partitioning. In that case, we will connect to all of them and get a separate handle
-	  // and store them in an array of structures.
-	  //
-	  if (dbServers.size() == 1) {
-		  // This means, no client side Redis partitioning.
-		  redisPartitionCnt = 0;
-		  // We have only one Redis server configured by the user.
-		  for (std::set<std::string>::iterator it=dbServers.begin(); it!=dbServers.end(); ++it) {
-			  std::string serverName = *it;
-			  // If the user has configured to use the unix domain socket, take care of that as well.
-			  if (serverName == "unixsocket") {
-				  redisPartitions[0].rdsc = redisConnectUnix((char *)"/tmp/redis.sock");
-			  } else {
-				  struct timeval timeout = { 1, 500000 }; // 1.5 seconds {tv_sec, tv_microsecs}
-	              // Redis server name can have port number specified along with it --> MyHost:2345
-	              string targetServerName = "";
-	              int targetServerPort = 0;
-	              char serverNameBuf[300];
-	              strcpy(serverNameBuf, serverName.c_str());
-	              char *ptr = strtok(serverNameBuf, ":");
+	  string redisClusterConnectionErrorMsg = "Unable to initialize the redis-cluster connection context.";
+	  // We need only one server in the Redis cluster to do the cluster based Redis HA operations.
+	  for (std::set<std::string>::iterator it=dbServers.begin(); it!=dbServers.end(); ++it) {
+		  std::string serverName = *it;
+		  // If the user has configured to use the unix domain socket, take care of that as well.
+		  if (serverName == "unixsocket") {
+			  // We will consider supporting this at a later time in the end of 2015.
+			  redisClusterConnectionErrorMsg += " UnixSocket is not supported when DPS is configured with redis-cluster.";
+			  dbError.set(redisClusterConnectionErrorMsg, DPS_INITIALIZE_ERROR);
+			  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" <<
+				  redisClusterConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisClusterDBLayer");
+			  return;
+		  } else {
+			  // Redis server name must have a port number specified along with it --> MyHost:2345
+			  string targetServerName = "";
+			  int targetServerPort = 0;
+			  char serverNameBuf[300];
+			  strcpy(serverNameBuf, serverName.c_str());
+			  char *ptr = strtok(serverNameBuf, ":");
 
-	              while(ptr) {
-	                if (targetServerName == "") {
-	                  // This must be our first token.
-	                  targetServerName = string(ptr);
-	                  ptr = strtok(NULL, ":");
-	                } else {
-	                  // This must be our second token.
-	                  targetServerPort = atoi(ptr);
-	                  // We are done.
-	                  break;
-	                }
-	              }
-
-	              if (targetServerName == "") {
-	                // User only specified the server name and no port.
-	            	// (This is the case of server name followed by a : character with a missing port number)
-	                targetServerName = serverName;
-	                // In this case, use the default Redis server port.
-	                targetServerPort = REDIS_SERVER_PORT;
-	              }
-
-	              if (targetServerPort == 0) {
-	                // User didn't give a Redis server port.
-	            	// Only a server name was given not followed by a : character.
-	                // Use the default Redis server port.
-	                targetServerPort = REDIS_SERVER_PORT;
-	              }
-
-	              char msg[128];
-	              sprintf(msg, "%d", targetServerPort);
-	              SPLAPPTRC(L_ERROR, "Connecting to the Redis server " << targetServerName << " on port " << string(msg), "RedisDBLayer");
-	              redisPartitions[0].rdsc = redisConnectWithTimeout(targetServerName.c_str(), targetServerPort, timeout);
-			  }
-
-			  if (redisPartitions[0].rdsc == NULL || redisPartitions[0].rdsc->err) {
-				  if (redisPartitions[0].rdsc) {
-					  redisConnectionErrorMsg += " Connection error: " + string(redisPartitions[0].rdsc->errstr);
-				  }
-			  } else {
-				  // We connected to at least one redis server. That is enough for our needs.
-				  // Reset the error string.
-				  redisConnectionErrorMsg = "";
+			  while(ptr) {
+				if (targetServerName == "") {
+				  // This must be our first token.
+				  targetServerName = string(ptr);
+				  ptr = strtok(NULL, ":");
+				} else {
+				  // This must be our second token.
+				  targetServerPort = atoi(ptr);
+				  // We are done.
 				  break;
+				}
 			  }
+
+			  if (targetServerName == "") {
+				// User only specified the server name and no port.
+				// (This is the case of server name followed by a : character with a missing port number)
+				targetServerName = serverName;
+				// In this case, user didn't specify the port for the chosen Redis cluster node.
+				redisClusterConnectionErrorMsg += " Redis cluster node's port number must be configured.";
+				dbError.set(redisClusterConnectionErrorMsg, DPS_INITIALIZE_ERROR);
+				SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" <<
+					redisClusterConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisClusterDBLayer");
+				return;
+			  }
+
+			  if (targetServerPort == 0) {
+				// User didn't give a Redis server port.
+				// Only a server name was given not followed by a : character.
+				redisClusterConnectionErrorMsg += " Redis cluster node's port number must be configured.";
+				dbError.set(redisClusterConnectionErrorMsg, DPS_INITIALIZE_ERROR);
+				SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" <<
+					redisClusterConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisClusterDBLayer");
+				return;
+			  }
+
+			  char msg[128];
+			  sprintf(msg, "%d", targetServerPort);
+			  SPLAPPTRC(L_ERROR, "Connecting to a Redis cluster node " << targetServerName << " on port " << string(msg), "RedisClusterDBLayer");
+			  redis_cluster = HiredisCommand::createCluster(targetServerName.c_str(), targetServerPort);
+		  }
+
+		  if (redis_cluster == NULL) {
+			  redisClusterConnectionErrorMsg += " Connection error in the createCluster API.";
+		  } else {
+			  // We connected to at least one redis-cluster server. That is enough for our needs.
+			  // Reset the error string.
+			  redisClusterConnectionErrorMsg = "";
+			  break;
 		  }
 
 		  // Check if there was any connection error.
-		  if (redisConnectionErrorMsg != "") {
-			  if (redisPartitions[0].rdsc != NULL) {
-				  redisFree(redisPartitions[0].rdsc);
-				  redisPartitions[0].rdsc = NULL;
-			  }
-
-			  dbError.set(redisConnectionErrorMsg, DPS_INITIALIZE_ERROR);
-			  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" << redisConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisDBLayer");
+		  if (redisClusterConnectionErrorMsg != "") {
+			  dbError.set(redisClusterConnectionErrorMsg, DPS_INITIALIZE_ERROR);
+			  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" <<
+				  redisClusterConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisClusterDBLayer");
 			  return;
 		  }
-	  } else {
-		  // We have more than one Redis server configured by the user.
-		  // In our dps toolkit, we allow only upto 50 servers. (It is just our own limit).
-		  if (dbServers.size() > 50) {
-			  redisConnectionErrorMsg += " Too many Redis servers configured. DPS toolkit supports only a maximum of 50 Redis servers.";
-			  dbError.set(redisConnectionErrorMsg, DPS_TOO_MANY_REDIS_SERVERS_CONFIGURED);
-			  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" << redisConnectionErrorMsg << "'. " << DPS_TOO_MANY_REDIS_SERVERS_CONFIGURED, "RedisDBLayer");
-			  return;
-		  }
-
-		  redisPartitionCnt = dbServers.size();
-		  int32_t idx = -1;
-		  // Now stay in a loop and connect to each of them.
-		  for (std::set<std::string>::iterator it=dbServers.begin(); it!=dbServers.end(); ++it) {
-			  std::string serverName = *it;
-			  struct timeval timeout = { 1, 500000 }; // 1.5 seconds {tv_sec, tv_microsecs}
-			  // In the case of client side Redis server partitioning, we expect the user to configure the ports of
-			  // their Redis servers starting from our REDIS_SERVER_PORT (base port number 6379) + 2 and go up by one for each new Redis server.
-			  idx++;
-
-              // Redis server name can have port number specified along with it --> MyHost:2345
-              string targetServerName = "";
-              int targetServerPort = 0;
-              char serverNameBuf[300];
-              strcpy(serverNameBuf, serverName.c_str());
-              char *ptr = strtok(serverNameBuf, ":");
-
-              while(ptr) {
-                if (targetServerName == "") {
-                  // This must be our first token.
-                  targetServerName = string(ptr);
-                  ptr = strtok(NULL, ":");
-                } else {
-                  // This must be our second token.
-                  targetServerPort = atoi(ptr);
-                  // We are done.
-                  break;
-                }
-              }
-
-              if (targetServerName == "") {
-                // User only specified the server name and no port.
-            	// (This is the case of server name followed by a : character with a missing port number)
-                targetServerName = serverName;
-                // In this case, use the default Redis server port.
-                targetServerPort = REDIS_SERVER_PORT;
-              }
-
-              if (targetServerPort == 0) {
-                // User didn't give a Redis server port.
-            	// Only a server name was given not followed by a : character.
-                // Use the default Redis server port.
-                targetServerPort = REDIS_SERVER_PORT;
-              }
-
-              char msg[128];
-              sprintf(msg, "%d", targetServerPort);
-              SPLAPPTRC(L_ERROR, "Connecting to the Redis server " << targetServerName << " on port " << string(msg), "RedisDBLayer");
-			  redisPartitions[idx].rdsc = redisConnectWithTimeout(targetServerName.c_str(), targetServerPort, timeout);
-
-			  if (redisPartitions[idx].rdsc == NULL || redisPartitions[idx].rdsc->err) {
-				  if (redisPartitions[idx].rdsc) {
-					  char serverNumber[50];
-					  sprintf(serverNumber, "%d", idx+1);
-					  redisConnectionErrorMsg += " Connection error for Redis server " + serverName + ". Error="  + string(redisPartitions[idx].rdsc->errstr);
-				  }
-
-				  // Since we got a connection error on one of the servers, let us disconnect from the servers that we successfully connected to so far.
-				  // Loop backwards.
-				  for(int32_t cnt=idx; cnt >=0; cnt--) {
-					  if (redisPartitions[cnt].rdsc != NULL) {
-						  redisFree(redisPartitions[cnt].rdsc);
-						  redisPartitions[cnt].rdsc = NULL;
-					  }
-				  }
-
-				  dbError.set(redisConnectionErrorMsg, DPS_INITIALIZE_ERROR);
-				  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" << redisConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisDBLayer");
-				  return;
-			  }
-		  } // End of for loop.
 	  }
 
-	  // We have now made connection to one or more servers in a redis cluster.
+	  // We have now made connection to one server in a redis-cluster.
 	  // Let us check if the global storeId key:value pair is already there in the cache.
 	  string keyString = string(DPS_AND_DL_GUID_KEY);
-	  int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
 	  std::string cmd = string(REDIS_EXISTS_CMD) + keyString;
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-	  // If we get a NULL reply, then it indicates a redis server connection error.
-	  if (redis_reply == NULL) {
-		// This is how we can detect that a wrong redis server name is configured by the user or
-		// not even a single redis server daemon being up and running.
-		// On such errors, redis context will carry an error string.
-		// When this error occurs, we can't reuse that redis context for further server commands. This is a serious error.
-		dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+	  // If we get a NULL reply, then it indicates a redis-cluster server connection error.
+	  if (redis_cluster_reply == NULL) {
+		// This is how we can detect that a wrong redis-cluster server name is configured by the user or
+		// not even a single redis-cluster server daemon being up and running.
+		// On such errors, redis-cluster context will carry an error string.
+		// When this error occurs, we can't reuse that redis-cluster context for further server commands. This is a serious error.
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error with a NULL redisReply." << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		return;
 	  }
 
-	  if (redis_reply->type == REDIS_REPLY_ERROR) {
-		  dbError.set("Unable to check the existence of the dps GUID key.", DPS_KEY_EXISTENCE_CHECK_ERROR);
-		  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed. rc=" << DPS_KEY_EXISTENCE_CHECK_ERROR, "RedisDBLayer");
-		  freeReplyObject(redis_reply);
+	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
+		  dbError.set("Unable to check the existence of the dps GUID key. Error=" + string(redis_cluster_reply->str), DPS_KEY_EXISTENCE_CHECK_ERROR);
+		  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed. Error=" <<
+			  string(redis_cluster_reply->str) << ". rc=" << DPS_KEY_EXISTENCE_CHECK_ERROR, "RedisClusterDBLayer");
+		  freeReplyObject(redis_cluster_reply);
 		  return;
 	  }
 
-	  if (redis_reply->integer == (int)0) {
+	  if (redis_cluster_reply->integer == (int)0) {
 		  // It could be that our global store id is not there now.
 		  // Let us create one with an initial value of 0.
 		  // Redis setnx is an atomic operation. It will succeed only for the very first operator that
-		  // attempts to do this setting after a redis server is started fresh. If some other operator
+		  // attempts to do this setting after a redis-cluster server is started fresh. If some other operator
 		  // already raced us ahead and created this guid_key, then our attempt below will be safely rejected.
-		  freeReplyObject(redis_reply);
+		  freeReplyObject(redis_cluster_reply);
 		  cmd = string(REDIS_SETNX_CMD) + keyString + string(" ") + string("0");
-		  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+		  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 	  }
 
-	  freeReplyObject(redis_reply);
-	  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase done", "RedisDBLayer");
+	  freeReplyObject(redis_cluster_reply);
+	  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase done", "RedisClusterDBLayer");
   }
 
-  uint64_t RedisDBLayer::createStore(std::string const & name,
+  uint64_t RedisClusterDBLayer::createStore(std::string const & name,
 	std::string const & keySplTypeName, std::string const & valueSplTypeName,
 	PersistenceError & dbError)
   {
-	SPLAPPTRC(L_DEBUG, "Inside createStore for store " << name, "RedisDBLayer");
+	SPLAPPTRC(L_DEBUG, "Inside createStore for store " << name, "RedisClusterDBLayer");
 
 	string base64_encoded_name;
 	base64_encode(name, base64_encoded_name);
@@ -385,7 +288,7 @@ namespace distributed
  		// Unable to acquire the general purpose lock.
  		dbError.set("Unable to get a generic lock for creating a store with its name as " + name + ".", DPS_GET_GENERIC_LOCK_ERROR);
  		SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for an yet to be created store with its name as " <<
- 			name << ". " << DPS_GET_GENERIC_LOCK_ERROR, "RedisDBLayer");
+ 			name << ". " << DPS_GET_GENERIC_LOCK_ERROR, "RedisClusterDBLayer");
  		// User has to retry again to create this store.
  		return 0;
  	}
@@ -397,56 +300,57 @@ namespace distributed
 	// (See the store layout description documented in the next page.)
  	// Additionally, in Redis, store names can have space characters in them.
  	string keyString = string(DPS_STORE_NAME_TYPE) + base64_encoded_name;
- 	int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
 	std::string cmd = string(REDIS_EXISTS_CMD) + keyString;
-	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-	if (redis_reply == NULL) {
-		dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name << ". " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+	if (redis_cluster_reply == NULL) {
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name << " with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		releaseGeneralPurposeLock(base64_encoded_name);
 		return 0;
 	}
 
-	if (redis_reply->type == REDIS_REPLY_ERROR) {
-		dbError.set("Unable to check the existence of a store with a name" + name + ".", DPS_KEY_EXISTENCE_CHECK_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside createStore, it failed to check for a store existence. rc=" << DPS_KEY_EXISTENCE_CHECK_ERROR, "RedisDBLayer");
-		freeReplyObject(redis_reply);
+	if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
+		dbError.set("Unable to check the existence of a store with a name" + name +
+			". Error=" + string(redis_cluster_reply->str), DPS_KEY_EXISTENCE_CHECK_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside createStore, it failed to check for a store existence. Error=" <<
+			string(redis_cluster_reply->str) << "rc=" << DPS_KEY_EXISTENCE_CHECK_ERROR, "RedisClusterDBLayer");
+		freeReplyObject(redis_cluster_reply);
 		releaseGeneralPurposeLock(base64_encoded_name);
 		return 0;
 	  }
 
-	if (redis_reply->integer == (int)1) {
+	if (redis_cluster_reply->integer == (int)1) {
 		// This store already exists in our cache.
 		// We can't create another one with the same name now.
 		dbError.set("A store named " + name + " already exists", DPS_STORE_EXISTS);
-		SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name << ". " << DPS_STORE_EXISTS, "RedisDBLayer");
-		freeReplyObject(redis_reply);
+		SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name << ". " << DPS_STORE_EXISTS, "RedisClusterDBLayer");
+		freeReplyObject(redis_cluster_reply);
 		releaseGeneralPurposeLock(base64_encoded_name);
 		return 0;
 	}
 
-	if (redis_reply->integer == (int)0) {
+	if (redis_cluster_reply->integer == (int)0) {
 		// Create a new store.
 		// At first, let us increment our global dps_guid to reserve a new store id.
-		freeReplyObject(redis_reply);
+		freeReplyObject(redis_cluster_reply);
 		uint64_t storeId = 0;
 		keyString = string(DPS_AND_DL_GUID_KEY);
-		partitionIdx = getRedisServerPartitionIndex(keyString);
 		cmd = string(REDIS_INCR_CMD) + keyString;
-		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-		if (redis_reply->type == REDIS_REPLY_ERROR) {
-			dbError.set("Unable to get a unique store id for a store named " + name + ". " + std::string(redis_reply->str), DPS_GUID_CREATION_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name << ". " << DPS_GUID_CREATION_ERROR, "RedisDBLayer");
-			freeReplyObject(redis_reply);
+		if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
+			dbError.set("Unable to get a unique store id for a store named " + name + ". Error=" + std::string(redis_cluster_reply->str), DPS_GUID_CREATION_ERROR);
+			SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name <<
+				". Error=" << std::string(redis_cluster_reply->str) << ". " << DPS_GUID_CREATION_ERROR, "RedisClusterDBLayer");
+			freeReplyObject(redis_cluster_reply);
 			releaseGeneralPurposeLock(base64_encoded_name);
 			return 0;
 		}
 
-		if (redis_reply->type == REDIS_REPLY_INTEGER) {
-			storeId = redis_reply->integer;
-			freeReplyObject(redis_reply);
+		if (redis_cluster_reply->type == REDIS_REPLY_INTEGER) {
+			storeId = redis_cluster_reply->integer;
+			freeReplyObject(redis_cluster_reply);
 
 			/*
 			We secured a guid. We can now create this store. Layout for a distributed process store (dps) looks like this.
@@ -473,17 +377,18 @@ namespace distributed
 			std::ostringstream value;
 			value << storeId;
 			keyString = string(DPS_STORE_NAME_TYPE) + base64_encoded_name;
-			partitionIdx = getRedisServerPartitionIndex(keyString);
 			cmd = string(REDIS_SET_CMD) + keyString + " " + value.str();
-			redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-			if (redis_reply->type == REDIS_REPLY_ERROR) {
+			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				// Problem in creating the "Store Name" entry in the cache.
-				dbError.set("Unable to create 'StoreName:StoreId' in the cache for a store named " + name + ". " + std::string(redis_reply->str), DPS_STORE_NAME_CREATION_ERROR);
-				SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name << ". " << DPS_STORE_NAME_CREATION_ERROR, "RedisDBLayer");
+				dbError.set("Unable to create 'StoreName:StoreId' in the cache for a store named " + name +
+					". Error=" + std::string(redis_cluster_reply->str), DPS_STORE_NAME_CREATION_ERROR);
+				SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name <<
+					". Error=" << std::string(redis_cluster_reply->str) << ". " << DPS_STORE_NAME_CREATION_ERROR, "RedisClusterDBLayer");
 				// We are simply leaving an incremented value for the dps_guid key in the cache that will never get used.
 				// Since it is harmless, there is no need to reduce this number by 1. It is okay that this guid number will remain unassigned to any store.
-				freeReplyObject(redis_reply);
+				freeReplyObject(redis_cluster_reply);
 				releaseGeneralPurposeLock(base64_encoded_name);
 				return 0;
 			}
@@ -502,30 +407,31 @@ namespace distributed
 			// Redis hash has the operational efficiency of O(1) i.e. constant time execution for get, put, and del with any hash size.
 			// Let us create a new store contents hash with a mandatory element that will carry the name of this store.
 			// (This mandatory entry will help us to do the reverse mapping from store id to store name.)
-			freeReplyObject(redis_reply);
+			freeReplyObject(redis_cluster_reply);
 			// StoreId becomes the new key now.
 			keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + value.str();
-			partitionIdx = getRedisServerPartitionIndex(keyString);
 			cmd = string(REDIS_HSET_CMD) + keyString + " " +
 				string(REDIS_STORE_ID_TO_STORE_NAME_KEY) + " " + base64_encoded_name;
-			redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-			if (redis_reply->type == REDIS_REPLY_ERROR) {
+			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				// Problem in creating the "Store Content Hash" metadata1 entry in the cache.
-				dbError.set("Unable to create 'Store Contents Hash' in the cache for the store named " + name + ". " + std::string(redis_reply->str), DPS_STORE_HASH_METADATA1_CREATION_ERROR);
-				SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name << ". " << DPS_STORE_HASH_METADATA1_CREATION_ERROR, "RedisDBLayer");
-				freeReplyObject(redis_reply);
+				dbError.set("Unable to create 'Store Contents Hash' in the cache for the store named " + name +
+					". Error=" + std::string(redis_cluster_reply->str), DPS_STORE_HASH_METADATA1_CREATION_ERROR);
+				SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name <<
+					". Error=" << std::string(redis_cluster_reply->str) << ". " <<
+					DPS_STORE_HASH_METADATA1_CREATION_ERROR, "RedisClusterDBLayer");
+				freeReplyObject(redis_cluster_reply);
 				// Delete the previous store name root entry we made.
 				keyString = string(DPS_STORE_NAME_TYPE) + base64_encoded_name;
-				partitionIdx = getRedisServerPartitionIndex(keyString);
 				cmd = string(REDIS_DEL_CMD) + keyString;
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-				freeReplyObject(redis_reply);
+				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+				freeReplyObject(redis_cluster_reply);
 				releaseGeneralPurposeLock(base64_encoded_name);
 				return 0;
 			}
 
-			freeReplyObject(redis_reply);
+			freeReplyObject(redis_cluster_reply);
 		    // We are now going to save the SPL type names of the key and value as part of this
 		    // store's metadata. That will help us in the Java dps API "findStore" to cache the
 		    // key and spl type names inside the Java StoreImpl object by querying from the store's metadata.
@@ -535,72 +441,76 @@ namespace distributed
 
 			cmd = string(REDIS_HSET_CMD) + keyString + " " +
 				string(REDIS_SPL_TYPE_NAME_OF_KEY) + " " + base64_encoded_keySplTypeName;
-			redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-			if (redis_reply->type == REDIS_REPLY_ERROR) {
+			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				// Problem in creating the "Store Content Hash" metadata2 entry in the cache.
-				dbError.set("Unable to create 'Store Contents Hash' in the cache for the store named " + name + ". " + std::string(redis_reply->str), DPS_STORE_HASH_METADATA2_CREATION_ERROR);
-				SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name << ". " << DPS_STORE_HASH_METADATA2_CREATION_ERROR, "RedisDBLayer");
-				freeReplyObject(redis_reply);
+				dbError.set("Unable to create 'Store Contents Hash' in the cache for the store named " + name +
+					". Error=" + std::string(redis_cluster_reply->str), DPS_STORE_HASH_METADATA2_CREATION_ERROR);
+				SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name <<
+					". Error=" << std::string(redis_cluster_reply->str) << ". " <<
+					DPS_STORE_HASH_METADATA2_CREATION_ERROR, "RedisClusterDBLayer");
+				freeReplyObject(redis_cluster_reply);
 				// Delete the store contents hash we created above.
 				cmd = string(REDIS_DEL_CMD) + keyString;
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-				freeReplyObject(redis_reply);
+				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+				freeReplyObject(redis_cluster_reply);
 				// Delete the previous store name root entry we made.
 				keyString = string(DPS_STORE_NAME_TYPE) + base64_encoded_name;
-				partitionIdx = getRedisServerPartitionIndex(keyString);
 				cmd = string(REDIS_DEL_CMD) + keyString;
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-				freeReplyObject(redis_reply);
+				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+				freeReplyObject(redis_cluster_reply);
 				releaseGeneralPurposeLock(base64_encoded_name);
 				return 0;
 			}
 
-			freeReplyObject(redis_reply);
+			freeReplyObject(redis_cluster_reply);
 			string base64_encoded_valueSplTypeName;
 			base64_encode(valueSplTypeName, base64_encoded_valueSplTypeName);
 
 			// Add the value spl type name metadata.
 			cmd = string(REDIS_HSET_CMD) + keyString + " " +
 				string(REDIS_SPL_TYPE_NAME_OF_VALUE) + " " + base64_encoded_valueSplTypeName;
-			redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-			if (redis_reply->type == REDIS_REPLY_ERROR) {
+			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				// Problem in creating the "Store Content Hash" metadata3 entry in the cache.
-				dbError.set("Unable to create 'Store Contents Hash' in the cache for the store named " + name + ". " + std::string(redis_reply->str), DPS_STORE_HASH_METADATA3_CREATION_ERROR);
-				SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name << ". " << DPS_STORE_HASH_METADATA3_CREATION_ERROR, "RedisDBLayer");
-				freeReplyObject(redis_reply);
+				dbError.set("Unable to create 'Store Contents Hash' in the cache for the store named " + name +
+					". Error=" + std::string(redis_cluster_reply->str), DPS_STORE_HASH_METADATA3_CREATION_ERROR);
+				SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name <<
+					". Error=" << std::string(redis_cluster_reply->str) << ". " <<
+					DPS_STORE_HASH_METADATA3_CREATION_ERROR, "RedisClusterDBLayer");
+				freeReplyObject(redis_cluster_reply);
 				// Delete the store contents hash we created above.
 				cmd = string(REDIS_DEL_CMD) + keyString;
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-				freeReplyObject(redis_reply);
+				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+				freeReplyObject(redis_cluster_reply);
 				// Delete the previous store name root entry we made.
 				keyString = string(DPS_STORE_NAME_TYPE) + base64_encoded_name;
-				partitionIdx = getRedisServerPartitionIndex(keyString);
 				cmd = string(REDIS_DEL_CMD) + keyString;
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-				freeReplyObject(redis_reply);
+				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+				freeReplyObject(redis_cluster_reply);
 				releaseGeneralPurposeLock(base64_encoded_name);
 				return 0;
 			}
 
-			freeReplyObject(redis_reply);
+			freeReplyObject(redis_cluster_reply);
 			releaseGeneralPurposeLock(base64_encoded_name);
 			return(storeId);
 		}
 	}
 
-	freeReplyObject(redis_reply);
+	freeReplyObject(redis_cluster_reply);
 	releaseGeneralPurposeLock(base64_encoded_name);
     return 0;
   }
 
-  uint64_t RedisDBLayer::createOrGetStore(std::string const & name,
+  uint64_t RedisClusterDBLayer::createOrGetStore(std::string const & name,
 	std::string const & keySplTypeName, std::string const & valueSplTypeName,
 	PersistenceError & dbError)
   {
 	// We will rely on a method above this and another method below this to accomplish what is needed here.
-	SPLAPPTRC(L_DEBUG, "Inside createOrGetStore for store " << name, "RedisDBLayer");
+	SPLAPPTRC(L_DEBUG, "Inside createOrGetStore for store " << name, "RedisClusterDBLayer");
 
 	uint64_t storeId = createStore(name, keySplTypeName, valueSplTypeName, dbError);
 
@@ -621,9 +531,9 @@ namespace distributed
 	return(findStore(name, dbError));
   }
                 
-  uint64_t RedisDBLayer::findStore(std::string const & name, PersistenceError & dbError)
+  uint64_t RedisClusterDBLayer::findStore(std::string const & name, PersistenceError & dbError)
   {
-	SPLAPPTRC(L_DEBUG, "Inside findStore for store " << name, "RedisDBLayer");
+	SPLAPPTRC(L_DEBUG, "Inside findStore for store " << name, "RedisClusterDBLayer");
 
 	string base64_encoded_name;
 	base64_encode(name, base64_encoded_name);
@@ -632,62 +542,67 @@ namespace distributed
 	// Inside Redis, all our store names will have a mapping type indicator of
 	// "0" at the beginning followed by the actual store name.  "0" + 'store name'
 	std::string storeNameKey = DPS_STORE_NAME_TYPE + base64_encoded_name;
-	int32_t partitionIdx = getRedisServerPartitionIndex(storeNameKey);
 	string cmd = string(REDIS_EXISTS_CMD) + storeNameKey;
-	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeNameKey, cmd.c_str()));
 
-	if (redis_reply == NULL) {
-		dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside findStore, it failed for store " << name << ". " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+	if (redis_cluster_reply == NULL) {
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside findStore, it failed for store " << name << " with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		return 0;
 	}
 
-	if (redis_reply->type == REDIS_REPLY_ERROR) {
+	if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Problem in finding the existence of a store.
-		dbError.set("Unable to find the existence of a store named " + name + ". " + std::string(redis_reply->str), DPS_STORE_EXISTENCE_CHECK_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside findStore, it failed for store " << name << ". " << DPS_STORE_EXISTENCE_CHECK_ERROR, "RedisDBLayer");
-		freeReplyObject(redis_reply);
+		dbError.set("Unable to find the existence of a store named " + name +
+			". Error=" + std::string(redis_cluster_reply->str), DPS_STORE_EXISTENCE_CHECK_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside findStore, it failed for store " << name <<
+			". Error=" << std::string(redis_cluster_reply->str) << ". " <<
+			DPS_STORE_EXISTENCE_CHECK_ERROR, "RedisClusterDBLayer");
+		freeReplyObject(redis_cluster_reply);
 		return(0);
 	}
 
-	if (redis_reply->integer == (int)0) {
+	if (redis_cluster_reply->integer == (int)0) {
 		// This store is not there in our cache.
 		dbError.set("Store named " + name + " not found.", DPS_STORE_DOES_NOT_EXIST);
-		SPLAPPTRC(L_DEBUG, "Inside findStore, it failed for store " << name << ". " << DPS_STORE_DOES_NOT_EXIST, "RedisDBLayer");
-		freeReplyObject(redis_reply);
+		SPLAPPTRC(L_DEBUG, "Inside findStore, it failed for store " << name << ". " << DPS_STORE_DOES_NOT_EXIST, "RedisClusterDBLayer");
+		freeReplyObject(redis_cluster_reply);
 		return 0;
 	}
 
 	// It is an existing store.
 	// We can get the storeId and return it to the caller.
-	freeReplyObject(redis_reply);
+	freeReplyObject(redis_cluster_reply);
 	cmd = string(REDIS_GET_CMD) + storeNameKey;
-	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeNameKey, cmd.c_str()));
 
-	if (redis_reply->type == REDIS_REPLY_ERROR) {
+	if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Unable to get an existing store id from the cache.
-		dbError.set("Unable to get the storeId for the storeName " + name + ". " + std::string(redis_reply->str), DPS_GET_STORE_ID_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside findStore, it failed for store " << name << ". " << DPS_GET_STORE_ID_ERROR, "RedisDBLayer");
-		freeReplyObject(redis_reply);
+		dbError.set("Unable to get the storeId for the storeName " + name + ". Error="
+			+ std::string(redis_cluster_reply->str), DPS_GET_STORE_ID_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside findStore, it failed for store " << name <<
+			". Error=" << std::string(redis_cluster_reply->str) << ". " <<
+			DPS_GET_STORE_ID_ERROR, "RedisClusterDBLayer");
+		freeReplyObject(redis_cluster_reply);
 		return(0);
-	} else if ((redis_reply->type == REDIS_REPLY_NIL) || (redis_reply->len <= 0)) {
+	} else if ((redis_cluster_reply->type == REDIS_REPLY_NIL) || (redis_cluster_reply->len <= 0)) {
 		// Requested data item is not there in the cache.
 		dbError.set("The requested store " + name + " doesn't exist.", DPS_DATA_ITEM_READ_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside findStore, it failed for store " << name << ". " << DPS_DATA_ITEM_READ_ERROR, "RedisDBLayer");
-		freeReplyObject(redis_reply);
+		SPLAPPTRC(L_DEBUG, "Inside findStore, it failed for store " << name << ". " << DPS_DATA_ITEM_READ_ERROR, "RedisClusterDBLayer");
+		freeReplyObject(redis_cluster_reply);
 		return(0);
 	} else {
-		uint64_t storeId = streams_boost::lexical_cast<uint64_t>(redis_reply->str);
-		freeReplyObject(redis_reply);
+		uint64_t storeId = streams_boost::lexical_cast<uint64_t>(redis_cluster_reply->str);
+		freeReplyObject(redis_cluster_reply);
 		return(storeId);
 	}
 
 	return 0;
   }
         
-  bool RedisDBLayer::removeStore(uint64_t store, PersistenceError & dbError)
+  bool RedisClusterDBLayer::removeStore(uint64_t store, PersistenceError & dbError)
   {
-	SPLAPPTRC(L_DEBUG, "Inside removeStore for store id " << store, "RedisDBLayer");
+	SPLAPPTRC(L_DEBUG, "Inside removeStore for store id " << store, "RedisClusterDBLayer");
 
 	ostringstream storeId;
 	storeId << store;
@@ -696,10 +611,10 @@ namespace distributed
 	// Ensure that a store exists for the given store id.
 	if (storeIdExistsOrNot(storeIdString, dbError) == false) {
 		if (dbError.hasError() == true) {
-			SPLAPPTRC(L_DEBUG, "Inside removeStore, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside removeStore, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		} else {
 			dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside removeStore, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside removeStore, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisClusterDBLayer");
 		}
 
 		return(false);
@@ -709,7 +624,7 @@ namespace distributed
 	if (acquireStoreLock(storeIdString) == false) {
 		// Unable to acquire the store lock.
 		dbError.set("Unable to get store lock for the StoreId " + storeIdString + ".", DPS_GET_STORE_LOCK_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside removeStore, it failed for store id " << storeIdString << ". " << DPS_GET_STORE_LOCK_ERROR, "RedisDBLayer");
+		SPLAPPTRC(L_DEBUG, "Inside removeStore, it failed for store id " << storeIdString << ". " << DPS_GET_STORE_LOCK_ERROR, "RedisClusterDBLayer");
 		// User has to retry again to remove the store.
 		return(false);
 	}
@@ -724,7 +639,7 @@ namespace distributed
  	string valueSplTypeName = "";
 
 	if (readStoreInformation(storeIdString, dbError, dataItemCnt, storeName, keySplTypeName, valueSplTypeName) == false) {
-		SPLAPPTRC(L_DEBUG, "Inside removeStore, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+		SPLAPPTRC(L_DEBUG, "Inside removeStore, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		releaseStoreLock(storeIdString);
 		// This is alarming. This will put this store in a bad state. Poor user has to deal with it.
 		return(false);
@@ -735,17 +650,15 @@ namespace distributed
 	// Let us delete the Store Contents Hash that contains all the active data items in this store.
 	// '1' + 'store id' => 'Redis Hash'  [It will always have this entry: dps_name_of_this_store ==> 'store name']
 	string storeContentsHashKey = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
-	int32_t partitionIdx = getRedisServerPartitionIndex(storeContentsHashKey);
 	cmd = string(REDIS_DEL_CMD) + storeContentsHashKey;
-	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-	freeReplyObject(redis_reply);
+	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeContentsHashKey, cmd.c_str()));
+	freeReplyObject(redis_cluster_reply);
 
 	// Finally, delete the StoreName key now.
 	string storeNameKey = string(DPS_STORE_NAME_TYPE) + storeName;
-	partitionIdx = getRedisServerPartitionIndex(storeNameKey);
 	cmd = string(REDIS_DEL_CMD) + storeNameKey;
-	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-	freeReplyObject(redis_reply);
+	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeNameKey, cmd.c_str()));
+	freeReplyObject(redis_cluster_reply);
 
 	// Life of this store ended completely with no trace left behind.
 	releaseStoreLock(storeIdString);
@@ -756,11 +669,11 @@ namespace distributed
   // It doesn't do any safety checks before putting a data item into a store.
   // If you want to go through that rigor, please use the putSafe method below.
   // This version will perform better since no safety checks are done in this.
-  bool RedisDBLayer::put(uint64_t store, char const * keyData, uint32_t keySize,
+  bool RedisClusterDBLayer::put(uint64_t store, char const * keyData, uint32_t keySize,
                              unsigned char const * valueData, uint32_t valueSize,
                              PersistenceError & dbError)
   {
-	SPLAPPTRC(L_DEBUG, "Inside put for store id " << store, "RedisDBLayer");
+	SPLAPPTRC(L_DEBUG, "Inside put for store id " << store, "RedisClusterDBLayer");
 
 	// Let us try to store this item irrespective of whether it is
 	// new or it is an existing item in the cache.
@@ -785,30 +698,32 @@ namespace distributed
 	// '1' + 'store id' => 'Redis Hash'  [It will always have this entry: dps_name_of_this_store ==> 'store name']
 	// To support space characters in the data item key, let us base64 encode it.
 	string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
-	int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
 	string base64_encoded_data_item_key;
 	base64_encode(data_item_key, base64_encoded_data_item_key);
 
 	string cmd = string(REDIS_HSET_CMD) + keyString + " " +
 			base64_encoded_data_item_key + " " +  "%b";
 	// We want to pass the exact binary data item value as given to us by the caller of this method.
-	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str(), (const char*)valueData, (size_t)valueSize);
+	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str(), (const char*)valueData, (size_t)valueSize));
 
-	if (redis_reply == NULL) {
-		dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside put, it failed for store " << storeIdString << ". " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+	if (redis_cluster_reply == NULL) {
+		dbError.set("Unable to connect to the redis-cluster server(s).  Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside put, it failed for store " << storeIdString << " with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		return(false);
 	}
 
-	if (redis_reply->type == REDIS_REPLY_ERROR) {
+	if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Problem in storing a data item in the cache.
-		dbError.set("Unable to store a data item in the store id " + storeIdString + ". " + std::string(redis_reply->str), DPS_DATA_ITEM_WRITE_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside put, it failed for store id " << storeIdString << ". " << DPS_DATA_ITEM_WRITE_ERROR, "RedisDBLayer");
-		freeReplyObject(redis_reply);
+		dbError.set("Unable to store a data item in the store id " + storeIdString +
+			". Error=" + std::string(redis_cluster_reply->str), DPS_DATA_ITEM_WRITE_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside put, it failed for store id " << storeIdString <<
+			". Error=" << std::string(redis_cluster_reply->str) << ". "
+			<< DPS_DATA_ITEM_WRITE_ERROR, "RedisClusterDBLayer");
+		freeReplyObject(redis_cluster_reply);
 		return(false);
 	}
 
-	freeReplyObject(redis_reply);
+	freeReplyObject(redis_cluster_reply);
 	return(true);
   }
 
@@ -816,11 +731,11 @@ namespace distributed
   // Because of these checks, it will be slower. If someone doesn't care about these safety checks,
   // then the regular put method can be used.
   // This version does all the safety checks and hence will have performance overhead.
-  bool RedisDBLayer::putSafe(uint64_t store, char const * keyData, uint32_t keySize,
+  bool RedisClusterDBLayer::putSafe(uint64_t store, char const * keyData, uint32_t keySize,
                              unsigned char const * valueData, uint32_t valueSize,
                              PersistenceError & dbError)
   {
-	SPLAPPTRC(L_DEBUG, "Inside putSafe for store id " << store, "RedisDBLayer");
+	SPLAPPTRC(L_DEBUG, "Inside putSafe for store id " << store, "RedisClusterDBLayer");
 
 	// Let us try to store this item irrespective of whether it is
 	// new or it is an existing item in the cache.
@@ -831,10 +746,10 @@ namespace distributed
 	// Ensure that a store exists for the given store id.
 	if (storeIdExistsOrNot(storeIdString, dbError) == false) {
 		if (dbError.hasError() == true) {
-			SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		} else {
 			dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisClusterDBLayer");
 		}
 
 		return(false);
@@ -847,7 +762,7 @@ namespace distributed
 	if (acquireStoreLock(storeIdString) == false) {
 		// Unable to acquire the store lock.
 		dbError.set("Unable to get store lock for the StoreId " + storeIdString + ".", DPS_GET_STORE_LOCK_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed for store id " << storeIdString << ". " << DPS_GET_STORE_LOCK_ERROR, "RedisDBLayer");
+		SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed for store id " << storeIdString << ". " << DPS_GET_STORE_LOCK_ERROR, "RedisClusterDBLayer");
 		// User has to retry again to put the data item in the store.
 		return(false);
 	}
@@ -857,42 +772,44 @@ namespace distributed
 	// '1' + 'store id' => 'Redis Hash'  [It will always have this entry: dps_name_of_this_store ==> 'store name']
 	// To support space characters in the data item key, let us base64 encode it.
 	string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
-	int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
 	string base64_encoded_data_item_key;
 	base64_encode(data_item_key, base64_encoded_data_item_key);
 
 	string cmd = string(REDIS_HSET_CMD) + keyString + " " +
 		base64_encoded_data_item_key + " " +  "%b";
 	// We want to pass the exact binary data item value as given to us by the caller of this method.
-	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str(), (const char*)valueData, (size_t)valueSize);
+	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str(), (const char*)valueData, (size_t)valueSize));
 
-	if (redis_reply == NULL) {
-		dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed for store " << storeIdString << ". " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+	if (redis_cluster_reply == NULL) {
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed for store " << storeIdString << " with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		releaseStoreLock(storeIdString);
 		return(false);
 	}
 
-	if (redis_reply->type == REDIS_REPLY_ERROR) {
+	if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Problem in storing a data item in the cache.
-		dbError.set("Unable to store a data item in the store id " + storeIdString + ". " + std::string(redis_reply->str), DPS_DATA_ITEM_WRITE_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed for store id " << storeIdString << ". " << DPS_DATA_ITEM_WRITE_ERROR, "RedisDBLayer");
-		freeReplyObject(redis_reply);
+		dbError.set("Unable to store a data item in the store id " + storeIdString + ". Error=" +
+			std::string(redis_cluster_reply->str), DPS_DATA_ITEM_WRITE_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed for store id " << storeIdString <<
+			". Error=" << std::string(redis_cluster_reply->str) << ". " <<
+			DPS_DATA_ITEM_WRITE_ERROR, "RedisClusterDBLayer");
+		freeReplyObject(redis_cluster_reply);
 		releaseStoreLock(storeIdString);
 		return(false);
 	}
 
-	freeReplyObject(redis_reply);
+	freeReplyObject(redis_cluster_reply);
 	releaseStoreLock(storeIdString);
 	return(true);
   }
 
   // Put a data item with a TTL (Time To Live in seconds) value into the global area of the Redis DB.
-  bool RedisDBLayer::putTTL(char const * keyData, uint32_t keySize,
+  bool RedisClusterDBLayer::putTTL(char const * keyData, uint32_t keySize,
 		  	  	  	  	    unsigned char const * valueData, uint32_t valueSize,
 							uint32_t ttl, PersistenceError & dbError)
   {
-	  SPLAPPTRC(L_DEBUG, "Inside putTTL.", "RedisDBLayer");
+	  SPLAPPTRC(L_DEBUG, "Inside putTTL.", "RedisClusterDBLayer");
 
 	  std::ostringstream ttlValue;
 	  ttlValue << ttl;
@@ -900,7 +817,6 @@ namespace distributed
 	  // In our Redis dps implementation, data item keys can have space characters.
 	  string base64_encoded_data_item_key;
 	  base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
-	  int32_t partitionIdx = getRedisServerPartitionIndex(base64_encoded_data_item_key);
 	  // We are ready to either store a new data item or update an existing data item with a TTL value specified in seconds.
 	  // To support space characters in the data item key, let us base64 encode it.
 	  string cmd = "";
@@ -916,23 +832,25 @@ namespace distributed
 	  }
 
 	  // We want to pass the exact binary data item value as given to us by the caller of this method.
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str(), (const char*)valueData, (size_t)valueSize);
+	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, cmd.c_str(), (const char*)valueData, (size_t)valueSize));
 
-	  if (redis_reply == NULL) {
-		  dbError.setTTL("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
-		  SPLAPPTRC(L_DEBUG, "Inside putTTL, it failed for executing the set command. Error=" << std::string(redisPartitions[partitionIdx].rdsc->errstr) << ". " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+	  if (redis_cluster_reply == NULL) {
+		  dbError.setTTL("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+		  SPLAPPTRC(L_DEBUG, "Inside putTTL, it failed for executing the set command with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		  return(false);
 	  }
 
-	  if (redis_reply->type == REDIS_REPLY_ERROR) {
+	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		  // Problem in storing a data item in the cache with TTL.
-		  dbError.setTTL("Unable to store a data item with TTL. " + std::string(redis_reply->str), DPS_DATA_ITEM_WRITE_ERROR);
-		  SPLAPPTRC(L_DEBUG, "Inside putTTL, it failed to store a data item with TTL. Error=" + std::string(redis_reply->str) << ". " << DPS_DATA_ITEM_WRITE_ERROR, "RedisDBLayer");
-		  freeReplyObject(redis_reply);
+		  dbError.setTTL("Unable to store a data item with TTL. Error=" +
+			  std::string(redis_cluster_reply->str), DPS_DATA_ITEM_WRITE_ERROR);
+		  SPLAPPTRC(L_DEBUG, "Inside putTTL, it failed to store a data item with TTL. Error=" <<
+			  std::string(redis_cluster_reply->str) << ". " << DPS_DATA_ITEM_WRITE_ERROR, "RedisClusterDBLayer");
+		  freeReplyObject(redis_cluster_reply);
 		  return(false);
 	  }
 
-	  freeReplyObject(redis_reply);
+	  freeReplyObject(redis_cluster_reply);
 	  return(true);
   }
 
@@ -940,10 +858,10 @@ namespace distributed
   // It doesn't do any safety checks before getting a data item from a store.
   // If you want to go through that rigor, please use the getSafe method below.
   // This version will perform better since no safety checks are done in this.
-  bool RedisDBLayer::get(uint64_t store, char const * keyData, uint32_t keySize,
+  bool RedisClusterDBLayer::get(uint64_t store, char const * keyData, uint32_t keySize,
                              unsigned char * & valueData, uint32_t & valueSize, PersistenceError & dbError)
   {
-	SPLAPPTRC(L_DEBUG, "Inside get for store id " << store, "RedisDBLayer");
+	SPLAPPTRC(L_DEBUG, "Inside get for store id " << store, "RedisClusterDBLayer");
 
 	// Let us get this data item from the cache as it is.
 	// Since there could be multiple data writers, we are going to get whatever is there now.
@@ -964,7 +882,7 @@ namespace distributed
 
 	if ((result == false) || (dbError.hasError() == true)) {
 		// Some error has occurred in reading the data item value.
-		SPLAPPTRC(L_DEBUG, "Inside get, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+		SPLAPPTRC(L_DEBUG, "Inside get, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 	}
 
     return(result);
@@ -974,10 +892,10 @@ namespace distributed
   // Because of these checks, it will be slower. If someone doesn't care about these safety checks,
   // then the regular get method can be used.
   // This version does all the safety checks and hence will have performance overhead.
-  bool RedisDBLayer::getSafe(uint64_t store, char const * keyData, uint32_t keySize,
+  bool RedisClusterDBLayer::getSafe(uint64_t store, char const * keyData, uint32_t keySize,
                              unsigned char * & valueData, uint32_t & valueSize, PersistenceError & dbError)
   {
-	SPLAPPTRC(L_DEBUG, "Inside getSafe for store id " << store, "RedisDBLayer");
+	SPLAPPTRC(L_DEBUG, "Inside getSafe for store id " << store, "RedisClusterDBLayer");
 
 	// Let us get this data item from the cache as it is.
 	// Since there could be multiple data writers, we are going to get whatever is there now.
@@ -991,10 +909,10 @@ namespace distributed
 	// Ensure that a store exists for the given store id.
 	if (storeIdExistsOrNot(storeIdString, dbError) == false) {
 		if (dbError.hasError() == true) {
-			SPLAPPTRC(L_DEBUG, "Inside getSafe, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside getSafe, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		} else {
 			dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside getSafe, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside getSafe, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisClusterDBLayer");
 		}
 
 		return(false);
@@ -1009,17 +927,17 @@ namespace distributed
 
 	if ((result == false) || (dbError.hasError() == true)) {
 		// Some error has occurred in reading the data item value.
-		SPLAPPTRC(L_DEBUG, "Inside getSafe, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+		SPLAPPTRC(L_DEBUG, "Inside getSafe, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 	}
 
     return(result);
   }
 
   // Get a TTL based data item that is stored in the global area of the Redis DB.
-   bool RedisDBLayer::getTTL(char const * keyData, uint32_t keySize,
+   bool RedisClusterDBLayer::getTTL(char const * keyData, uint32_t keySize,
                               unsigned char * & valueData, uint32_t & valueSize, PersistenceError & dbError)
    {
-		SPLAPPTRC(L_DEBUG, "Inside getTTL.", "RedisDBLayer");
+		SPLAPPTRC(L_DEBUG, "Inside getTTL.", "RedisClusterDBLayer");
 
 		// Let us get this data item from the cache as it is.
 		// Since there could be multiple data writers, we are going to get whatever is there now.
@@ -1029,63 +947,64 @@ namespace distributed
 		// In our Redis dps implementation, data item keys can have space characters.
 		string base64_encoded_data_item_key;
 		base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
-		int32_t partitionIdx = getRedisServerPartitionIndex(base64_encoded_data_item_key);
 		// Since this is a data item with TTL, it is stored in the global area of Redis and not inside a user created store (i.e. a Redis hash).
 		// Hence, we can't use the Redis hash get command. Rather, we will use the plain Redis get command to read this data item.
 		string cmd = string(REDIS_GET_CMD) + base64_encoded_data_item_key;
-		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, cmd.c_str()));
 
-		if (redis_reply == NULL) {
-			dbError.setTTL("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside getTTL, it failed for executing the setx command. Error=" << std::string(redisPartitions[partitionIdx].rdsc->errstr) << ". " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+		if (redis_cluster_reply == NULL) {
+			dbError.setTTL("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+			SPLAPPTRC(L_DEBUG, "Inside getTTL, it failed for executing the setx command with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 			return(false);
 		}
 
-		if (redis_reply->type == REDIS_REPLY_ERROR) {
+		if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 			// Unable to get an existing data item with TTL from the cache.
-			dbError.setTTL("Unable to get the requested data item with TTL value. Error=" + std::string(redis_reply->str), DPS_DATA_ITEM_READ_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside getTTL, it failed to get the requested data item with TTL value. Error=" << std::string(redis_reply->str) << ". " << DPS_DATA_ITEM_READ_ERROR, "RedisDBLayer");
-			freeReplyObject(redis_reply);
+			dbError.setTTL("Unable to get the requested data item with TTL value. Error=" +
+				std::string(redis_cluster_reply->str), DPS_DATA_ITEM_READ_ERROR);
+			SPLAPPTRC(L_DEBUG, "Inside getTTL, it failed to get the requested data item with TTL value. Error=" <<
+				std::string(redis_cluster_reply->str) << ". " << DPS_DATA_ITEM_READ_ERROR, "RedisClusterDBLayer");
+			freeReplyObject(redis_cluster_reply);
 			return(false);
-		} else if (redis_reply->type == REDIS_REPLY_NIL) {
+		} else if (redis_cluster_reply->type == REDIS_REPLY_NIL) {
 			// Requested data item is not there in the cache. It was never inserted there to begin with or it probably expired due to its TTL value.
 			dbError.setTTL("The requested data item with TTL doesn't exist.", DPS_DATA_ITEM_READ_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside getTTL, it failed to get the data item with TTL. It was either never there to begin with or it probably expired due to its TTL value. " << DPS_DATA_ITEM_READ_ERROR, "RedisDBLayer");
-			freeReplyObject(redis_reply);
+			SPLAPPTRC(L_DEBUG, "Inside getTTL, it failed to get the data item with TTL. It was either never there to begin with or it probably expired due to its TTL value. " << DPS_DATA_ITEM_READ_ERROR, "RedisClusterDBLayer");
+			freeReplyObject(redis_cluster_reply);
 			return(false);
 		}
 
 		// Data item value read from the store will be in this format: 'value'
-		if ((unsigned)redis_reply->len == 0) {
+		if ((unsigned)redis_cluster_reply->len == 0) {
 			// User stored empty data item value in the cache.
 			valueData = (unsigned char *)"";
 			valueSize = 0;
 		} else {
 			// We can allocate memory for the exact length of the data item value.
-			valueSize = redis_reply->len;
+			valueSize = redis_cluster_reply->len;
 			valueData = (unsigned char *) malloc(valueSize);
 
 			if (valueData == NULL) {
 				// Unable to allocate memory to transfer the data item value.
 				dbError.setTTL("Unable to allocate memory to copy the data item value with TTL.", DPS_GET_DATA_ITEM_MALLOC_ERROR);
 				// Free the response memory pointer handed to us.
-				freeReplyObject(redis_reply);
+				freeReplyObject(redis_cluster_reply);
 				valueSize = 0;
 				return(false);
 			}
 
 			// We expect the caller of this method to free the valueData pointer.
-			memcpy(valueData, redis_reply->str, valueSize);
+			memcpy(valueData, redis_cluster_reply->str, valueSize);
 		}
 
-		freeReplyObject(redis_reply);
+		freeReplyObject(redis_cluster_reply);
 		return(true);
    }
 
-  bool RedisDBLayer::remove(uint64_t store, char const * keyData, uint32_t keySize,
+  bool RedisClusterDBLayer::remove(uint64_t store, char const * keyData, uint32_t keySize,
                                 PersistenceError & dbError) 
   {
-	SPLAPPTRC(L_DEBUG, "Inside remove for store id " << store, "RedisDBLayer");
+	SPLAPPTRC(L_DEBUG, "Inside remove for store id " << store, "RedisClusterDBLayer");
 
 	std::ostringstream storeId;
 	storeId << store;
@@ -1094,10 +1013,10 @@ namespace distributed
 	// Ensure that a store exists for the given store id.
 	if (storeIdExistsOrNot(storeIdString, dbError) == false) {
 		if (dbError.hasError() == true) {
-			SPLAPPTRC(L_DEBUG, "Inside remove, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside remove, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		} else {
 			dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside remove, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside remove, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisClusterDBLayer");
 		}
 
 		return(false);
@@ -1110,7 +1029,7 @@ namespace distributed
 	if (acquireStoreLock(storeIdString) == false) {
 		// Unable to acquire the store lock.
 		dbError.set("Unable to get store lock for the StoreId " + storeIdString + ".", DPS_GET_STORE_LOCK_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside remove, it failed for store id " << storeIdString << ". " << DPS_GET_STORE_LOCK_ERROR, "RedisDBLayer");
+		SPLAPPTRC(L_DEBUG, "Inside remove, it failed for store id " << storeIdString << ". " << DPS_GET_STORE_LOCK_ERROR, "RedisClusterDBLayer");
 		// User has to retry again to remove the data item from the store.
 		return(false);
 	}
@@ -1118,91 +1037,94 @@ namespace distributed
 	// This action is performed on the Store Contents Hash that takes the following format.
 	// '1' + 'store id' => 'Redis Hash'  [It will always have this entry: dps_name_of_this_store ==> 'store name']
 	string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
-	int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
 	string base64_encoded_data_item_key;
 	base64_encode(data_item_key, base64_encoded_data_item_key);
 	string cmd = string(REDIS_HDEL_CMD) + keyString + " " + base64_encoded_data_item_key;
-	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-	if (redis_reply == NULL) {
-		dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside remove, it failed for store id " << storeIdString << ". " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+	if (redis_cluster_reply == NULL) {
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside remove, it failed for store id " << storeIdString << " with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		releaseStoreLock(storeIdString);
 		return(false);
 	}
 
-	if (redis_reply->type == REDIS_REPLY_ERROR) {
+	if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Problem in deleting the requested data item from the store.
-		dbError.set("Redis reply error while removing the requested data item from the store id " + storeIdString + ". " + std::string(redis_reply->str), DPS_DATA_ITEM_DELETE_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside remove, it failed with Redis reply error for store id " << storeIdString << ". " << DPS_DATA_ITEM_DELETE_ERROR, "RedisDBLayer");
-		freeReplyObject(redis_reply);
+		dbError.set("Redis reply error while removing the requested data item from the store id " + storeIdString +
+			". Error=" + std::string(redis_cluster_reply->str), DPS_DATA_ITEM_DELETE_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside remove, it failed with Redis reply error for store id " << storeIdString <<
+			". Error=" << std::string(redis_cluster_reply->str) << ". "
+			<< DPS_DATA_ITEM_DELETE_ERROR, "RedisClusterDBLayer");
+		freeReplyObject(redis_cluster_reply);
 		releaseStoreLock(storeIdString);
 		return(false);
 	}
 
 	// Let us ensure that it really removed the requested data item.
-	if ((redis_reply->type == REDIS_REPLY_INTEGER) && (redis_reply->integer == (int)0)) {
+	if ((redis_cluster_reply->type == REDIS_REPLY_INTEGER) && (redis_cluster_reply->integer == (int)0)) {
 		// Something is not correct here. It didn't remove the data item. Raise an error.
 		dbError.set("Unable to remove the requested data item from the store id " + storeIdString + ".", DPS_DATA_ITEM_DELETE_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside remove, it failed to remove the requested data item from the store id " << storeIdString << ". " << DPS_DATA_ITEM_DELETE_ERROR, "RedisDBLayer");
-		freeReplyObject(redis_reply);
+		SPLAPPTRC(L_DEBUG, "Inside remove, it failed to remove the requested data item from the store id " << storeIdString << ". " << DPS_DATA_ITEM_DELETE_ERROR, "RedisClusterDBLayer");
+		freeReplyObject(redis_cluster_reply);
 		releaseStoreLock(storeIdString);
 		return(false);
 	}
 
 	// All done. An existing data item in the given store has been removed.
-	freeReplyObject(redis_reply);
+	freeReplyObject(redis_cluster_reply);
 	releaseStoreLock(storeIdString);
     return(true);
   }
 
   // Remove a TTL based data item that is stored in the global area of the Redis DB.
-  bool RedisDBLayer::removeTTL(char const * keyData, uint32_t keySize,
+  bool RedisClusterDBLayer::removeTTL(char const * keyData, uint32_t keySize,
                                 PersistenceError & dbError)
   {
-		SPLAPPTRC(L_DEBUG, "Inside removeTTL.", "RedisDBLayer");
+		SPLAPPTRC(L_DEBUG, "Inside removeTTL.", "RedisClusterDBLayer");
 
 		// In our Redis dps implementation, data item keys can have space characters.
 		string base64_encoded_data_item_key;
 		base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
-		int32_t partitionIdx = getRedisServerPartitionIndex(base64_encoded_data_item_key);
 		// Since this data item has a TTL value, it is not stored in the Redis hash (i.e. user created store).
 		// Instead, it will be in the global area of the Redis DB. Hence, use the regular del command instead of the hash del command.
 		string cmd = string(REDIS_DEL_CMD) + base64_encoded_data_item_key;
-		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, cmd.c_str()));
 
-		if (redis_reply == NULL) {
-			dbError.setTTL("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside removeTTL, it failed to remove a data item with TTL. Error=" << std::string(redisPartitions[partitionIdx].rdsc->errstr) << ". " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+		if (redis_cluster_reply == NULL) {
+			dbError.setTTL("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+			SPLAPPTRC(L_DEBUG, "Inside removeTTL, it failed to remove a data item with TTL with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 			return(false);
 		}
 
-		if (redis_reply->type == REDIS_REPLY_ERROR) {
+		if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 			// Problem in deleting the requested data item from the store.
-			dbError.setTTL("Redis reply error while removing the requested data item with TTL. " + std::string(redis_reply->str), DPS_DATA_ITEM_DELETE_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside removeTTL, it failed with Redis reply error. Error=" << std::string(redis_reply->str) << ". " << DPS_DATA_ITEM_DELETE_ERROR, "RedisDBLayer");
-			freeReplyObject(redis_reply);
+			dbError.setTTL("Redis reply error while removing the requested data item with TTL. Error=" +
+				std::string(redis_cluster_reply->str), DPS_DATA_ITEM_DELETE_ERROR);
+			SPLAPPTRC(L_DEBUG, "Inside removeTTL, it failed with Redis reply error. Error=" <<
+				std::string(redis_cluster_reply->str) << ". " << DPS_DATA_ITEM_DELETE_ERROR, "RedisClusterDBLayer");
+			freeReplyObject(redis_cluster_reply);
 			return(false);
 		}
 
 		// Let us ensure that it really removed the requested data item.
-		if ((redis_reply->type == REDIS_REPLY_INTEGER) && (redis_reply->integer == (int)0)) {
+		if ((redis_cluster_reply->type == REDIS_REPLY_INTEGER) && (redis_cluster_reply->integer == (int)0)) {
 			// Something is not correct here. It didn't remove the data item. Raise an error.
 			dbError.setTTL("Unable to remove the requested data item with TTL.", DPS_DATA_ITEM_DELETE_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside removeTTL, it failed to remove the requested data item with TTL. " << DPS_DATA_ITEM_DELETE_ERROR, "RedisDBLayer");
-			freeReplyObject(redis_reply);
+			SPLAPPTRC(L_DEBUG, "Inside removeTTL, it failed to remove the requested data item with TTL. " << DPS_DATA_ITEM_DELETE_ERROR, "RedisClusterDBLayer");
+			freeReplyObject(redis_cluster_reply);
 			return(false);
 		}
 
 		// All done. An existing data item with TTL in the global area has been removed.
-		freeReplyObject(redis_reply);
+		freeReplyObject(redis_cluster_reply);
 		return(true);
   }
 
-  bool RedisDBLayer::has(uint64_t store, char const * keyData, uint32_t keySize,
+  bool RedisClusterDBLayer::has(uint64_t store, char const * keyData, uint32_t keySize,
                              PersistenceError & dbError) 
   {
-	SPLAPPTRC(L_DEBUG, "Inside has for store id " << store, "RedisDBLayer");
+	SPLAPPTRC(L_DEBUG, "Inside has for store id " << store, "RedisClusterDBLayer");
 
 	std::ostringstream storeId;
 	storeId << store;
@@ -1211,10 +1133,10 @@ namespace distributed
 	// Ensure that a store exists for the given store id.
 	if (storeIdExistsOrNot(storeIdString, dbError) == false) {
 		if (dbError.hasError() == true) {
-			SPLAPPTRC(L_DEBUG, "Inside has, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside has, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		} else {
 			dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside has, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside has, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisClusterDBLayer");
 		}
 
 		return(false);
@@ -1233,50 +1155,50 @@ namespace distributed
 		true, false, dummyValueData, dummyValueSize, dbError);
 
 	if (dbError.getErrorCode() != 0) {
-		SPLAPPTRC(L_DEBUG, "Inside has, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+		SPLAPPTRC(L_DEBUG, "Inside has, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 	}
 
 	return(dataItemAlreadyInCache);
   }
 
   // Check for the existence of a TTL based data item that is stored in the global area of the Redis DB.
-  bool RedisDBLayer::hasTTL(char const * keyData, uint32_t keySize,
+  bool RedisClusterDBLayer::hasTTL(char const * keyData, uint32_t keySize,
                              PersistenceError & dbError)
   {
-		SPLAPPTRC(L_DEBUG, "Inside hasTTL.", "RedisDBLayer");
+		SPLAPPTRC(L_DEBUG, "Inside hasTTL.", "RedisClusterDBLayer");
 
 		// In our Redis dps implementation, data item keys can have space characters.
 		string base64_encoded_data_item_key;
 		base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
-		int32_t partitionIdx = getRedisServerPartitionIndex(base64_encoded_data_item_key);
 		string cmd = string(REDIS_EXISTS_CMD) + base64_encoded_data_item_key;
-		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, cmd.c_str()));
 
-		if (redis_reply == NULL) {
-			dbError.setTTL("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+		if (redis_cluster_reply == NULL) {
+			dbError.setTTL("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
 			return(false);
 		}
 
-		if (redis_reply->type == REDIS_REPLY_ERROR) {
+		if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 			// Unable to check for the existence of the data item.
-			dbError.setTTL("Unable to check for the existence of the data item with TTL. Error=" + std::string(redis_reply->str), DPS_KEY_EXISTENCE_CHECK_ERROR);
-			freeReplyObject(redis_reply);
+			dbError.setTTL("Unable to check for the existence of the data item with TTL. Error=" +
+				std::string(redis_cluster_reply->str), DPS_KEY_EXISTENCE_CHECK_ERROR);
+			freeReplyObject(redis_cluster_reply);
 			return(false);
 		}
 
 		bool ttlKeyExists = false;
 
-		if (redis_reply->integer == (int)1) {
+		if (redis_cluster_reply->integer == (int)1) {
 			// TTL based key exists;
 			ttlKeyExists = true;
 		}
 
-		freeReplyObject(redis_reply);
+		freeReplyObject(redis_cluster_reply);
 		return(ttlKeyExists);
   }
 
-  void RedisDBLayer::clear(uint64_t store, PersistenceError & dbError) {
-     SPLAPPTRC(L_DEBUG, "Inside clear for store id " << store, "RedisDBLayer");
+  void RedisClusterDBLayer::clear(uint64_t store, PersistenceError & dbError) {
+     SPLAPPTRC(L_DEBUG, "Inside clear for store id " << store, "RedisClusterDBLayer");
 
  	ostringstream storeId;
  	storeId << store;
@@ -1285,10 +1207,10 @@ namespace distributed
 	// Ensure that a store exists for the given store id.
 	if (storeIdExistsOrNot(storeIdString, dbError) == false) {
 		if (dbError.hasError() == true) {
-			SPLAPPTRC(L_DEBUG, "Inside clear, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside clear, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		} else {
 			dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside clear, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside clear, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisClusterDBLayer");
 		}
 
 		return;
@@ -1298,7 +1220,7 @@ namespace distributed
  	if (acquireStoreLock(storeIdString) == false) {
  		// Unable to acquire the store lock.
  		dbError.set("Unable to get store lock for the StoreId " + storeIdString + ".", DPS_GET_STORE_LOCK_ERROR);
- 		SPLAPPTRC(L_DEBUG, "Inside clear, it failed for store id " << storeIdString << ". " << DPS_GET_STORE_LOCK_ERROR, "RedisDBLayer");
+ 		SPLAPPTRC(L_DEBUG, "Inside clear, it failed for store id " << storeIdString << ". " << DPS_GET_STORE_LOCK_ERROR, "RedisClusterDBLayer");
  		// User has to retry again to remove the store.
  		return;
  	}
@@ -1310,7 +1232,7 @@ namespace distributed
  	string valueSplTypeName = "";
 
 	if (readStoreInformation(storeIdString, dbError, dataItemCnt, storeName, keySplTypeName, valueSplTypeName) == false) {
-		SPLAPPTRC(L_DEBUG, "Inside clear, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+		SPLAPPTRC(L_DEBUG, "Inside clear, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		releaseStoreLock(storeIdString);
 		// This is alarming. This will put this store in a bad state. Poor user has to deal with it.
 		return;
@@ -1322,80 +1244,88 @@ namespace distributed
 	// '1' + 'store id' => 'Redis Hash'  [It will always have three metadata entries carrying the value of the actual store name, key spl type name, and value spl type name.]
 	// Delete the entire store contents hash.
 	string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
-	int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
 	string cmd = string(REDIS_DEL_CMD) + keyString;
-	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-	if (redis_reply == NULL) {
-		dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside clear, it failed for store id " << storeIdString << ". " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+	if (redis_cluster_reply == NULL) {
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside clear, it failed for store id " << storeIdString << " with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		releaseStoreLock(storeIdString);
 		return;
 	}
 
-	if (redis_reply->type == REDIS_REPLY_ERROR) {
+	if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Problem in deleting the store contents hash.
-		dbError.set("Unable to remove the requested data item from the store for the store id " + storeIdString + ". " + std::string(redis_reply->str), DPS_STORE_CLEARING_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside clear, it failed for store id " << storeIdString << ". " << DPS_STORE_CLEARING_ERROR, "RedisDBLayer");
-		freeReplyObject(redis_reply);
+		dbError.set("Unable to remove the requested data item from the store for the store id " + storeIdString +
+			". Error=" + std::string(redis_cluster_reply->str), DPS_STORE_CLEARING_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside clear, it failed for store id " << storeIdString <<
+			". Error=" << std::string(redis_cluster_reply->str) << ". " <<
+			DPS_STORE_CLEARING_ERROR, "RedisClusterDBLayer");
+		freeReplyObject(redis_cluster_reply);
 		releaseStoreLock(storeIdString);
 		return;
 	}
 
-	freeReplyObject(redis_reply);
+	freeReplyObject(redis_cluster_reply);
 
 	// Let us now recreate a new Store Contents Hash for this store with three meta data entries (store name, key spl type name, value spl type name).
 	// Then we are done.
 	// 1) Store name.
 	cmd = string(REDIS_HSET_CMD) + keyString + " " +
 		string(REDIS_STORE_ID_TO_STORE_NAME_KEY) + " " + storeName;
-	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-	if (redis_reply->type == REDIS_REPLY_ERROR) {
+	if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Problem in creating the "Store Content Hash" metadata1 entry in the cache.
 		dbError.set("Fatal error in clear method: Unable to recreate 'Store Contents Hash' metadata1 in the store id " +
-			storeIdString + ". " + std::string(redis_reply->str), DPS_STORE_HASH_METADATA1_CREATION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Fatal error: Inside clear, it failed for store id " << storeIdString << ". " << DPS_STORE_HASH_METADATA1_CREATION_ERROR, "RedisDBLayer");
-		freeReplyObject(redis_reply);
+			storeIdString + ". Error=" + std::string(redis_cluster_reply->str), DPS_STORE_HASH_METADATA1_CREATION_ERROR);
+		SPLAPPTRC(L_DEBUG, "Fatal error: Inside clear, it failed for store id " << storeIdString <<
+			". Error=" << std::string(redis_cluster_reply->str) << ". "
+			<< DPS_STORE_HASH_METADATA1_CREATION_ERROR, "RedisClusterDBLayer");
+		freeReplyObject(redis_cluster_reply);
 		releaseStoreLock(storeIdString);
 		return;
 	}
 
-	freeReplyObject(redis_reply);
+	freeReplyObject(redis_cluster_reply);
 
 	// 2) Key spl type name.
 	cmd = string(REDIS_HSET_CMD) + keyString + " " +
 		string(REDIS_SPL_TYPE_NAME_OF_KEY) + " " + keySplTypeName;
-	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-	if (redis_reply->type == REDIS_REPLY_ERROR) {
+	if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Problem in creating the "Store Content Hash" metadata2 entry in the cache.
 		dbError.set("Fatal error in clear method: Unable to recreate 'Store Contents Hash' metadata2  in the store id " +
-			storeIdString + ". " + std::string(redis_reply->str), DPS_STORE_HASH_METADATA2_CREATION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Fatal error: Inside clear, it failed for store id " << storeIdString << ". " << DPS_STORE_HASH_METADATA2_CREATION_ERROR, "RedisDBLayer");
-		freeReplyObject(redis_reply);
+			storeIdString + ". Error=" + std::string(redis_cluster_reply->str), DPS_STORE_HASH_METADATA2_CREATION_ERROR);
+		SPLAPPTRC(L_DEBUG, "Fatal error: Inside clear, it failed for store id " << storeIdString <<
+			". Error=" << std::string(redis_cluster_reply->str) << ". " <<
+			DPS_STORE_HASH_METADATA2_CREATION_ERROR, "RedisClusterDBLayer");
+		freeReplyObject(redis_cluster_reply);
 		releaseStoreLock(storeIdString);
 		return;
 	}
 
-	freeReplyObject(redis_reply);
+	freeReplyObject(redis_cluster_reply);
 
 	// 3) Value spl type name.
 	cmd = string(REDIS_HSET_CMD) + keyString + " " +
 		string(REDIS_SPL_TYPE_NAME_OF_VALUE) + " " + valueSplTypeName;
-	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-	if (redis_reply->type == REDIS_REPLY_ERROR) {
+	if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Problem in creating the "Store Content Hash" metadata3 entry in the cache.
 		dbError.set("Fatal error in clear method: Unable to recreate 'Store Contents Hash' metadata3  in the store id " +
-			storeIdString + ". " + std::string(redis_reply->str), DPS_STORE_HASH_METADATA3_CREATION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Fatal error: Inside clear, it failed for store id " << storeIdString << ". " << DPS_STORE_HASH_METADATA3_CREATION_ERROR, "RedisDBLayer");
-		freeReplyObject(redis_reply);
+			storeIdString + ". Error=" + std::string(redis_cluster_reply->str), DPS_STORE_HASH_METADATA3_CREATION_ERROR);
+		SPLAPPTRC(L_DEBUG, "Fatal error: Inside clear, it failed for store id " << storeIdString <<
+			". Error=" << std::string(redis_cluster_reply->str) << ". " <<
+			DPS_STORE_HASH_METADATA3_CREATION_ERROR, "RedisClusterDBLayer");
+		freeReplyObject(redis_cluster_reply);
 		releaseStoreLock(storeIdString);
 		return;
 	}
 
-	freeReplyObject(redis_reply);
+	freeReplyObject(redis_cluster_reply);
 
  	// If there was an error in the store contents hash recreation, then this store is going to be in a weird state.
 	// It is a fatal error. If that happened, something terribly had gone wrong in clearing the contents.
@@ -1403,9 +1333,9 @@ namespace distributed
  	releaseStoreLock(storeIdString);
   }
         
-  uint64_t RedisDBLayer::size(uint64_t store, PersistenceError & dbError)
+  uint64_t RedisClusterDBLayer::size(uint64_t store, PersistenceError & dbError)
   {
-	SPLAPPTRC(L_DEBUG, "Inside size for store id " << store, "RedisDBLayer");
+	SPLAPPTRC(L_DEBUG, "Inside size for store id " << store, "RedisClusterDBLayer");
 
 	std::ostringstream storeId;
 	storeId << store;
@@ -1414,10 +1344,10 @@ namespace distributed
 	// Ensure that a store exists for the given store id.
 	if (storeIdExistsOrNot(storeIdString, dbError) == false) {
 		if (dbError.hasError() == true) {
-			SPLAPPTRC(L_DEBUG, "Inside size, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside size, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		} else {
 			dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside size, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside size, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisClusterDBLayer");
 		}
 
 		return(false);
@@ -1430,7 +1360,7 @@ namespace distributed
  	string valueSplTypeName = "";
 
 	if (readStoreInformation(storeIdString, dbError, dataItemCnt, storeName, keySplTypeName, valueSplTypeName) == false) {
-		SPLAPPTRC(L_DEBUG, "Inside size, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+		SPLAPPTRC(L_DEBUG, "Inside size, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		return(0);
 	}
 
@@ -1441,7 +1371,7 @@ namespace distributed
   // Hence, it is required to based64 encode them before storing the
   // key:value data item in Redis.
   // (Use boost functions to do this.)
-  void RedisDBLayer::base64_encode(std::string const & str, std::string & base64) {
+  void RedisClusterDBLayer::base64_encode(std::string const & str, std::string & base64) {
 	  // Insert line breaks for every 64KB characters.
 	  typedef insert_linebreaks<base64_from_binary<transform_width<string::const_iterator,6,8> >, 64*1024 > it_base64_t;
 
@@ -1454,7 +1384,7 @@ namespace distributed
   // If we need to get back the original key name, this function will help us in
   // decoding the base64 encoded key.
   // (Use boost functions to do this.)
-  void RedisDBLayer::base64_decode(std::string & base64, std::string & result) {
+  void RedisClusterDBLayer::base64_decode(std::string & base64, std::string & result) {
 	  // IMPORTANT:
 	  // For performance reasons, we are not passing a const string to this method.
 	  // Instead, we are passing a directly modifiable reference. Caller should be aware that
@@ -1469,37 +1399,36 @@ namespace distributed
   }
 
   // This method will check if a store exists for a given store id.
-  bool RedisDBLayer::storeIdExistsOrNot(string storeIdString, PersistenceError & dbError) {
+  bool RedisClusterDBLayer::storeIdExistsOrNot(string storeIdString, PersistenceError & dbError) {
 	  string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
-	  int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
 	  string cmd = string(REDIS_EXISTS_CMD) + keyString;
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-	  if (redis_reply == NULL) {
-		dbError.set("StoreIdExistsOrNot: Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+	  if (redis_cluster_reply == NULL) {
+		dbError.set("StoreIdExistsOrNot: Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
 		return(false);
 	  }
 
-	  if (redis_reply->type == REDIS_REPLY_ERROR) {
+	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Unable to get the store contents hash for the given store id.
 		dbError.set("StoreIdExistsOrNot: Unable to get StoreContentsHash from the StoreId " + storeIdString +
-			". " + std::string(redis_reply->str), DPS_GET_STORE_CONTENTS_HASH_ERROR);
-		freeReplyObject(redis_reply);
+			". Error=" + std::string(redis_cluster_reply->str), DPS_GET_STORE_CONTENTS_HASH_ERROR);
+		freeReplyObject(redis_cluster_reply);
 		return(false);
 	  }
 
 	  bool storeIdExists = true;
 
-	  if (redis_reply->integer == (int)0) {
+	  if (redis_cluster_reply->integer == (int)0) {
 		  storeIdExists = false;
 	  }
 
-	  freeReplyObject(redis_reply);
+	  freeReplyObject(redis_cluster_reply);
 	  return(storeIdExists);
   }
 
   // This method will acquire a lock for a given store.
-  bool RedisDBLayer::acquireStoreLock(string const & storeIdString) {
+  bool RedisClusterDBLayer::acquireStoreLock(string const & storeIdString) {
 	  int32_t retryCnt = 0;
 	  string cmd = "";
 
@@ -1507,56 +1436,55 @@ namespace distributed
 	  while (1) {
 		// '4' + 'store id' + 'dps_lock' => 1
 		std::string storeLockKey = string(DPS_STORE_LOCK_TYPE) + storeIdString + DPS_LOCK_TOKEN;
-		int32_t partitionIdx = getRedisServerPartitionIndex(storeLockKey);
 		// This is an atomic activity.
 		// If multiple threads attempt to do it at the same time, only one will succeed.
 		// Winner will hold the lock until they release it voluntarily or
 		// until the Redis back-end removes this lock entry after the DPS_AND_DL_GET_LOCK_TTL times out.
 		cmd = string(REDIS_SETNX_CMD) + storeLockKey + " " + "1";
-		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeLockKey, cmd.c_str()));
 
-		if (redis_reply == NULL) {
+		if (redis_cluster_reply == NULL) {
 			return(false);
 		}
 
-		if (redis_reply->type == REDIS_REPLY_ERROR) {
+		if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 			// Problem in atomic creation of the store lock.
-			freeReplyObject(redis_reply);
+			freeReplyObject(redis_cluster_reply);
 			return(false);
 		}
 
-		if (redis_reply->integer == (int)1) {
+		if (redis_cluster_reply->integer == (int)1) {
 			// We got the lock.
 			// Set the expiration time for this lock key.
-			freeReplyObject(redis_reply);
+			freeReplyObject(redis_cluster_reply);
 			std::ostringstream cmd_stream;
 			cmd_stream << string(REDIS_EXPIRE_CMD) << storeLockKey << " " << DPS_AND_DL_GET_LOCK_TTL;
 			cmd = cmd_stream.str();
-			redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeLockKey, cmd.c_str()));
 
-			if (redis_reply == NULL) {
+			if (redis_cluster_reply == NULL) {
 				// Delete the erroneous lock data item we created.
 				cmd = string(REDIS_DEL_CMD) + " " + storeLockKey;
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-				freeReplyObject(redis_reply);
+				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeLockKey, cmd.c_str()));
+				freeReplyObject(redis_cluster_reply);
 				return(false);
 			}
 
-			if (redis_reply->type == REDIS_REPLY_ERROR) {
+			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				// Problem in atomic creation of the store lock.
-				freeReplyObject(redis_reply);
+				freeReplyObject(redis_cluster_reply);
 				// Delete the erroneous lock data item we created.
 				cmd = string(REDIS_DEL_CMD) + " " + storeLockKey;
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-				freeReplyObject(redis_reply);
+				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeLockKey, cmd.c_str()));
+				freeReplyObject(redis_cluster_reply);
 				return(false);
 			}
 
-			freeReplyObject(redis_reply);
+			freeReplyObject(redis_cluster_reply);
 			return(true);
 		}
 
-		freeReplyObject(redis_reply);
+		freeReplyObject(redis_cluster_reply);
 		// Someone else is holding on to the lock of this store. Wait for a while before trying again.
 		retryCnt++;
 
@@ -1573,16 +1501,15 @@ namespace distributed
 	  return(false);
   }
 
-  void RedisDBLayer::releaseStoreLock(string const & storeIdString) {
+  void RedisClusterDBLayer::releaseStoreLock(string const & storeIdString) {
 	  // '4' + 'store id' + 'dps_lock' => 1
 	  std::string storeLockKey = DPS_STORE_LOCK_TYPE + storeIdString + DPS_LOCK_TOKEN;
-	  int32_t partitionIdx = getRedisServerPartitionIndex(storeLockKey);
 	  string cmd = string(REDIS_DEL_CMD) + storeLockKey;
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-	  freeReplyObject(redis_reply);
+	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeLockKey, cmd.c_str()));
+	  freeReplyObject(redis_cluster_reply);
   }
 
-  bool RedisDBLayer::readStoreInformation(std::string const & storeIdString, PersistenceError & dbError,
+  bool RedisClusterDBLayer::readStoreInformation(std::string const & storeIdString, PersistenceError & dbError,
 		  uint32_t & dataItemCnt, std::string & storeName, std::string & keySplTypeName, std::string & valueSplTypeName) {
 	  // Read the store name, this store's key and value SPL type names,  and get the store size.
 	  storeName = "";
@@ -1598,26 +1525,25 @@ namespace distributed
 	  // dps_spl_type_name_of_value ==> 'spl type name for this store's value'
 	  // 1) Get the store name.
 	  string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
-	  int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
 	  string cmd = string(REDIS_HGET_CMD) + keyString +
 			  " " + string(REDIS_STORE_ID_TO_STORE_NAME_KEY);
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-	  if (redis_reply == NULL) {
-		dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+	  if (redis_cluster_reply == NULL) {
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
 		return(false);
 	  }
 
-	  if (redis_reply->type == REDIS_REPLY_ERROR) {
+	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Unable to get the metadata1 from the store contents hash for the given store id.
 		dbError.set("Unable to get StoreContentsHash metadata1 from the StoreId " + storeIdString +
-			". " + std::string(redis_reply->str), DPS_GET_STORE_CONTENTS_HASH_ERROR);
-		freeReplyObject(redis_reply);
+			". Error=" + std::string(redis_cluster_reply->str), DPS_GET_STORE_CONTENTS_HASH_ERROR);
+		freeReplyObject(redis_cluster_reply);
 		return(false);
 	  }
 
-	  storeName = string(redis_reply->str);
-	  freeReplyObject(redis_reply);
+	  storeName = string(redis_cluster_reply->str);
+	  freeReplyObject(redis_cluster_reply);
 
 	  if (storeName == "") {
 		  // Unable to get the name of this store.
@@ -1628,23 +1554,23 @@ namespace distributed
 	  // 2) Let us get the spl type name for this store's key.
 	  cmd = string(REDIS_HGET_CMD) + keyString +
 			  " " + string(REDIS_SPL_TYPE_NAME_OF_KEY);
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-	  if (redis_reply == NULL) {
-		dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+	  if (redis_cluster_reply == NULL) {
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
 		return(false);
 	  }
 
-	  if (redis_reply->type == REDIS_REPLY_ERROR) {
+	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Unable to get the metadata2 from the store contents hash for the given store id.
 		dbError.set("Unable to get StoreContentsHash metadata2 from the StoreId " + storeIdString +
-			". " + std::string(redis_reply->str), DPS_GET_STORE_CONTENTS_HASH_ERROR);
-		freeReplyObject(redis_reply);
+			". Error=" + std::string(redis_cluster_reply->str), DPS_GET_STORE_CONTENTS_HASH_ERROR);
+		freeReplyObject(redis_cluster_reply);
 		return(false);
 	  }
 
-	  keySplTypeName = string(redis_reply->str);
-	  freeReplyObject(redis_reply);
+	  keySplTypeName = string(redis_cluster_reply->str);
+	  freeReplyObject(redis_cluster_reply);
 
 	  if (keySplTypeName == "") {
 		  // Unable to get the spl type name for this store's key.
@@ -1655,23 +1581,23 @@ namespace distributed
 	  // 3) Let us get the spl type name for this store's value.
 	  cmd = string(REDIS_HGET_CMD) + keyString +
 			  " " + string(REDIS_SPL_TYPE_NAME_OF_VALUE);
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-	  if (redis_reply == NULL) {
-		dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+	  if (redis_cluster_reply == NULL) {
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
 		return(false);
 	  }
 
-	  if (redis_reply->type == REDIS_REPLY_ERROR) {
+	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Unable to get the metadata3 from the store contents hash for the given store id.
 		dbError.set("Unable to get StoreContentsHash metadata3 from the StoreId " + storeIdString +
-			". " + std::string(redis_reply->str), DPS_GET_STORE_CONTENTS_HASH_ERROR);
-		freeReplyObject(redis_reply);
+			". Error=" + std::string(redis_cluster_reply->str), DPS_GET_STORE_CONTENTS_HASH_ERROR);
+		freeReplyObject(redis_cluster_reply);
 		return(false);
 	  }
 
-	  valueSplTypeName = string(redis_reply->str);
-	  freeReplyObject(redis_reply);
+	  valueSplTypeName = string(redis_cluster_reply->str);
+	  freeReplyObject(redis_cluster_reply);
 
 	  if (valueSplTypeName == "") {
 		  // Unable to get the spl type name for this store's value.
@@ -1681,36 +1607,36 @@ namespace distributed
 
 	  // 4) Let us get the size of the store contents hash now.
 	  cmd = string(REDIS_HLEN_CMD) + keyString;
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-	  if (redis_reply == NULL) {
-		  dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+	  if (redis_cluster_reply == NULL) {
+		  dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
 		  return(false);
 	  }
 
-	  if (redis_reply->type == REDIS_REPLY_ERROR) {
+	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		  // Unable to get the store contents hash for the given store id.
 		  dbError.set("Unable to get StoreContentsHash size from the StoreId " + storeIdString +
-				  ". " + std::string(redis_reply->str), DPS_GET_STORE_SIZE_ERROR);
-		  freeReplyObject(redis_reply);
+				  ". Error=" + std::string(redis_cluster_reply->str), DPS_GET_STORE_SIZE_ERROR);
+		  freeReplyObject(redis_cluster_reply);
 		  return(false);
 	  }
 
 	  // Our Store Contents Hash for every store will have a mandatory reserved internal elements (store name, key spl type name, and value spl type name).
 	  // Let us not count those three elements in the actual store contents hash size that the caller wants now.
-	  if (redis_reply->integer <= 0) {
+	  if (redis_cluster_reply->integer <= 0) {
 		  // This is not correct. We must have a minimum hash size of 3 because of the reserved elements.
 		  dbError.set("Wrong value (zero) observed as the store size for StoreId " + storeIdString + ".", DPS_GET_STORE_SIZE_ERROR);
-		  freeReplyObject(redis_reply);
+		  freeReplyObject(redis_cluster_reply);
 		  return(false);
 	  }
 
-	  dataItemCnt = redis_reply->integer - 3;
-	  freeReplyObject(redis_reply);
+	  dataItemCnt = redis_cluster_reply->integer - 3;
+	  freeReplyObject(redis_cluster_reply);
 	  return(true);
   }
 
-  string RedisDBLayer::getStoreName(uint64_t store, PersistenceError & dbError) {
+  string RedisClusterDBLayer::getStoreName(uint64_t store, PersistenceError & dbError) {
 	std::ostringstream storeId;
 	storeId << store;
 	string storeIdString = storeId.str();
@@ -1718,10 +1644,10 @@ namespace distributed
 	// Ensure that a store exists for the given store id.
 	if (storeIdExistsOrNot(storeIdString, dbError) == false) {
 		if (dbError.hasError() == true) {
-			SPLAPPTRC(L_DEBUG, "Inside getStoreName, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside getStoreName, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		} else {
 			dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside getStoreName, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside getStoreName, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisClusterDBLayer");
 		}
 
 		return("");
@@ -1733,7 +1659,7 @@ namespace distributed
 	  string valueSplTypeName = "";
 
 	  if (readStoreInformation(storeIdString, dbError, dataItemCnt, storeName, keySplTypeName, valueSplTypeName) == false) {
-		  SPLAPPTRC(L_DEBUG, "Inside getStoreName, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+		  SPLAPPTRC(L_DEBUG, "Inside getStoreName, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		  return("");
 	  }
 
@@ -1742,7 +1668,7 @@ namespace distributed
 	  return(base64_decoded_storeName);
   }
 
-  string RedisDBLayer::getSplTypeNameForKey(uint64_t store, PersistenceError & dbError) {
+  string RedisClusterDBLayer::getSplTypeNameForKey(uint64_t store, PersistenceError & dbError) {
 	std::ostringstream storeId;
 	storeId << store;
 	string storeIdString = storeId.str();
@@ -1750,10 +1676,10 @@ namespace distributed
 	// Ensure that a store exists for the given store id.
 	if (storeIdExistsOrNot(storeIdString, dbError) == false) {
 		if (dbError.hasError() == true) {
-			SPLAPPTRC(L_DEBUG, "Inside getSplTypeNameForKey, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside getSplTypeNameForKey, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		} else {
 			dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside getSplTypeNameForKey, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside getSplTypeNameForKey, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisClusterDBLayer");
 		}
 
 		return("");
@@ -1765,7 +1691,7 @@ namespace distributed
 	  string valueSplTypeName = "";
 
 	  if (readStoreInformation(storeIdString, dbError, dataItemCnt, storeName, keySplTypeName, valueSplTypeName) == false) {
-		  SPLAPPTRC(L_DEBUG, "Inside getSplTypeNameForKey, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+		  SPLAPPTRC(L_DEBUG, "Inside getSplTypeNameForKey, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		  return("");
 	  }
 
@@ -1774,7 +1700,7 @@ namespace distributed
 	  return(base64_decoded_keySplTypeName);
   }
 
-  string RedisDBLayer::getSplTypeNameForValue(uint64_t store, PersistenceError & dbError) {
+  string RedisClusterDBLayer::getSplTypeNameForValue(uint64_t store, PersistenceError & dbError) {
 	std::ostringstream storeId;
 	storeId << store;
 	string storeIdString = storeId.str();
@@ -1782,10 +1708,10 @@ namespace distributed
 	// Ensure that a store exists for the given store id.
 	if (storeIdExistsOrNot(storeIdString, dbError) == false) {
 		if (dbError.hasError() == true) {
-			SPLAPPTRC(L_DEBUG, "Inside getSplTypeNameForValue, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside getSplTypeNameForValue, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		} else {
 			dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside getSplTypeNameForValue, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside getSplTypeNameForValue, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisClusterDBLayer");
 		}
 
 		return("");
@@ -1797,7 +1723,7 @@ namespace distributed
 	  string valueSplTypeName = "";
 
 	  if (readStoreInformation(storeIdString, dbError, dataItemCnt, storeName, keySplTypeName, valueSplTypeName) == false) {
-		  SPLAPPTRC(L_DEBUG, "Inside getSplTypeNameForValue, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+		  SPLAPPTRC(L_DEBUG, "Inside getSplTypeNameForValue, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		  return("");
 	  }
 
@@ -1806,17 +1732,17 @@ namespace distributed
 	  return(base64_decoded_valueSplTypeName);
   }
 
-  std::string RedisDBLayer::getNoSqlDbProductName(void) {
-	  return(string(REDIS_NO_SQL_DB_NAME));
+  std::string RedisClusterDBLayer::getNoSqlDbProductName(void) {
+	  return(string(REDIS_CLUSTER_NO_SQL_DB_NAME));
   }
 
-  void RedisDBLayer::getDetailsAboutThisMachine(std::string & machineName, std::string & osVersion, std::string & cpuArchitecture) {
+  void RedisClusterDBLayer::getDetailsAboutThisMachine(std::string & machineName, std::string & osVersion, std::string & cpuArchitecture) {
 	  machineName = nameOfThisMachine;
 	  osVersion = osVersionOfThisMachine;
 	  cpuArchitecture = cpuTypeOfThisMachine;
   }
 
-  bool RedisDBLayer::runDataStoreCommand(std::string const & cmd, PersistenceError & dbError) {
+  bool RedisClusterDBLayer::runDataStoreCommand(std::string const & cmd, PersistenceError & dbError) {
 	  // If users want to execute simple arbitrary back-end data store (fire and forget)
 	  // native commands, this API can be used. This covers any Redis or Cassandra(CQL)
 	  // native commands that don't have to fetch and return K/V pairs or return size of the db etc.
@@ -1829,42 +1755,67 @@ namespace distributed
 	  //
 	  // We will simply take your command string and run it. So, be sure of what
 	  // command you are sending here.
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[0].rdsc, cmd.c_str());
+	  //
+	  // In the Redis-cluster wrapper hiredis API, we must pass the key. Usually, it is the second token in
+	  // the command string passed by the caller. Let us parse it now.
+	  char cmdBuf[2048];
+	  strcpy(cmdBuf, cmd.c_str());
+	  char *ptr = strtok(cmdBuf, " ");
+	  int tokenCnt = 0;
+	  string keyString = "";
 
-	  if (redis_reply == NULL) {
-		  dbError.set("From Redis data store: Unable to connect to the redis server(s). " + std::string(redisPartitions[0].rdsc->errstr), DPS_CONNECTION_ERROR);
+	  while(ptr) {
+		tokenCnt++;
+		if (tokenCnt == 1) {
+		  // This must be our first token.
+	      // Skip this one.
+		  ptr = strtok(NULL, " ");
+		} else {
+		  // This must be our second token.
+		  keyString = string(ptr);
+		  // We are done.
+		  break;
+		}
+	  }
+
+	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+
+	  if (redis_cluster_reply == NULL) {
+		  dbError.set("From Redis data store: Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
 		  SPLAPPTRC(L_DEBUG, "From Redis data store: Inside runDataStoreCommand, it failed to run this command: '" <<
-				  cmd << "'. Error=" << std::string(redisPartitions[0].rdsc->errstr) << ". " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+				  cmd << "'. Failed with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		  return(false);
 	  }
 
-	  if (redis_reply->type == REDIS_REPLY_ERROR) {
+	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		  // Problem in running an arbitrary data store command.
-		  dbError.set("From Redis data store: Unable to run this command: '" + cmd + "'. Error=" + std::string(redis_reply->str), DPS_RUN_DATA_STORE_COMMAND_ERROR);
+		  dbError.set("From Redis data store: Unable to run this command: '" + cmd + "'. Error=" +
+			  std::string(redis_cluster_reply->str), DPS_RUN_DATA_STORE_COMMAND_ERROR);
 		  SPLAPPTRC(L_DEBUG, "From Redis data store: Inside runDataStoreCommand, it failed to run this command: '" << cmd <<
-				  "'. Error=" + std::string(redis_reply->str) << ". " << DPS_RUN_DATA_STORE_COMMAND_ERROR, "RedisDBLayer");
-		  freeReplyObject(redis_reply);
+			  "'. Error=" << std::string(redis_cluster_reply->str) << ". " <<
+			  DPS_RUN_DATA_STORE_COMMAND_ERROR, "RedisClusterDBLayer");
+		  freeReplyObject(redis_cluster_reply);
 		  return(false);
 	  }
 
-	  freeReplyObject(redis_reply);
+	  freeReplyObject(redis_cluster_reply);
 	  return(true);
   }
 
-  bool RedisDBLayer::runDataStoreCommand(uint32_t const & cmdType, std::string const & httpVerb,
+  bool RedisClusterDBLayer::runDataStoreCommand(uint32_t const & cmdType, std::string const & httpVerb,
 		std::string const & baseUrl, std::string const & apiEndpoint, std::string const & queryParams,
 		std::string const & jsonRequest, std::string & jsonResponse, PersistenceError & dbError) {
 		// This API can only be supported in NoSQL data stores such as Cloudant, HBase etc.
 		// Redis doesn't have a way to do this.
 		dbError.set("From Redis data store: This API to run native data store commands is not supported in Redis.", DPS_RUN_DATA_STORE_COMMAND_ERROR);
-		SPLAPPTRC(L_DEBUG, "From Redis data store: This API to run native data store commands is not supported in Redis. " << DPS_RUN_DATA_STORE_COMMAND_ERROR, "RedisDBLayer");
+		SPLAPPTRC(L_DEBUG, "From Redis data store: This API to run native data store commands is not supported in Redis. " << DPS_RUN_DATA_STORE_COMMAND_ERROR, "RedisClusterDBLayer");
 		return(false);
   }
 
   // This method will get the data item from the store for a given key.
   // Caller of this method can also ask us just to find if a data item
   // exists in the store without the extra work of fetching and returning the data item value.
-  bool RedisDBLayer::getDataItemFromStore(std::string const & storeIdString,
+  bool RedisClusterDBLayer::getDataItemFromStore(std::string const & storeIdString,
 		  std::string const & keyDataString, bool const & checkOnlyForDataItemExistence,
 		  bool const & skipDataItemExistenceCheck, unsigned char * & valueData,
 		  uint32_t & valueSize, PersistenceError & dbError) {
@@ -1874,35 +1825,34 @@ namespace distributed
 		// you read it due to the data write made by some other thread. Such is life in a global distributed in-memory store.
 	    string cmd = "";
     	string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
-    	int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
 
 	  	// If the caller doesn't want to perform the data existence check to save time, honor that wish here.
 	    if (skipDataItemExistenceCheck == false) {
 			// This action is performed on the Store Contents Hash that takes the following format.
 			// '1' + 'store id' => 'Redis Hash'  [It will always have this entry: dps_name_of_this_store ==> 'store name']
 			cmd = string(REDIS_HEXISTS_CMD) + keyString + " " + keyDataString;
-			redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-			if (redis_reply == NULL) {
-				dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+			if (redis_cluster_reply == NULL) {
+				dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
 				return(false);
 			}
 
-			if (redis_reply->type == REDIS_REPLY_ERROR) {
+			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				// Unable to check for the existence of the data item.
 				dbError.set("Unable to check for the existence of the data item in the StoreId " + storeIdString +
-					". " + std::string(redis_reply->str), DPS_KEY_EXISTENCE_CHECK_ERROR);
-				freeReplyObject(redis_reply);
+					". Error=" + std::string(redis_cluster_reply->str), DPS_KEY_EXISTENCE_CHECK_ERROR);
+				freeReplyObject(redis_cluster_reply);
 				return(false);
 			}
 
 			bool dataItemExists = true;
 
-			if (redis_reply->integer == int(0)) {
+			if (redis_cluster_reply->integer == int(0)) {
 				dataItemExists = false;
 			}
 
-			freeReplyObject(redis_reply);
+			freeReplyObject(redis_cluster_reply);
 
 			// If the caller only wanted us to check for the data item existence, we can exit now.
 			if (checkOnlyForDataItemExistence == true) {
@@ -1922,38 +1872,38 @@ namespace distributed
 
 	    // Fetch the data item now.
 		cmd = string(REDIS_HGET_CMD) + keyString + " " + keyDataString;
-		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
 
-		if (redis_reply == NULL) {
-			dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+		if (redis_cluster_reply == NULL) {
+			dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
 			return(false);
 		}
 
 		// If SUCCESS, this result can come as an empty string.
-		if (redis_reply->type == REDIS_REPLY_ERROR) {
+		if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 			// Unable to get the requested data item from the cache.
 			dbError.set("Unable to get the requested data item from the store with the StoreId " + storeIdString +
-				". " + std::string(redis_reply->str), DPS_DATA_ITEM_READ_ERROR);
-			freeReplyObject(redis_reply);
+				". Error=" + std::string(redis_cluster_reply->str), DPS_DATA_ITEM_READ_ERROR);
+			freeReplyObject(redis_cluster_reply);
 			return(false);
 		}
 
-		if (redis_reply->type == REDIS_REPLY_NIL) {
+		if (redis_cluster_reply->type == REDIS_REPLY_NIL) {
 			// Requested data item is not there in the cache.
 			dbError.set("The requested data item doesn't exist in the StoreId " + storeIdString +
 				".", DPS_DATA_ITEM_READ_ERROR);
-			freeReplyObject(redis_reply);
+			freeReplyObject(redis_cluster_reply);
 			return(false);
 		}
 
 		// Data item value read from the store will be in this format: 'value'
-		if ((unsigned)redis_reply->len == 0) {
+		if ((unsigned)redis_cluster_reply->len == 0) {
 			// User stored empty data item value in the cache.
 			valueData = (unsigned char *)"";
 			valueSize = 0;
 		} else {
 			// We can allocate memory for the exact length of the data item value.
-			valueSize = redis_reply->len;
+			valueSize = redis_cluster_reply->len;
 			valueData = (unsigned char *) malloc(valueSize);
 
 			if (valueData == NULL) {
@@ -1961,21 +1911,21 @@ namespace distributed
 				dbError.set("Unable to allocate memory to copy the data item value for the StoreId " +
 					storeIdString + ".", DPS_GET_DATA_ITEM_MALLOC_ERROR);
 				// Free the response memory pointer handed to us.
-				freeReplyObject(redis_reply);
+				freeReplyObject(redis_cluster_reply);
 				valueSize = 0;
 				return(false);
 			}
 
 			// We expect the caller of this method to free the valueData pointer.
-			memcpy(valueData, redis_reply->str, valueSize);
+			memcpy(valueData, redis_cluster_reply->str, valueSize);
 		}
 
-		freeReplyObject(redis_reply);
+		freeReplyObject(redis_cluster_reply);
 	    return(true);
   }
 
-  RedisDBLayerIterator * RedisDBLayer::newIterator(uint64_t store, PersistenceError & dbError) {
-	  SPLAPPTRC(L_DEBUG, "Inside newIterator for store id " << store, "RedisDBLayer");
+  RedisClusterDBLayerIterator * RedisClusterDBLayer::newIterator(uint64_t store, PersistenceError & dbError) {
+	  SPLAPPTRC(L_DEBUG, "Inside newIterator for store id " << store, "RedisClusterDBLayer");
 
 	  std::ostringstream storeId;
 	  storeId << store;
@@ -1984,10 +1934,10 @@ namespace distributed
 	  // Ensure that a store exists for the given store id.
 	  if (storeIdExistsOrNot(storeIdString, dbError) == false) {
 		  if (dbError.hasError() == true) {
-			  SPLAPPTRC(L_DEBUG, "Inside newIterator, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+			  SPLAPPTRC(L_DEBUG, "Inside newIterator, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		  } else {
 			  dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
-			  SPLAPPTRC(L_DEBUG, "Inside newIterator, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisDBLayer");
+			  SPLAPPTRC(L_DEBUG, "Inside newIterator, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisClusterDBLayer");
 		  }
 
 		  return(false);
@@ -2000,28 +1950,26 @@ namespace distributed
 	  string valueSplTypeName = "";
 
 	  if (readStoreInformation(storeIdString, dbError, dataItemCnt, storeName, keySplTypeName, valueSplTypeName) == false) {
-		  SPLAPPTRC(L_DEBUG, "Inside newIterator, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+		  SPLAPPTRC(L_DEBUG, "Inside newIterator, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayer");
 		  return(NULL);
 	  }
 
 	  // It is a valid store. Create a new iterator and return it to the caller.
-	  string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
-	  int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
-	  RedisDBLayerIterator *iter = new RedisDBLayerIterator();
+	  RedisClusterDBLayerIterator *iter = new RedisClusterDBLayerIterator();
 	  iter->store = store;
 	  base64_decode(storeName, iter->storeName);
-	  // Give this iterator access to our redis connection handle.
-	  iter->rdsc = redisPartitions[partitionIdx].rdsc;
+	  // Give this iterator access to our redis-cluster connection handle.
+	  iter->redis_cluster = redis_cluster;
 	  iter->hasData = true;
-	  // Give this iterator access to our RedisDBLayer object.
-	  iter->redisDBLayerPtr = this;
+	  // Give this iterator access to our RedisClusterDBLayer object.
+	  iter->redisClusterDBLayerPtr = this;
 	  iter->sizeOfDataItemKeysVector = 0;
 	  iter->currentIndex = 0;
 	  return(iter);
   }
 
-  void RedisDBLayer::deleteIterator(uint64_t store, Iterator * iter, PersistenceError & dbError) {
-	  SPLAPPTRC(L_DEBUG, "Inside deleteIterator for store id " << store, "RedisDBLayer");
+  void RedisClusterDBLayer::deleteIterator(uint64_t store, Iterator * iter, PersistenceError & dbError) {
+	  SPLAPPTRC(L_DEBUG, "Inside deleteIterator for store id " << store, "RedisClusterDBLayer");
 
 	  if (iter == NULL) {
 		  return;
@@ -2031,7 +1979,7 @@ namespace distributed
 	  storeId << store;
 	  string storeIdString = storeId.str();
 
-	  RedisDBLayerIterator *myIter = static_cast<RedisDBLayerIterator *>(iter);
+	  RedisClusterDBLayerIterator *myIter = static_cast<RedisClusterDBLayerIterator *>(iter);
 
 	  // Let us ensure that the user wants to delete an iterator that really belongs to the store passed to us.
 	  // This will handle user's coding errors where a wrong combination of store id and iterator is passed to us for deletion.
@@ -2039,7 +1987,7 @@ namespace distributed
 		  // User sent us a wrong combination of a store and an iterator.
 		  dbError.set("A wrong iterator has been sent for deletion. This iterator doesn't belong to the StoreId " +
 		  				storeIdString + ".", DPS_STORE_ITERATION_DELETION_ERROR);
-		  SPLAPPTRC(L_DEBUG, "Inside deleteIterator, it failed for store id " << storeIdString << ". " << DPS_STORE_ITERATION_DELETION_ERROR, "RedisDBLayer");
+		  SPLAPPTRC(L_DEBUG, "Inside deleteIterator, it failed for store id " << storeIdString << ". " << DPS_STORE_ITERATION_DELETION_ERROR, "RedisClusterDBLayer");
 		  return;
 	  } else {
 		  delete iter;
@@ -2049,7 +1997,7 @@ namespace distributed
   // This method will acquire a lock for any given generic/arbitrary identifier passed as a string..
   // This is typically used inside the createStore, createOrGetStore, createOrGetLock methods to
   // provide thread safety. There are other lock acquisition/release methods once someone has a valid store id or lock id.
-  bool RedisDBLayer::acquireGeneralPurposeLock(string const & entityName) {
+  bool RedisClusterDBLayer::acquireGeneralPurposeLock(string const & entityName) {
 	  int32_t retryCnt = 0;
 	  string cmd = "";
 
@@ -2057,56 +2005,55 @@ namespace distributed
 	  while (1) {
 		// '501' + 'entity name' + 'generic_lock' => 1
 		std::string genericLockKey = GENERAL_PURPOSE_LOCK_TYPE + entityName + GENERIC_LOCK_TOKEN;
-		int32_t partitionIdx = getRedisServerPartitionIndex(genericLockKey);
 		// This is an atomic activity.
 		// If multiple threads attempt to do it at the same time, only one will succeed.
 		// Winner will hold the lock until they release it voluntarily or
 		// until the Redis back-end removes this lock entry after the DPS_AND_DL_GET_LOCK_TTL times out.
 		cmd = string(REDIS_SETNX_CMD) + genericLockKey + " " + "1";
-		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, genericLockKey, cmd.c_str()));
 
-		if (redis_reply == NULL) {
+		if (redis_cluster_reply == NULL) {
 			return(false);
 		}
 
-		if (redis_reply->type == REDIS_REPLY_ERROR) {
+		if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 			// Problem in atomic creation of the general purpose lock.
-			freeReplyObject(redis_reply);
+			freeReplyObject(redis_cluster_reply);
 			return(false);
 		}
 
-		if (redis_reply->integer == (int)1) {
+		if (redis_cluster_reply->integer == (int)1) {
 			// We got the lock.
 			// Set the expiration time for this lock key.
-			freeReplyObject(redis_reply);
+			freeReplyObject(redis_cluster_reply);
 			std::ostringstream cmd_stream;
 			cmd_stream << string(REDIS_EXPIRE_CMD) << genericLockKey << " " << DPS_AND_DL_GET_LOCK_TTL;
 			cmd = cmd_stream.str();
-			redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, genericLockKey, cmd.c_str()));
 
-			if (redis_reply == NULL) {
+			if (redis_cluster_reply == NULL) {
 				// Delete the erroneous lock data item we created.
 				cmd = string(REDIS_DEL_CMD) + " " + genericLockKey;
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-				freeReplyObject(redis_reply);
+				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, genericLockKey, cmd.c_str()));
+				freeReplyObject(redis_cluster_reply);
 				return(false);
 			}
 
-			if (redis_reply->type == REDIS_REPLY_ERROR) {
+			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				// Problem in atomic creation of the general purpose lock.
-				freeReplyObject(redis_reply);
+				freeReplyObject(redis_cluster_reply);
 				// Delete the erroneous lock data item we created.
 				cmd = string(REDIS_DEL_CMD) + " " + genericLockKey;
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-				freeReplyObject(redis_reply);
+				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, genericLockKey, cmd.c_str()));
+				freeReplyObject(redis_cluster_reply);
 				return(false);
 			}
 
-			freeReplyObject(redis_reply);
+			freeReplyObject(redis_cluster_reply);
 			return(true);
 		}
 
-		freeReplyObject(redis_reply);
+		freeReplyObject(redis_cluster_reply);
 		// Someone else is holding on to the lock of this entity. Wait for a while before trying again.
 		retryCnt++;
 
@@ -2123,26 +2070,25 @@ namespace distributed
 	  return(false);
   }
 
-  void RedisDBLayer::releaseGeneralPurposeLock(string const & entityName) {
+  void RedisClusterDBLayer::releaseGeneralPurposeLock(string const & entityName) {
 	  // '501' + 'entity name' + 'generic_lock' => 1
 	  std::string genericLockKey = GENERAL_PURPOSE_LOCK_TYPE + entityName + GENERIC_LOCK_TOKEN;
-	  int32_t partitionIdx = getRedisServerPartitionIndex(genericLockKey);
 	  string cmd = string(REDIS_DEL_CMD) + genericLockKey;
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-	  freeReplyObject(redis_reply);
+	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, genericLockKey, cmd.c_str()));
+	  freeReplyObject(redis_cluster_reply);
   }
 
-  RedisDBLayerIterator::RedisDBLayerIterator() {
-
-  }
-
-  RedisDBLayerIterator::~RedisDBLayerIterator() {
+  RedisClusterDBLayerIterator::RedisClusterDBLayerIterator() {
 
   }
 
-  bool RedisDBLayerIterator::getNext(uint64_t store, unsigned char * & keyData, uint32_t & keySize,
+  RedisClusterDBLayerIterator::~RedisClusterDBLayerIterator() {
+
+  }
+
+  bool RedisClusterDBLayerIterator::getNext(uint64_t store, unsigned char * & keyData, uint32_t & keySize,
   	  		unsigned char * & valueData, uint32_t & valueSize, PersistenceError & dbError) {
-	  SPLAPPTRC(L_DEBUG, "Inside getNext for store id " << store, "RedisDBLayerIterator");
+	  SPLAPPTRC(L_DEBUG, "Inside getNext for store id " << store, "RedisClusterDBLayerIterator");
 
 	  // If the iteration already ended, do a quick return back to the caller.
 	  // Another possibility we want to detect is whether the caller really passed the
@@ -2159,21 +2105,21 @@ namespace distributed
 	  string data_item_key = "";
 
 	  // Ensure that a store exists for the given store id.
-	  if (this->redisDBLayerPtr->storeIdExistsOrNot(storeIdString, dbError) == false) {
+	  if (this->redisClusterDBLayerPtr->storeIdExistsOrNot(storeIdString, dbError) == false) {
 		  if (dbError.hasError() == true) {
-			  SPLAPPTRC(L_DEBUG, "Inside getNext, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayerIterator");
+			  SPLAPPTRC(L_DEBUG, "Inside getNext, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayerIterator");
 		  } else {
 			  dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
-			  SPLAPPTRC(L_DEBUG, "Inside getNext, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisDBLayerIterator");
+			  SPLAPPTRC(L_DEBUG, "Inside getNext, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisClusterDBLayerIterator");
 		  }
 
 		  return(false);
 	  }
 
 	  // Ensure that this store is not empty at this time.
-	  if (this->redisDBLayerPtr->size(store, dbError) <= 0) {
+	  if (this->redisClusterDBLayerPtr->size(store, dbError) <= 0) {
 		  dbError.set("Store is empty for the StoreId " + storeIdString + ".", DPS_STORE_EMPTY_ERROR);
-		  SPLAPPTRC(L_DEBUG, "Inside getNext, it failed for store id " << storeIdString << ". " << DPS_STORE_EMPTY_ERROR, "RedisDBLayerIterator");
+		  SPLAPPTRC(L_DEBUG, "Inside getNext, it failed for store id " << storeIdString << ". " << DPS_STORE_EMPTY_ERROR, "RedisClusterDBLayerIterator");
 		  return(false);
 	  }
 
@@ -2182,39 +2128,44 @@ namespace distributed
 		  // Let us get the available data item keys from this store.
 		  this->dataItemKeys.clear();
 
-		  string cmd = string(REDIS_HKEYS_CMD) + string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
-		  this->redis_reply = (redisReply*)redisCommand(this->rdsc, cmd.c_str());
+		  string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
+		  string cmd = string(REDIS_HKEYS_CMD) + keyString;
+		  this->redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, keyString, cmd.c_str()));
 
-			if (this->redis_reply == NULL) {
-				dbError.set("Unable to connect to the redis server(s). " + std::string(this->rdsc->errstr), DPS_CONNECTION_ERROR);
+			if (this->redis_cluster_reply == NULL) {
+				dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
 				this->hasData = false;
 				return(false);
 			}
 
-			if (this->redis_reply->type == REDIS_REPLY_ERROR) {
+			if (this->redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				// Unable to get data item keys from the store.
 				dbError.set("Unable to get data item keys for the StoreId " + storeIdString +
-					". " + std::string(this->redis_reply->str), DPS_GET_STORE_DATA_ITEM_KEYS_ERROR);
-				SPLAPPTRC(L_DEBUG, "Inside getNext, it failed for store id " << storeIdString << ". " << DPS_GET_STORE_DATA_ITEM_KEYS_ERROR, "RedisDBLayerIterator");
-				freeReplyObject(this->redis_reply);
+					". Error=" + std::string(this->redis_cluster_reply->str), DPS_GET_STORE_DATA_ITEM_KEYS_ERROR);
+				SPLAPPTRC(L_DEBUG, "Inside getNext, it failed for store id " << storeIdString <<
+					". Error=" << std::string(this->redis_cluster_reply->str) << ". " <<
+					DPS_GET_STORE_DATA_ITEM_KEYS_ERROR, "RedisClusterDBLayerIterator");
+				freeReplyObject(this->redis_cluster_reply);
 				this->hasData = false;
 				return(false);
 			}
 
-			if (this->redis_reply->type != REDIS_REPLY_ARRAY) {
+			if (this->redis_cluster_reply->type != REDIS_REPLY_ARRAY) {
 				// Unable to get data item keys from the store in an array format.
 				dbError.set("Unable to get data item keys in an array format for the StoreId " + storeIdString +
-					". " + std::string(this->redis_reply->str), DPS_GET_STORE_DATA_ITEM_KEYS_AS_AN_ARRAY_ERROR);
-				SPLAPPTRC(L_DEBUG, "Inside getNext, it failed for store id " << storeIdString << ". " << DPS_GET_STORE_DATA_ITEM_KEYS_AS_AN_ARRAY_ERROR, "RedisDBLayerIterator");
-				freeReplyObject(this->redis_reply);
+					". Error=" + std::string(this->redis_cluster_reply->str), DPS_GET_STORE_DATA_ITEM_KEYS_AS_AN_ARRAY_ERROR);
+				SPLAPPTRC(L_DEBUG, "Inside getNext, it failed for store id " << storeIdString <<
+					". Error=" << std::string(this->redis_cluster_reply->str) << ". " <<
+					DPS_GET_STORE_DATA_ITEM_KEYS_AS_AN_ARRAY_ERROR, "RedisClusterDBLayerIterator");
+				freeReplyObject(this->redis_cluster_reply);
 				this->hasData = false;
 				return(false);
 			}
 
 			// We have the data item keys returned in array now.
 			// Let us insert them into the iterator object's member variable that will hold the data item keys for this store.
-	        for (unsigned int j = 0; j < this->redis_reply->elements; j++) {
-	        	data_item_key = string(this->redis_reply->element[j]->str);
+	        for (unsigned int j = 0; j < this->redis_cluster_reply->elements; j++) {
+	        	data_item_key = string(this->redis_cluster_reply->element[j]->str);
 
 	        	// Every dps store will have three mandatory reserved data item keys for internal use.
 	        	// Let us not add them to the iteration object's member variable.
@@ -2229,7 +2180,7 @@ namespace distributed
 	        	this->dataItemKeys.push_back(data_item_key);
 	        }
 
-	        freeReplyObject(this->redis_reply);
+	        freeReplyObject(this->redis_cluster_reply);
 	        this->sizeOfDataItemKeysVector = this->dataItemKeys.size();
 	        this->currentIndex = 0;
 
@@ -2259,12 +2210,12 @@ namespace distributed
 	  // Get this data item's value data and value size.
 	  // data_item_key was obtained straight from the store contents hash, where it is
 	  // already in the base64 encoded format.
-	  bool result = this->redisDBLayerPtr->getDataItemFromStore(storeIdString, data_item_key,
+	  bool result = this->redisClusterDBLayerPtr->getDataItemFromStore(storeIdString, data_item_key,
 		false, false, valueData, valueSize, dbError);
 
 	  if (result == false) {
 		  // Some error has occurred in reading the data item value.
-		  SPLAPPTRC(L_DEBUG, "Inside getNext, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayerIterator");
+		  SPLAPPTRC(L_DEBUG, "Inside getNext, it failed for store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterDBLayerIterator");
 		  // We will disable any future action for this store using the current iterator.
 		  this->hasData = false;
 		  return(false);
@@ -2274,7 +2225,7 @@ namespace distributed
 	  // In order to support spaces in data item keys, we base64 encoded them before storing it in Redis.
 	  // Let us base64 decode it now to get the original data item key.
 	  string base64_decoded_data_item_key;
-	  this->redisDBLayerPtr->base64_decode(data_item_key, base64_decoded_data_item_key);
+	  this->redisClusterDBLayerPtr->base64_decode(data_item_key, base64_decoded_data_item_key);
 	  data_item_key = base64_decoded_data_item_key;
 	  keySize = data_item_key.length();
 	  // Allocate memory for this key and copy it to that buffer.
@@ -2294,7 +2245,7 @@ namespace distributed
 		  keySize = 0;
 		  dbError.set("Unable to allocate memory for the keyData while doing the next data item iteration for the StoreId " +
 		  				storeIdString + ".", DPS_STORE_ITERATION_MALLOC_ERROR);
-		  SPLAPPTRC(L_DEBUG, "Inside getNext, it failed for store id " << storeIdString << ". " << DPS_STORE_ITERATION_MALLOC_ERROR, "RedisDBLayerIterator");
+		  SPLAPPTRC(L_DEBUG, "Inside getNext, it failed for store id " << storeIdString << ". " << DPS_STORE_ITERATION_MALLOC_ERROR, "RedisClusterDBLayerIterator");
 		  return(false);
 	  }
 
@@ -2308,8 +2259,8 @@ namespace distributed
 // Beyond this point, we have code that deals with the distributed locks that a SPL developer can
 // create, remove,acquire, and release.
 // =======================================================================================================
-  uint64_t RedisDBLayer::createOrGetLock(std::string const & name, PersistenceError & lkError) {
-		SPLAPPTRC(L_DEBUG, "Inside createOrGetLock with a name " << name, "RedisDBLayer");
+  uint64_t RedisClusterDBLayer::createOrGetLock(std::string const & name, PersistenceError & lkError) {
+		SPLAPPTRC(L_DEBUG, "Inside createOrGetLock with a name " << name, "RedisClusterDBLayer");
 
 		string base64_encoded_name;
 		base64_encode(name, base64_encoded_name);
@@ -2320,7 +2271,7 @@ namespace distributed
 	 		// Unable to acquire the general purpose lock.
 	 		lkError.set("Unable to get a generic lock for creating a lock with its name as " + name + ".", DPS_GET_GENERIC_LOCK_ERROR);
 	 		SPLAPPTRC(L_DEBUG, "Inside createOrGetLock, it failed for an yet to be created lock with its name as " <<
-	 			name << ". " << DPS_GET_GENERIC_LOCK_ERROR, "RedisDBLayer");
+	 			name << ". " << DPS_GET_GENERIC_LOCK_ERROR, "RedisClusterDBLayer");
 	 		// User has to retry again to create this distributed lock.
 	 		return 0;
 	 	}
@@ -2331,73 +2282,78 @@ namespace distributed
 		// "5" at the beginning followed by the actual lock name.
 		// '5' + 'lock name' ==> 'lock id'
 		std::string lockNameKey = DL_LOCK_NAME_TYPE + base64_encoded_name;
-		int32_t partitionIdx = getRedisServerPartitionIndex(lockNameKey);
 		std::string cmd = string(REDIS_EXISTS_CMD) + lockNameKey;
-		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
 
-		// If we get a NULL reply, then it indicates a redis server connection error.
-		if (redis_reply == NULL) {
-			lkError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DL_CONNECTION_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside createOrGetLock, it failed for the lock named " << name << ". " << DL_CONNECTION_ERROR, "RedisDBLayer");
+		// If we get a NULL reply, then it indicates a redis-cluster server connection error.
+		if (redis_cluster_reply == NULL) {
+			lkError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DL_CONNECTION_ERROR);
+			SPLAPPTRC(L_DEBUG, "Inside createOrGetLock, it failed for the lock named " << name << " with a NULL redisReply. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
 			return(0);
 		}
 
-		if (redis_reply->integer == (int)1) {
+		if (redis_cluster_reply->integer == (int)1) {
 			// This lock already exists in our cache.
 			// We can get the lockId and return it to the caller.
-			freeReplyObject(redis_reply);
+			freeReplyObject(redis_cluster_reply);
 			cmd = string(REDIS_GET_CMD) + lockNameKey;
-			redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
 
-			if (redis_reply->type == REDIS_REPLY_ERROR) {
+			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				// Unable to get an existing lock id from the cache.
-				lkError.set("Unable to get the lockId for the lockName " + name + ". " + std::string(redis_reply->str), DL_GET_LOCK_ID_ERROR);
-				SPLAPPTRC(L_DEBUG, "Inside createOrGetLock, it failed for the lockName " << name << ". " << DL_GET_LOCK_ID_ERROR, "RedisDBLayer");
-				freeReplyObject(redis_reply);
+				lkError.set("Unable to get the lockId for the lockName " + name + ". Error=" +
+					std::string(redis_cluster_reply->str), DL_GET_LOCK_ID_ERROR);
+				SPLAPPTRC(L_DEBUG, "Inside createOrGetLock, it failed for the lockName " << name <<
+					". Error=" << std::string(redis_cluster_reply->str) << ". " <<
+					DL_GET_LOCK_ID_ERROR, "RedisClusterDBLayer");
+				freeReplyObject(redis_cluster_reply);
 				releaseGeneralPurposeLock(base64_encoded_name);
 				return(0);
 			} else {
 				uint64_t lockId = 0;
 
-				if (redis_reply->len > 0) {
-					lockId = streams_boost::lexical_cast<uint64_t>(redis_reply->str);
+				if (redis_cluster_reply->len > 0) {
+					lockId = streams_boost::lexical_cast<uint64_t>(redis_cluster_reply->str);
 				} else {
 					// Unable to get the lock information. It is an abnormal error. Convey this to the caller.
 					lkError.set("Redis returned an empty lockId for the lockName " + name + ".", DL_GET_LOCK_ID_ERROR);
-					SPLAPPTRC(L_DEBUG, "Inside createOrGetLock, it failed with an empty lockId for the lockName " << name << ". " << DL_GET_LOCK_ID_ERROR, "RedisDBLayer");
-					freeReplyObject(redis_reply);
+					SPLAPPTRC(L_DEBUG, "Inside createOrGetLock, it failed with an empty lockId for the lockName " <<
+						name << ". " << DL_GET_LOCK_ID_ERROR, "RedisClusterDBLayer");
+					freeReplyObject(redis_cluster_reply);
 					releaseGeneralPurposeLock(base64_encoded_name);
 					return(0);
 				}
 
-				freeReplyObject(redis_reply);
+				freeReplyObject(redis_cluster_reply);
 				releaseGeneralPurposeLock(base64_encoded_name);
 				return(lockId);
 			}
 		}
 
-		if (redis_reply->integer == (int)0) {
+		if (redis_cluster_reply->integer == (int)0) {
 			// Create a new lock.
 			// At first, let us increment our global dps_and_dl_guid to reserve a new lock id.
-			freeReplyObject(redis_reply);
+			freeReplyObject(redis_cluster_reply);
 			uint64_t lockId = 0;
 			std::string guid_key = DPS_AND_DL_GUID_KEY;
-			partitionIdx = getRedisServerPartitionIndex(guid_key);
 			cmd = string(REDIS_INCR_CMD) + guid_key;
-			redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, guid_key, cmd.c_str()));
 
-			if (redis_reply->type == REDIS_REPLY_ERROR) {
-				lkError.set("Unable to get a unique lock id for a lock named " + name + ". " + std::string(redis_reply->str), DL_GUID_CREATION_ERROR);
-				SPLAPPTRC(L_DEBUG, "Inside createOrGetLock, it failed for a lock named " << name << ". " << DL_GUID_CREATION_ERROR, "RedisDBLayer");
-				freeReplyObject(redis_reply);
+			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
+				lkError.set("Unable to get a unique lock id for a lock named " + name + ". Error=" +
+					std::string(redis_cluster_reply->str), DL_GUID_CREATION_ERROR);
+				SPLAPPTRC(L_DEBUG, "Inside createOrGetLock, it failed for a lock named " << name <<
+					". Error=" << std::string(redis_cluster_reply->str) << ". " <<
+					DL_GUID_CREATION_ERROR, "RedisClusterDBLayer");
+				freeReplyObject(redis_cluster_reply);
 				releaseGeneralPurposeLock(base64_encoded_name);
 				return 0;
 			}
 
-			if (redis_reply->type == REDIS_REPLY_INTEGER) {
+			if (redis_cluster_reply->type == REDIS_REPLY_INTEGER) {
 				// Get the newly created lock id.
-				lockId = redis_reply->integer;
-				freeReplyObject(redis_reply);
+				lockId = redis_cluster_reply->integer;
+				freeReplyObject(redis_cluster_reply);
 
 				// We secured a guid. We can now create this lock.
 				//
@@ -2406,59 +2362,59 @@ namespace distributed
 				std::ostringstream value;
 				value << lockId;
 				std::string value_string = value.str();
-				partitionIdx = getRedisServerPartitionIndex(lockNameKey);
 				cmd = string(REDIS_SET_CMD) + lockNameKey + " " + value_string;
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
 
-				if (redis_reply->type == REDIS_REPLY_ERROR) {
+				if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 					// Problem in creating the "Lock Name" entry in the cache.
-					lkError.set("Unable to create 'LockName:LockId' in the cache for a lock named " + name + ". " + std::string(redis_reply->str), DL_LOCK_NAME_CREATION_ERROR);
-					SPLAPPTRC(L_DEBUG, "Inside createOrGetLock, it failed for a lock named " << name << ". " << DL_LOCK_NAME_CREATION_ERROR, "RedisDBLayer");
+					lkError.set("Unable to create 'LockName:LockId' in the cache for a lock named " + name + ". Error=" +
+						std::string(redis_cluster_reply->str), DL_LOCK_NAME_CREATION_ERROR);
+					SPLAPPTRC(L_DEBUG, "Inside createOrGetLock, it failed for a lock named " << name <<
+						". Error=" << std::string(redis_cluster_reply->str) << ". " <<
+						DL_LOCK_NAME_CREATION_ERROR, "RedisClusterDBLayer");
 					// We are simply leaving an incremented value for the dps_and_dl_guid key in the cache that will never get used.
 					// Since it is harmless, there is no need to reduce this number by 1. It is okay that this guid number will remain unassigned to any store or a lock.
-					freeReplyObject(redis_reply);
+					freeReplyObject(redis_cluster_reply);
 					releaseGeneralPurposeLock(base64_encoded_name);
 					return 0;
 				}
 
 				// 2) Create the Lock Info
 				//    '6' + 'lock id' ==> 'lock use count' + '_' + 'lock expiration time expressed as elapsed seconds since the epoch' + '_' + 'pid that owns this lock' + "_" + lock name'
-				freeReplyObject(redis_reply);
+				freeReplyObject(redis_cluster_reply);
 				std::string lockInfoKey = DL_LOCK_INFO_TYPE + value_string;  // LockId becomes the new key now.
 				value_string = string("0_0_0_") + base64_encoded_name;
-				partitionIdx = getRedisServerPartitionIndex(lockInfoKey);
 				cmd = string(REDIS_SET_CMD) + lockInfoKey + " " + value_string;
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockInfoKey, cmd.c_str()));
 
-				if (redis_reply->type == REDIS_REPLY_ERROR) {
+				if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 					// Problem in creating the "LockId:LockInfo" entry in the cache.
-					lkError.set("Unable to create 'LockId:LockInfo' in the cache for a lock named " + name + ". " + std::string(redis_reply->str), DL_LOCK_INFO_CREATION_ERROR);
-					SPLAPPTRC(L_DEBUG, "Inside createOrGetLock, it failed for a lock named " << name << ". " << DL_LOCK_INFO_CREATION_ERROR, "RedisDBLayer");
+					lkError.set("Unable to create 'LockId:LockInfo' in the cache for a lock named " + name + ". " + std::string(redis_cluster_reply->str), DL_LOCK_INFO_CREATION_ERROR);
+					SPLAPPTRC(L_DEBUG, "Inside createOrGetLock, it failed for a lock named " << name << ". " << DL_LOCK_INFO_CREATION_ERROR, "RedisClusterDBLayer");
 					// Delete the previous entry we made.
-					freeReplyObject(redis_reply);
-					partitionIdx = getRedisServerPartitionIndex(lockNameKey);
+					freeReplyObject(redis_cluster_reply);
 					cmd = string(REDIS_DEL_CMD) + lockNameKey;
-					redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-					freeReplyObject(redis_reply);
+					redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
+					freeReplyObject(redis_cluster_reply);
 					releaseGeneralPurposeLock(base64_encoded_name);
 					return 0;
 				}
 
 				// We created the lock.
-				freeReplyObject(redis_reply);
-				SPLAPPTRC(L_DEBUG, "Inside createOrGetLock done for a lock named " << name, "RedisDBLayer");
+				freeReplyObject(redis_cluster_reply);
+				SPLAPPTRC(L_DEBUG, "Inside createOrGetLock done for a lock named " << name, "RedisClusterDBLayer");
 				releaseGeneralPurposeLock(base64_encoded_name);
 				return (lockId);
 			}
 		}
 
-		freeReplyObject(redis_reply);
+		freeReplyObject(redis_cluster_reply);
 		releaseGeneralPurposeLock(base64_encoded_name);
 		return 0;
   }
 
-  bool RedisDBLayer::removeLock(uint64_t lock, PersistenceError & lkError) {
-		SPLAPPTRC(L_DEBUG, "Inside removeLock for lock id " << lock, "RedisDBLayer");
+  bool RedisClusterDBLayer::removeLock(uint64_t lock, PersistenceError & lkError) {
+		SPLAPPTRC(L_DEBUG, "Inside removeLock for lock id " << lock, "RedisClusterDBLayer");
 
 		ostringstream lockId;
 		lockId << lock;
@@ -2467,10 +2423,10 @@ namespace distributed
 		// If the lock doesn't exist, there is nothing to remove. Don't allow this caller inside this method.
 		if(lockIdExistsOrNot(lockIdString, lkError) == false) {
 			if (lkError.hasError() == true) {
-				SPLAPPTRC(L_DEBUG, "Inside removeLock, it failed to check for the existence of lock id " << lockIdString << ". " << lkError.getErrorCode(), "RedisDBLayer");
+				SPLAPPTRC(L_DEBUG, "Inside removeLock, it failed to check for the existence of lock id " << lockIdString << ". " << lkError.getErrorCode(), "RedisClusterDBLayer");
 			} else {
 				lkError.set("No lock exists for the LockId " + lockIdString + ".", DL_INVALID_LOCK_ID_ERROR);
-				SPLAPPTRC(L_DEBUG, "Inside removeLock, it failed for lock id " << lockIdString << ". " << DL_INVALID_LOCK_ID_ERROR, "RedisDBLayer");
+				SPLAPPTRC(L_DEBUG, "Inside removeLock, it failed for lock id " << lockIdString << ". " << DL_INVALID_LOCK_ID_ERROR, "RedisClusterDBLayer");
 			}
 
 			return(false);
@@ -2480,7 +2436,7 @@ namespace distributed
 		if (acquireLock(lock, 5, 3, lkError) == false) {
 			// Unable to acquire the distributed lock.
 			lkError.set("Unable to get a distributed lock for the LockId " + lockIdString + ".", DL_GET_DISTRIBUTED_LOCK_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside removeLock, it failed for the lock id " << lockIdString << ". " << DL_GET_DISTRIBUTED_LOCK_ERROR, "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside removeLock, it failed for the lock id " << lockIdString << ". " << DL_GET_DISTRIBUTED_LOCK_ERROR, "RedisClusterDBLayer");
 			// User has to retry again to remove the lock.
 			return(false);
 		}
@@ -2494,7 +2450,7 @@ namespace distributed
 		pid_t lockOwningPid = 0;
 
 		if (readLockInformation(lockIdString, lkError, lockUsageCnt, lockExpirationTime, lockOwningPid, lockName) == false) {
-			SPLAPPTRC(L_DEBUG, "Inside removeLock, it failed for lock id " << lockIdString << ". " << lkError.getErrorCode(), "RedisDBLayer");
+			SPLAPPTRC(L_DEBUG, "Inside removeLock, it failed for lock id " << lockIdString << ". " << lkError.getErrorCode(), "RedisClusterDBLayer");
 			releaseLock(lock, lkError);
 			// This is alarming. This will put this lock in a bad state. Poor user has to deal with it.
 			return(false);
@@ -2503,17 +2459,15 @@ namespace distributed
 		// Let us first remove the lock info for this distributed lock.
 		// '6' + 'lock id' ==> 'lock use count' + '_' + 'lock expiration time expressed as elapsed seconds since the epoch' + '_' + 'pid that owns this lock' + "_" + lock name'
 		std::string lockInfoKey = DL_LOCK_INFO_TYPE + lockIdString;
-		int32_t partitionIdx = getRedisServerPartitionIndex(lockInfoKey);
 		string cmd = string(REDIS_DEL_CMD) + lockInfoKey;
-		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-		freeReplyObject(redis_reply);
+		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockInfoKey, cmd.c_str()));
+		freeReplyObject(redis_cluster_reply);
 
 		// We can now delete the lock name root entry.
 		string lockNameKey = DL_LOCK_NAME_TYPE + lockName;
-		partitionIdx = getRedisServerPartitionIndex(lockNameKey);
 		cmd = string(REDIS_DEL_CMD) + lockNameKey;
-		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-		freeReplyObject(redis_reply);
+		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
+		freeReplyObject(redis_cluster_reply);
 
 		// We can delete the lock item itself now.
 		releaseLock(lock, lkError);
@@ -2526,8 +2480,8 @@ namespace distributed
 	    return(true);
   }
 
-  bool RedisDBLayer::acquireLock(uint64_t lock, double leaseTime, double maxWaitTimeToAcquireLock, PersistenceError & lkError) {
-	  SPLAPPTRC(L_DEBUG, "Inside acquireLock for lock id " << lock, "RedisDBLayer");
+  bool RedisClusterDBLayer::acquireLock(uint64_t lock, double leaseTime, double maxWaitTimeToAcquireLock, PersistenceError & lkError) {
+	  SPLAPPTRC(L_DEBUG, "Inside acquireLock for lock id " << lock, "RedisClusterDBLayer");
 
 	  ostringstream lockId;
 	  lockId << lock;
@@ -2538,10 +2492,10 @@ namespace distributed
 	  // If the lock doesn't exist, there is nothing to acquire. Don't allow this caller inside this method.
 	  if(lockIdExistsOrNot(lockIdString, lkError) == false) {
 		  if (lkError.hasError() == true) {
-			  SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed to check for the existence of lock id " << lockIdString << ". " << lkError.getErrorCode(), "RedisDBLayer");
+			  SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed to check for the existence of lock id " << lockIdString << ". " << lkError.getErrorCode(), "RedisClusterDBLayer");
 		  } else {
 			  lkError.set("No lock exists for the LockId " + lockIdString + ".", DL_INVALID_LOCK_ID_ERROR);
-			  SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed for lock id " << lockIdString << ". " << DL_INVALID_LOCK_ID_ERROR, "RedisDBLayer");
+			  SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed for lock id " << lockIdString << ". " << DL_INVALID_LOCK_ID_ERROR, "RedisClusterDBLayer");
 		  }
 
 		  return(false);
@@ -2550,7 +2504,6 @@ namespace distributed
 	  // We will first check if we can get this lock.
 	  // '7' + 'lock id' + 'dl_lock' => 1
 	  std::string distributedLockKey = DL_LOCK_TYPE + lockIdString + DL_LOCK_TOKEN;
-	  int32_t partitionIdx = getRedisServerPartitionIndex(distributedLockKey);
 	  time_t startTime, timeNow;
 	  // Get the start time for our lock acquisition attempts.
 	  time(&startTime);
@@ -2564,46 +2517,46 @@ namespace distributed
 		  // We will add the lease time to the current timestamp i.e. seconds elapsed since the epoch.
 		  time_t new_lock_expiry_time = time(0) + (time_t)leaseTime;
 		  cmd = string(REDIS_SETNX_CMD) + distributedLockKey + " " + "1";
-		  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+		  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, distributedLockKey, cmd.c_str()));
 
-			if (redis_reply == NULL) {
+			if (redis_cluster_reply == NULL) {
 				return(false);
 			}
 
-			if (redis_reply->type == REDIS_REPLY_ERROR) {
+			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				// Problem in atomic creation of the distributed lock.
-				freeReplyObject(redis_reply);
+				freeReplyObject(redis_cluster_reply);
 				return(false);
 			}
 
-			if (redis_reply->integer == (int)1) {
+			if (redis_cluster_reply->integer == (int)1) {
 				// We got the lock.
 				// Set the expiration time for this lock key.
-				freeReplyObject(redis_reply);
+				freeReplyObject(redis_cluster_reply);
 				ostringstream expiryTimeInMillis;
 				expiryTimeInMillis << (leaseTime*1000.00);
 				cmd = string(REDIS_PSETEX_CMD) + distributedLockKey + " " + expiryTimeInMillis.str() + " " + "2";
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, distributedLockKey, cmd.c_str()));
 
-				if (redis_reply == NULL) {
+				if (redis_cluster_reply == NULL) {
 					// Delete the erroneous lock data item we created.
 					cmd = string(REDIS_DEL_CMD) + " " + distributedLockKey;
-					redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-					freeReplyObject(redis_reply);
+					redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, distributedLockKey, cmd.c_str()));
+					freeReplyObject(redis_cluster_reply);
 					return(false);
 				}
 
-				if (redis_reply->type == REDIS_REPLY_ERROR) {
+				if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 					// Problem in atomic creation of the general purpose lock.
-					freeReplyObject(redis_reply);
+					freeReplyObject(redis_cluster_reply);
 					// Delete the erroneous lock data item we created.
 					cmd = string(REDIS_DEL_CMD) + " " + distributedLockKey;
-					redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-					freeReplyObject(redis_reply);
+					redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, distributedLockKey, cmd.c_str()));
+					freeReplyObject(redis_cluster_reply);
 					return(false);
 				}
 
-				freeReplyObject(redis_reply);
+				freeReplyObject(redis_cluster_reply);
 
 				// We got the lock.
 				// Let us update the lock information now.
@@ -2619,14 +2572,14 @@ namespace distributed
 				// Let us check if the previous owner of this lock simply forgot to release it.
 				// In that case, we will release this expired lock.
 				// Read the time at which this lock is expected to expire.
-				freeReplyObject(redis_reply);
+				freeReplyObject(redis_cluster_reply);
 				uint32_t _lockUsageCnt = 0;
 				int32_t _lockExpirationTime = 0;
 				std::string _lockName = "";
 				pid_t _lockOwningPid = 0;
 
 				if (readLockInformation(lockIdString, lkError, _lockUsageCnt, _lockExpirationTime, _lockOwningPid, _lockName) == false) {
-					SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed for lock id " << lockIdString << ". " << lkError.getErrorCode(), "RedisDBLayer");
+					SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed for lock id " << lockIdString << ". " << lkError.getErrorCode(), "RedisClusterDBLayer");
 				} else {
 					// Is current time greater than the lock expiration time?
 					if ((_lockExpirationTime > 0) && (time(0) > (time_t)_lockExpirationTime)) {
@@ -2642,7 +2595,7 @@ namespace distributed
 
 			if (retryCnt >= DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT) {
 				lkError.set("Unable to acquire the lock named " + lockIdString + ".", DL_GET_LOCK_ERROR);
-				SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed for a lock named " << lockIdString << ". " << DL_GET_LOCK_ERROR, "RedisDBLayer");
+				SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed for a lock named " << lockIdString << ". " << DL_GET_LOCK_ERROR, "RedisClusterDBLayer");
 				// Our caller can check the error code and try to acquire the lock again.
 				return(false);
 			}
@@ -2652,7 +2605,7 @@ namespace distributed
 			if (difftime(startTime, timeNow) > maxWaitTimeToAcquireLock) {
 				lkError.set("Unable to acquire the lock named " + lockIdString + " within the caller specified wait time.", DL_GET_LOCK_TIMEOUT_ERROR);
 				SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed to acquire the lock named " << lockIdString <<
-					" within the caller specified wait time." << DL_GET_LOCK_TIMEOUT_ERROR, "RedisDBLayer");
+					" within the caller specified wait time." << DL_GET_LOCK_TIMEOUT_ERROR, "RedisClusterDBLayer");
 				// Our caller can check the error code and try to acquire the lock again.
 				return(false);
 			}
@@ -2663,8 +2616,8 @@ namespace distributed
 	  } // End of while(1)
   }
 
-  void RedisDBLayer::releaseLock(uint64_t lock, PersistenceError & lkError) {
-	  SPLAPPTRC(L_DEBUG, "Inside releaseLock for lock id " << lock, "RedisDBLayer");
+  void RedisClusterDBLayer::releaseLock(uint64_t lock, PersistenceError & lkError) {
+	  SPLAPPTRC(L_DEBUG, "Inside releaseLock for lock id " << lock, "RedisClusterDBLayer");
 
 	  ostringstream lockId;
 	  lockId << lock;
@@ -2672,21 +2625,20 @@ namespace distributed
 
 	  // '7' + 'lock id' + 'dl_lock' => 1
 	  std::string distributedLockKey = DL_LOCK_TYPE + lockIdString + DL_LOCK_TOKEN;
-	  int32_t partitionIdx = getRedisServerPartitionIndex(distributedLockKey);
 	  string cmd = string(REDIS_DEL_CMD) + distributedLockKey;
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, distributedLockKey, cmd.c_str()));
 
-	  if (redis_reply->type == REDIS_REPLY_ERROR) {
-		  lkError.set("Unable to release the distributed lock id " + lockIdString + ". " + std::string(redis_reply->str), DL_LOCK_RELEASE_ERROR);
-		  freeReplyObject(redis_reply);
+	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
+		  lkError.set("Unable to release the distributed lock id " + lockIdString + ". " + std::string(redis_cluster_reply->str), DL_LOCK_RELEASE_ERROR);
+		  freeReplyObject(redis_cluster_reply);
 		  return;
 	  }
 
-	  freeReplyObject(redis_reply);
+	  freeReplyObject(redis_cluster_reply);
 	  updateLockInformation(lockIdString, lkError, 0, 0, 0);
   }
 
-  bool RedisDBLayer::updateLockInformation(std::string const & lockIdString,
+  bool RedisClusterDBLayer::updateLockInformation(std::string const & lockIdString,
 	PersistenceError & lkError, uint32_t const & lockUsageCnt, int32_t const & lockExpirationTime, pid_t const & lockOwningPid) {
 	  // Get the lock name for this lock.
 	  uint32_t _lockUsageCnt = 0;
@@ -2697,33 +2649,35 @@ namespace distributed
 
 
 	  if (readLockInformation(lockIdString, lkError, _lockUsageCnt, _lockExpirationTime, _lockOwningPid, _lockName) == false) {
-		  SPLAPPTRC(L_DEBUG, "Inside updateLockInformation, it failed for lock id " << lockIdString << ". " << lkError.getErrorCode(), "RedisDBLayer");
+		  SPLAPPTRC(L_DEBUG, "Inside updateLockInformation, it failed for lock id " << lockIdString << ". " << lkError.getErrorCode(), "RedisClusterDBLayer");
 		  return(false);
 	  }
 
 	  // Let us update the lock information.
 	  // '6' + 'lock id' ==> 'lock use count' + '_' + 'lock expiration time expressed as elapsed seconds since the epoch' + '_' + 'pid that owns this lock' + "_" + lock name'
 	  std::string lockInfoKey = DL_LOCK_INFO_TYPE + lockIdString;
-	  int32_t partitionIdx = getRedisServerPartitionIndex(lockInfoKey);
 	  ostringstream lockInfoValue;
 	  lockInfoValue << lockUsageCnt << "_" << lockExpirationTime << "_" << lockOwningPid << "_" << _lockName;
 	  string lockInfoValueString = lockInfoValue.str();
 	  cmd = string(REDIS_SET_CMD) + lockInfoKey + " " + lockInfoValueString;
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockInfoKey, cmd.c_str()));
 
-	  if (redis_reply->type == REDIS_REPLY_ERROR) {
+	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		  // Problem in updating the "LockId:LockInfo" entry in the cache.
-		  lkError.set("Unable to update 'LockId:LockInfo' in the cache for a lock named " + _lockName + ". " + std::string(redis_reply->str), DL_LOCK_INFO_UPDATE_ERROR);
-		  SPLAPPTRC(L_DEBUG, "Inside updateLockInformation, it failed for a lock named " << _lockName << ". " << DL_LOCK_INFO_UPDATE_ERROR, "RedisDBLayer");
-		  freeReplyObject(redis_reply);
+		  lkError.set("Unable to update 'LockId:LockInfo' in the cache for a lock named " + _lockName +
+			  ". Error=" + std::string(redis_cluster_reply->str), DL_LOCK_INFO_UPDATE_ERROR);
+		  SPLAPPTRC(L_DEBUG, "Inside updateLockInformation, it failed for a lock named " << _lockName <<
+			  ". Error=" << std::string(redis_cluster_reply->str) << ". " <<
+			  DL_LOCK_INFO_UPDATE_ERROR, "RedisClusterDBLayer");
+		  freeReplyObject(redis_cluster_reply);
 		  return(false);
 	  }
 
-	  freeReplyObject(redis_reply);
+	  freeReplyObject(redis_cluster_reply);
 	  return(true);
   }
 
-  bool RedisDBLayer::readLockInformation(std::string const & lockIdString, PersistenceError & lkError, uint32_t & lockUsageCnt,
+  bool RedisClusterDBLayer::readLockInformation(std::string const & lockIdString, PersistenceError & lkError, uint32_t & lockUsageCnt,
 		  int32_t & lockExpirationTime, pid_t & lockOwningPid, std::string & lockName) {
 	  // Read the contents of the lock information.
 	  lockName = "";
@@ -2732,20 +2686,19 @@ namespace distributed
 	  // Lock Info contains meta data information about a given lock.
 	  // '6' + 'lock id' ==> 'lock use count' + '_' + 'lock expiration time expressed as elapsed seconds since the epoch' + '_' + 'pid that owns this lock' + "_" + lock name'
 	  string lockInfoKey = DL_LOCK_INFO_TYPE + lockIdString;
-	  int32_t partitionIdx = getRedisServerPartitionIndex(lockInfoKey);
 	  cmd = string(REDIS_GET_CMD) + lockInfoKey;
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockInfoKey, cmd.c_str()));
 
-	  if (redis_reply->type == REDIS_REPLY_ERROR) {
+	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Unable to get the LockInfo from our cache.
 		lkError.set("Unable to get LockInfo using the LockId " + lockIdString +
-			". " + std::string(redis_reply->str), DL_GET_LOCK_INFO_ERROR);
-		freeReplyObject(redis_reply);
+			". " + std::string(redis_cluster_reply->str), DL_GET_LOCK_INFO_ERROR);
+		freeReplyObject(redis_cluster_reply);
 		return(false);
 	  }
 
-	  std::string lockInfo = std::string(redis_reply->str, redis_reply->len);
-	  freeReplyObject(redis_reply);
+	  std::string lockInfo = std::string(redis_cluster_reply->str, redis_cluster_reply->len);
+	  freeReplyObject(redis_cluster_reply);
 
 	  // As shown in the comment line above, lock information is a string that has multiple pieces of
 	  // information each separated by an underscore character. We are interested in all the three tokens (lock usage count, lock expiration time, lock name).
@@ -2801,38 +2754,37 @@ namespace distributed
   }
 
   // This method will check if a lock exists for a given lock id.
-  bool RedisDBLayer::lockIdExistsOrNot(string lockIdString, PersistenceError & lkError) {
+  bool RedisClusterDBLayer::lockIdExistsOrNot(string lockIdString, PersistenceError & lkError) {
 	  string keyString = string(DL_LOCK_INFO_TYPE) + lockIdString;
-	  int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
 	  string cmd = string(REDIS_EXISTS_CMD) + keyString;
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, keyString, cmd.c_str()));
 
-	  if (redis_reply == NULL) {
-		lkError.set("LockIdExistsOrNot: Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+	  if (redis_cluster_reply == NULL) {
+		lkError.set("LockIdExistsOrNot: Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
 		return(false);
 	  }
 
-	  if (redis_reply->type == REDIS_REPLY_ERROR) {
+	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Unable to get the lock info for the given lock id.
 		lkError.set("LockIdExistsOrNot: Unable to get LockInfo for the lockId " + lockIdString +
-			". " + std::string(redis_reply->str), DL_GET_LOCK_INFO_ERROR);
-		freeReplyObject(redis_reply);
+			". " + std::string(redis_cluster_reply->str), DL_GET_LOCK_INFO_ERROR);
+		freeReplyObject(redis_cluster_reply);
 		return(false);
 	  }
 
 	  bool lockIdExists = true;
 
-	  if (redis_reply->integer == (int)0) {
+	  if (redis_cluster_reply->integer == (int)0) {
 		  lockIdExists = false;
 	  }
 
-	  freeReplyObject(redis_reply);
+	  freeReplyObject(redis_cluster_reply);
 	  return(lockIdExists);
   }
 
   // This method will return the process id that currently owns the given lock.
-  uint32_t RedisDBLayer::getPidForLock(string const & name, PersistenceError & lkError) {
-	  SPLAPPTRC(L_DEBUG, "Inside getPidForLock with a name " << name, "RedisDBLayer");
+  uint32_t RedisClusterDBLayer::getPidForLock(string const & name, PersistenceError & lkError) {
+	  SPLAPPTRC(L_DEBUG, "Inside getPidForLock with a name " << name, "RedisClusterDBLayer");
 
 	  string base64_encoded_name;
 	  base64_encode(name, base64_encoded_name);
@@ -2844,50 +2796,52 @@ namespace distributed
 	  // "5" at the beginning followed by the actual lock name.
 	  // '5' + 'lock name' ==> 'lock id'
 	  std::string lockNameKey = DL_LOCK_NAME_TYPE + base64_encoded_name;
-	  int32_t partitionIdx = getRedisServerPartitionIndex(lockNameKey);
 	  std::string cmd = string(REDIS_EXISTS_CMD) + lockNameKey;
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
 
-	  // If we get a NULL reply, then it indicates a redis server connection error.
-	  if (redis_reply == NULL) {
-		lkError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DL_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside getPidForLock, it failed for the lock named " << name << ". " << DL_CONNECTION_ERROR, "RedisDBLayer");
+	  // If we get a NULL reply, then it indicates a redis-cluster server connection error.
+	  if (redis_cluster_reply == NULL) {
+		lkError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DL_CONNECTION_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside getPidForLock, it failed for the lock named " << name << " with a NULL redisReply. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
 		return(0);
 	  }
 
-	  if (redis_reply->integer == (int)1) {
+	  if (redis_cluster_reply->integer == (int)1) {
 		// This lock already exists in our cache.
 		// We can get the lockId and return it to the caller.
-		freeReplyObject(redis_reply);
+		freeReplyObject(redis_cluster_reply);
 		cmd = string(REDIS_GET_CMD) + lockNameKey;
-		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
 
-		if (redis_reply->type == REDIS_REPLY_ERROR) {
+		if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 			// Unable to get an existing lock id from the cache.
-			lkError.set("Unable to get the lockId for the lockName " + name + ". " + std::string(redis_reply->str), DL_GET_LOCK_ID_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside getPidForLock, it failed for the lockName " << name << ". " << DL_GET_LOCK_ID_ERROR, "RedisDBLayer");
-			freeReplyObject(redis_reply);
+			lkError.set("Unable to get the lockId for the lockName " + name + ". Error=" +
+				std::string(redis_cluster_reply->str), DL_GET_LOCK_ID_ERROR);
+			SPLAPPTRC(L_DEBUG, "Inside getPidForLock, it failed for the lockName " << name <<
+				". Error=" << std::string(redis_cluster_reply->str) << ". " <<
+				DL_GET_LOCK_ID_ERROR, "RedisClusterDBLayer");
+			freeReplyObject(redis_cluster_reply);
 			return(0);
 		} else {
-			if (redis_reply->len > 0) {
-				lock = streams_boost::lexical_cast<uint64_t>(redis_reply->str);
+			if (redis_cluster_reply->len > 0) {
+				lock = streams_boost::lexical_cast<uint64_t>(redis_cluster_reply->str);
 			} else {
 				// Unable to get the lock information. It is an abnormal error. Convey this to the caller.
 				lkError.set("Redis returned an empty lockId for the lockName " + name + ".", DL_GET_LOCK_ID_ERROR);
-				SPLAPPTRC(L_DEBUG, "Inside getPidForLock, it failed with an empty lockId for the lockName " << name << ". " << DL_GET_LOCK_ID_ERROR, "RedisDBLayer");
-				freeReplyObject(redis_reply);
+				SPLAPPTRC(L_DEBUG, "Inside getPidForLock, it failed with an empty lockId for the lockName " << name << ". " << DL_GET_LOCK_ID_ERROR, "RedisClusterDBLayer");
+				freeReplyObject(redis_cluster_reply);
 				return(0);
 			}
 
-			freeReplyObject(redis_reply);
+			freeReplyObject(redis_cluster_reply);
 		}
 	  }
 
 	  if (lock == 0) {
 		  // Lock with the given name doesn't exist.
 		  lkError.set("Unable to find a lockName " + name + ".", DL_LOCK_NOT_FOUND_ERROR);
-		  SPLAPPTRC(L_DEBUG, "Inside getPidForLock, unable to find the lockName " << name << ". " << DL_LOCK_NOT_FOUND_ERROR, "RedisDBLayer");
-		  freeReplyObject(redis_reply);
+		  SPLAPPTRC(L_DEBUG, "Inside getPidForLock, unable to find the lockName " << name << ". " << DL_LOCK_NOT_FOUND_ERROR, "RedisClusterDBLayer");
+		  freeReplyObject(redis_cluster_reply);
 		  return(0);
 	  }
 
@@ -2902,24 +2856,10 @@ namespace distributed
 	  pid_t _lockOwningPid = 0;
 
 	  if (readLockInformation(lockIdString, lkError, _lockUsageCnt, _lockExpirationTime, _lockOwningPid, _lockName) == false) {
-		  SPLAPPTRC(L_DEBUG, "Inside getPidForLock, it failed for lock id " << lockIdString << ". " << lkError.getErrorCode(), "RedisDBLayer");
+		  SPLAPPTRC(L_DEBUG, "Inside getPidForLock, it failed for lock id " << lockIdString << ". " << lkError.getErrorCode(), "RedisClusterDBLayer");
 		  return(0);
 	  } else {
 		  return(_lockOwningPid);
-	  }
-  }
-
-  // This method will return the redis server partition index for a given key string.
-  inline int32_t RedisDBLayer::getRedisServerPartitionIndex(std::string const & key) {
-	  if (redisPartitionCnt == 0) {
-		  // We only have a single redis server.
-		  return(0);
-	  } else {
-		  // We have multiple Redis servers and that means we are doing client side partitioning.
-		  // Hence, pick the correct Redis server partition for the given key.
-		  uint64_t hashValue = SPL::Functions::Utility::hashCode(key);
-		  // Take modulo based on the available number of Redis servers.
-		  return((int32_t)(hashValue % redisPartitionCnt));
 	  }
   }
 

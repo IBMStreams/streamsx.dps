@@ -11,17 +11,18 @@ between non-fused Streams operators by using an external NoSQL K/V data store.
 
 Following are the NoSQL K/V stores supported by the DPS toolkit:
 1) memcached
-2) Redis
+2) Redis           [version 2.x that doesn't have a built-in cluster feature]
 3) Cassandra
 4) IBM Cloudant
 5) Apache HBase
 6) Mongo
 7) Couchbase
 8) Aerospike
+9) Redis-Cluster   [New cluster feature is available in Redis version 3 and above]
  
 A companion IBM developerWorks article about this toolkit: http://tinyurl.com/nxrf3gg
 
-[Feb/14/2015]                  [DPS toolkit version 1.0.8]                  [Share and prosper]
+[Apr/12/2015]                  [DPS toolkit version 1.0.9]                  [Share and prosper]
 ================================================================================================
 This usage tips file provides high-level implementation details about the Streams DPS toolkit.
 Main effort here is to provide a Streams toolkit that will allow data sharing
@@ -99,10 +100,11 @@ no other APIs can be used that take store name or store id as a function argumen
 For working with the TTL based key value pairs, one can only use the functions mentioned below.
 These functions will return true or false indicating whether the operation succeeded or not.
 In case of a false return value, an error code and an error string can be obtained.
-In the back-end data store (memcached or redis or cassandra or hbase or mongo or couchbase or aerospike),
-such TTL based data items can coexist along with other user created stores containing data items that
-could live forever. Such TTL based APIs only provide a limited set of functions (put, get, has, and remove),
-but at the same time will have a slightly low overhead when compared to the feature rich non TTL based APIs.
+In the back-end data store (memcached or redis or cassandra or hbase or mongo or 
+couchbase or aerospike or redis-cluster), such TTL based data items can coexist along with other
+user created stores containing data items that could live forever. Such TTL based APIs only provide
+a limited set of functions (put, get, has, and remove), but at the same time will have a slightly
+low overhead when compared to the feature rich non TTL based APIs.
 (Note: A non zero TTL value passed to these functions will automatically remove the K/V pairs
 at the end of their specified lifetime. A TTL value of zero will keep the K/V pair in 
 the back-end data store forever and they have to be removed manually via the dpsRemoveTTL API.)
@@ -132,18 +134,19 @@ b) RedHat Enterprise Linux 6.4 for IBM Power machines + gcc version 4.4.7 201203
    [Dec/23/2014: DPS toolkit version 1.0.6 and later can't be used with RHEL5 and CentOS5.]
 c) IBM InfoSphere Streams Version 3.x
 d) memcached server version 1.4.15 with libmemcached client version 1.0.16
-e) redis server version 2.8.19 with hiredis C client version 0.11.0
-f) Cassandra server version 2.1.0 with C++ client rc1 driver (Dec/2014) from DataStax
+e) redis server version 2.8.19 with hiredis C client version 0.12.1
+f) Cassandra server version 2.1.4 with C++ client driver 1.0.1 (April/2015) from DataStax
 g) Cloudant cloud service with libcurl and libjson-c client libraries.  
 h) Apache HBase version 0.98.8 for Hadoop2 with libcurl and libjson-c client libraries.
    (Tested with Hadoop version 2.5.1 and Zookeeper version 3.4.6)
 i) MongoDB version 2.6.7 with MongoDB client Library for C version 1.0.2
 j) Couchbase Server version 3.0.2 with Couchbase C SDK 2.4.5
 k) Aerospike Server version 3.4.1 with Aerospike C client
+l) redis-cluster server version 3.0.0 with hiredis C client version 0.12.1 coupled with the hiredis-cluster wrapper include files
 
 Streams DPS toolkit is enabled out of the box to work with either memcached or redis or cassandra or cloudant or hBase or 
-mongodb or couchbase or aerospike back-end data store. You can specify the type of your external NoSQL K/V store product 
-(memcached or redis or cassandra or cloudant or hbase or mongodb or couchbase or aerospike) in a very simple configuration file 
+mongodb or couchbase or aerospike or redis-cluster back-end data store. You can specify the type of your external NoSQL K/V store product 
+(memcached or redis or cassandra or cloudant or hbase or mongodb or couchbase or aerospike or redis-cluster) in a very simple configuration file 
 (<YOUR-SPL-PROJECT-DIRECTORY>/etc/no-sql-kv-store-servers.cfg). For the SPL projects you create newly, you can simply
 take a copy of this file from the example provided in the DPS toolkit to the etc directory inside of your SPL project directory.
 Then, you can make your configuration changes in that file based on your application's needs.
@@ -176,9 +179,10 @@ d) impl/include                      (Directory where the include files for the 
       --> HBaseDBLayer.h             (C++ interface for HBase data store access logic)   
       --> MongoDBLayer.h             (C++ interface for MongoDB data store access logic)
       --> CouchbaseDBLayer.h         (C++ interface for Couchbase data store access logic)
-      --> AerospikeDBLayer.h         (C++ interface for Aerospike data store access logic)   
+      --> AerospikeDBLayer.h         (C++ interface for Aerospike data store access logic) 
+      --> RedisClusterDBLayer.h      (C++ interface for Redis-Cluster no-sql store access logic)  
       --> DpsConstants.h             (C++ include file with constants used for interfacing with 
-                                      memcached or redis or cassandra or cloudant or hbase or mongo or couchbase or aerospike no-sql store)
+                                      memcached or redis or cassandra or cloudant or hbase or mongo or couchbase or aerospike or redis-cluster no-sql store)
       --> com*_DpsHelper.h           (Automatically generated JNI C++ include file for use by the Java primitive operators)
 
 e) impl/src                          (Directory where the CPP files for the DPS will be present)
@@ -191,7 +195,9 @@ e) impl/src                          (Directory where the CPP files for the DPS 
      --> MongoDBLayer.cpp            (C++ class implementation for the MongoDB data store access logic)
      --> CouchbaseDBLayer.cpp        (C++ class implementation for the Couchbase data store access logic)
      --> AerospikeDBLayer.cpp        (C++ class implementation for the Aerospike data store access logic)
+     --> RedisClusterDBLayer.cpp     (C++ class implementation for the Redis-Cluster no-sql store access logic)
      --> com*_DpsHelper.cpp          (JNI C++ bridge for Java code to call directly into the common C++ DPS implementation)
+     --> com*_JavaLibLoader.cpp      (JNI C++ bridge for loading the back-end .so libraries from within the DpsHelper.java file)
 
 f) impl/java/src
       --> com.ibm.*/DpsHelper.java   (Java DpsHelper class needed to access DPS APIs from Java primitive operators)
@@ -205,13 +211,13 @@ h) impl/mk                           (A shell script to build the shared object 
 i) impl/lib                          (Linux platform specific directory into which the .so library built above will be copied)
                                      (Streams Native Function Model file is configured to load .so from this directory)
                                      (Inside this directory, we also ship the necessary client libraries for memcached and redis, cassandra,
-                                      cloudant, hbase, couchbase, and aerospike)
+                                      cloudant, hbase, couchbase, aerospike and redis-cluster)
 j) samples/dps_test_1 
       --> DpsTest1.splmm             (Simple test application SPL file that invokes native functions to
                                       show the various DPS features.)
       --> etc                        (SPL test application's etc directory)
          --> no-sql*.cfg             (Configuration file containing memcached or redis or cassandra or cloudant or 
-                                      hbase or mongo or couchbase or aerospike server names)
+                                      hbase or mongo or couchbase or aerospike or redis-cluster server names)
       --> bin                                        
          --> build-distributed.sh    (Script that will build a Distributed Streams executable - It requires the Streams runtime)
          --> run-distributed.sh      (Script that will run the distributed executable of this example application)
@@ -225,7 +231,8 @@ SPL code for a Streams test driver example application.
 
 Inside this toolkit, impl/src and impl/include directories contain the C++ source code for the
 DPS API logic. Primarily, it provides the serialization/deserialization code and the
-memcached or redis or cassandra or cloudant or hbase or mongodb or couchbase or aerospike interface layer code.
+memcached or redis or cassandra or cloudant or hbase or mongodb or couchbase or aerospike or 
+redis-cluster interface layer code.
 A Wrapper include (.h) file is an important one and that file provides an entry point for the 
 SPL application to directly call a C++ class method. All the C++ logic will be compiled into a 
 shared object library (.so) file and will be available to any SPL application that will have a
@@ -240,16 +247,17 @@ created within this toolkit, location of the shared object library, location of 
 include file etc. SPL test application code in this toolkit demonstrates how two different PEs can share their
 data between themselves using the DPS APIs. In addition, there is code to do 10 parallel writers and
 10 parallel readers to write and read data to/from memcached or redis or cassandra or cloudant or hbase or 
-mongodb or couchbase or aerospike data store. Please refer to the top of the SPLMM and the C++ source files for additional commentary.
+mongodb or couchbase or aerospike or redis-cluster data store. Please refer to the top of the SPLMM 
+and the C++ source files for additional commentary.
 
-Installing memcached or redis or cassandra or cloudant or hbase or mongo or couchbase or aerospike server(s)
-------------------------------------------------------------------------------------------------------------
+Installing memcached or redis or cassandra or cloudant or hbase or mongo or couchbase or aerospike or redis-cluster server(s)
+-----------------------------------------------------------------------------------------------------------------------------
 Before you can do anything with this toolkit, you should have either the memcached or the redis or the cassandra or 
-cloudant or hbase or mongodb or couchbase or aerospike server infrastructure up and running.
+cloudant or hbase or mongodb or couchbase or aerospike or redis-cluster server infrastructure up and running.
 memcached has been around since 2003 and it has been put to use in many commercial environments. It is a pure 
 distributed cache capable of running on several dozens of machines to provide a massive no-sql in-memory store.
-On the other hand, redis is a nimble cousin of memcached that came into existence in 2009. Features of redis are
-very rich: supports complex types (lists, sets, hashes etc.), replicates with a single master and multiple slaves,
+On the other hand, redis and redis-cluster are nimble cousins of memcached that came into existence in 2009. Features of redis and
+redis-cluster are very rich: supports complex types (lists, sets, hashes etc.), replicates with a single master and multiple slaves,
 persists periodic snapshots of the store contents on disk, AOF (Append Only File) feature that journals all the changes made to
 the store contents thereby recovering the entire store after a machine crash, clustering support for running on multiple machines etc.
 Cassandra is an Apache project and it is a highly touted distributed database. Cassandra provides high availability, replication,
@@ -264,9 +272,9 @@ NoSQL data store with replication/peristence/clustering features. It is built us
 Aerospike is a great NoSQL K/V store that can work effectively using DRAM or SSD flash drives or both.
 You can choose either one of these data stores and it will serve you very well.
 
-memcached, redis, cassandra, cloudant, hbase, mongodb, couchbase and aerospike are very easy to install either on a single machine or on 
+memcached, redis, cassandra, cloudant, hbase, mongodb, couchbase, aerospike and redis-cluster are very easy to install either on a single machine or on 
 multiple machines. You can follow the instructions below for installing memcached (OR) redis (OR) cassandra (OR) cloudant (OR)
-hbase (OR) mongodb (OR) couchbase (OR) aerospike that we used for testing this toolkit in our Streams lab. 
+hbase (OR) mongodb (OR) couchbase (OR) aerospike (OR) redis-cluster that we used for testing this toolkit in our Streams lab. 
 Please note that memcached and redis are open source offerings and they carry a BSD license. Cassandra carries an 
 Apache open source software license. Cloudant is a cloud service available from IBM for free as well as for a subscription fee 
 when a dedicated Cloudant setup is needed. HBase carries an Apache open source software license. MongoDB carries an 
@@ -289,11 +297,14 @@ You can install MongoDB by following step(6) below.
 You can install Couchbase by following step(7) below.
 (OR) 
 You can install Aerospike by following step (8) below.
+(OR)
+You can install redis-cluster by following step (9) below.
 
 If you want to go with memcached, proceed right below here. If you want to go with redis, proceed from step (2). If you want to
 use Cassandra, please proceed to step (3). If you want to use Cloudant, please proceed to step (4). If you want to use HBase,
 please proceed to step (5). If you want to use MongoDB, please proceed to step (6). If you want to use Couchbase, please
-proceed to step (7). If you want to use Aerospike, please proceed to step (8).
+proceed to step (7). If you want to use Aerospike, please proceed to step (8). If you want to use redis-cluster, 
+please proceed to step (9). 
 
 <<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
 Decide about which machine(s) [one or more] will be used to run the memcached server (e-g: server1 and server2 or more the merrier)
@@ -334,7 +345,8 @@ Decide about which machine(s) [one or more] will be used to run the memcached se
    d) Whenever you want to stop memcached, you can simply run:  killall memcached
 <<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
 
-2) Install the redis server by following these steps:
+2) Install the redis server by following these steps (This is for Redis 2.x that doesn't provide built-in 
+   multi-server cluster facility. However, DPS toolkit provides a way to achieve multi-server setup using Redis 2.x):
    (No root access needed. You can install it in the regular Linux userid's home directory.)
    a) wget http://download.redis.io/releases/redis-2.8.19.tar.gz
    b) tar -xvzf redis-2.8.19.tar.gz
@@ -381,9 +393,9 @@ c) You can quickly verify if your redis installation works by doing these checks
       redis> exit
 d) Whenever you want to stop redis, you can simply run: killall redis-server
 e) Redis DPS API usage tips:
-   [When there are multiple Redis servers configured, using the dpsXXXXTTL APIs will provide a
-   good scaling factor for your put/get requests than using the APIs that take the user created
-   store id as a function argument. You are encouraged to choose the APIs according to your
+   [With Redis 2.x, our DPS toolkit supports a multi-server setup. When there are multiple Redis servers configured,
+   using the dpsXXXXTTL APIs will provide a good scaling factor for your put/get requests than using the APIs that
+   take the user created store id as a function argument. You are encouraged to choose the APIs according to your
    functional and scaling needs.] 
 <<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
 
@@ -392,7 +404,7 @@ e) Redis DPS API usage tips:
    [
     Cassandra can be installed from RPM or from a tarball. It can also be installed in a cluster
     configuration on multiple machines. To test the DPS functions, we only outline steps needed to
-    install it on a single machine version. You have to learn about Cassandra cluster installation and
+    install Cassandra on a single machine version. You have to learn about Cassandra cluster installation and
     do that on your own if a cluster configuration is needed.
     
     Cassandra is not a pure in-memory data store such as memcached and Redis. Cassandra is a NoSQL DB.
@@ -408,25 +420,23 @@ e) Redis DPS API usage tips:
     needs when you are thinking of using the DPS toolkit configured with Cassandra.
     
     Please be aware of the following details:
-       * For the Cassandra client driver, the DPS toolkit uses the CPP driver from DataStax. This driver is 
-         a release candidate 1 as of DEC/2014. You can make your own assessment about the stability and performance of 
-         this CPP driver. When this driver comes out as a fully blessed production release, we will include that 
-         version inside the DPS toolkit. In our extensive tests, this driver's release candidate 1 (rc1) version worked 
-         well on a single Cassandra server for all the DPS functions. We also did limited testing of this driver on a 
-         6 node Cassandra cluster.
+       * For the Cassandra client driver, the DPS toolkit uses the CPP driver from DataStax. This driver's
+         version number is 1.0.1 (released in April/2015). In our extensive tests, this driver version
+         worked well on a single Cassandra server for all the DPS functions. We also did limited testing of this
+         driver on a 6 node Cassandra cluster.
          
        * Since Cassandra provides tunable consistency, an immediate read from a thread of a K/V pair right after it
          was written by another thread in a Cassandra cluster may not return the newest value. Please read about
          how Cassandra satisfies the AP properties in the CAP theorem.
    ]
     
-    a) wget http://www.eng.lsu.edu/mirrors/apache/cassandra/2.1.0/apache-cassandra-2.1.0-bin.tar.gz
+    a) wget http://www.eng.lsu.edu/mirrors/apache/cassandra/2.1.4/apache-cassandra-2.1.4-bin.tar.gz
        [Or a later version if available.]
-    b) tar apache-cassandra-2.1.0-bin.tar.gz
-    c) That is it. The binaries are now available in the apache-cassandra-2.1.0 for you to run the Cassandra server.
+    b) tar -xvzf apache-cassandra-2.1.4-bin.tar.gz
+    c) That is it. The binaries are now available in the apache-cassandra-2.1.4 directory for you to run the Cassandra server.
     
 If you installed Cassandra, you can start Cassandra as shown below.
-    a) cd apache-cassandra-2.1.0/conf
+    a) cd apache-cassandra-2.1.4/conf
     b) Edit the cassandra.yaml file and see if you want to change any of the configuration values.
        (Most importantly the data_file_directories, commitlog_directory, and saved_caches directory.
         If you don't want to modify them, then you should export CASSANDRA_HOME in your .bashrc file to
@@ -434,11 +444,19 @@ If you installed Cassandra, you can start Cassandra as shown below.
         $CASSANDRA_HOME/data/data, $CASSANDRA_HOME/data/commitlog, $CASSANDRA_HOME/data/saved_caches directories.
         You must ensure these directories exist on your Cassandra server. In addition, you will also have to
         create a directory named $CASSANDRA_HOME/logs directory.)
-        In this configuration file, you may also want to verify the seeds and the listen_address fields. If you don't want
-        the default 127.0.0.1 address, then you have to change it to the correct IP address of your Cassandra server machine.
-    c) You can now start Cassandra to run in the background using this command: $CASSANDRA_HOME/bin/cassandra
+        In this configuration file, you may also want to verify the seeds, listen_address, rpc_address,
+        and broadcast_rpc_address fields. If you don't want the default 127.0.0.1 address, then you have to change it to
+        the correct IP address of your Cassandra server machine in those fields.
+    c) Cassandra 2.x requires that you have Java version 1.7u25 or later. If your machine doesn't have that version of Java,
+       running the Cassandra server will result in an error. You can get the latest version of Java that is greater than
+       1.7u25, from here and unzip it in your own directory and set the JAVA_HOME environment variable to that new Java directory.
+       
+       http://www.oracle.com/technetwork/java/javase/downloads/jdk7-downloads-1880260.html
+       (As of April/2015, the latest version of Java SDK from this URL is 1.7.0_75)
+       
+    d) You can now start Cassandra to run in the background using this command: $CASSANDRA_HOME/bin/cassandra
     
-    d) You can quickly verify if your Cassandra installation works by doing these checks.
+    e) You can quickly verify if your Cassandra installation works by doing these checks.
        i)  From a terminal window, run $CASSANDRA_HOME/bin/cqlsh
        ii) Type these commands inside the CQL shell:
            describe keyspaces;
@@ -446,7 +464,7 @@ If you installed Cassandra, you can start Cassandra as shown below.
            desc tables;
            exit;
 
-    e) IMPORTANT FIRST STEP THAT USERS MUST PERFORM IN ORDER TO USE CASSANDRA AS A DATA STORE IN DPS.
+    f) IMPORTANT FIRST STEP THAT USERS MUST PERFORM IN ORDER TO USE CASSANDRA AS A DATA STORE IN DPS.
        i)   Pick any one of your Cassandra machines in your Cassandra environment.
        ii)  On that machine, change directory to <CASSANDRA_INSTALL_DIR>/bin
        iii) Run this command: ./cqlsh
@@ -457,18 +475,18 @@ If you installed Cassandra, you can start Cassandra as shown below.
 
 		    create keyspace com_ibm_streamsx_dps with replication = { 'class': 'SimpleStrategy', 'replication_factor': 'XXXX' };
 
-		5) In that same CQL shell session, correctly type or copy/paste the following command and press enter.
+	   v) In that same CQL shell session, correctly type or copy/paste the following command and press enter.
 
 		   create table com_ibm_streamsx_dps.t1(r_key text, c_key text, b_val blob, t_val text, dbsig text, info text, PRIMARY KEY (r_key, c_key));
 
-		6) Type or copy/paste the following CQL shell commands one at a time to ensure that we got everything correctly.
+	   vi) Type or copy/paste the following CQL shell commands one at a time to ensure that we got everything correctly.
 
 		   desc keyspaces;
 		   use com_ibm_streamsx_dps;
 		   desc tables;
 		   quit;
 
-    f) Whenever you want to stop Cassandra, you can run this command: pkill -f CassandraDaemon
+    g) Whenever you want to stop Cassandra, you can run this command: pkill -f CassandraDaemon
 <<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
     
 4) Install the Cloudant server by following these steps:
@@ -860,21 +878,51 @@ mongos> sh.shardCollection("ibm_dps.dps_ttl_kv_global_store", {"_id": "hashed"})
           the Aerospike NoSQL server(s) only on Intel x86 servers and not on IBM Power machines.
 <<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
 
-How about the client installation for memcached or redis or cassandra or cloudant or hbase or mongodb or couchbase or aerospike?
---------------------------------------------------------------------------------------------------------------------------------
+9) Install the redis-cluster:
+
+Redis 3.0.0 and higher versions provide a new feature to install and run a Redis cluster.
+In this version, you can install multiple instances of Redis and configure them with a replication factor.
+For every master Redis instance you can have one or more slaves instances. When the DPS toolkit writes 
+data into the Redis 3.x cluster, they will be automatically sharded and distributed among all the master
+Redis instances running on your Redis cluster. Just to remind you, in the case of Redis 2.x multi-server
+setup, our DPS toolkit provides a way to accomplish sharding of your data among those Redis 2.x servers.
+In Redis 3.x, automatic sharding is a built-in feature. Another important feature in Redis 3.x
+is that when a master Redis instance fails, its slave copy will automatically take-over the operation with no
+disruption to the Redis client applications.
+
+According to the Redis 3.x official documentation, this is what you get with Redis Cluster:
+
+* The ability to automatically split your dataset among multiple nodes.
+
+* The ability to continue operations when a subset of the nodes are experiencing
+  failures or are unable to communicate with the rest of the cluster.
+        
+To install, configure, start and stop a multi-server Redis 3.x cluster is somewhat involved.
+You can follow the instructions published here by the Redis release team: 
+
+http://redis.io/topics/cluster-tutorial
+
+In our Streams lab, we tested the DPS toolkit on a 10 server Redis 3.x cluster and everything worked fine.
+If you want to know how we installed and configured our Redis 3.x cluster to test the DPS toolkit, you may
+contact the author of the DPS toolkit and obtain an informal set of instructions scribbled in a notebook.
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+How about the client installation for memcached or redis or cassandra or cloudant or hbase or mongodb or couchbase or aerospike or redis-cluster?
+-------------------------------------------------------------------------------------------------------------------------------------------------
 In order to run and use the DPS toolkit, it is important to have the no-sql store client software available
 on all the machines where the Streams applications will be running. Does that mean, we have to now go and install
 our chosen backend data store client software on several dozens of machines? The answer is an
 emphatic "No". Because, we made that job so easy for you. There is no need to install any of the memcached or
-redis or cassandra or cloudant or hbase or mongodb or couchbase or aerospike client software on one or more of
+redis or cassandra or cloudant or hbase or mongodb or couchbase or aerospike or redis-cluster client software on one or more of
 your Streams application machines. As part of this toolkit, we already packaged the client libraries (.so files)
-for memcached, redis, cassandra, cloudant, hbase, mongodb, couchbase and aerospike. Our DPS implementation uses the
+for memcached, redis, cassandra, cloudant, hbase, mongodb, couchbase, aerospike and redis-cluster. Our DPS implementation uses the
 popular libmemcached C client for accessing the memcached no-sql store. It uses the fantastic hiredis C client for
 accessing the redis no-sql store. It uses the Cassandra C++ client driver from DataStax for working with the Cassndra
 servers. For Cloudant, we use the libcurl and libjson-c client libraries. For HBase, we use the same libcurl and
 libjson-c client libraries. For MongoDB, we use the libbson and libmongoc client libraries. For Couchbase, we use the
 libcouchbase client library. For Aerospike, we use the libaerospike client library. Library files for all of them are
-included in the impl/lib sub-directory inside the DPS toolkit.
+included in the impl/lib sub-directory inside the DPS toolkit. For redis-cluster, we used the same hiredis C client
+coupled with the hiredis-cluster wrapper include files published by the Redis release team in April/2015.
 
 At this time, we support the DPS toolkit on both x86 and IBM Power servers installed with one of
 these Linux flavors: RHEL6, CentOS6 or on IBM Power servers using PPC64-RHEL6.

@@ -91,6 +91,7 @@ interface with many different back-end in-memory stores.
 #define MONGO_NO_SQL_DB_NAME										"mongo"
 #define COUCHBASE_NO_SQL_DB_NAME									"couchbase"
 #define AEROSPIKE_NO_SQL_DB_NAME									"aerospike"
+#define REDIS_CLUSTER_NO_SQL_DB_NAME								"redis-cluster"
 #define HTTP_GET													"GET"
 #define HTTP_PUT													"PUT"
 #define HTTP_POST													"POST"

@@ -188,6 +188,7 @@
         <cmn:managedLibrary>
 		  <cmn:lib>DistributedProcessStoreLib</cmn:lib>
           <cmn:lib>memcached</cmn:lib>
+          <cmn:lib>sds</cmn:lib>
           <cmn:lib>hiredis</cmn:lib>
           <cmn:lib>uv</cmn:lib>
           <cmn:lib>crypto</cmn:lib>

@@ -14,6 +14,7 @@
 #include "MongoDBLayer.h"
 #include "CouchbaseDBLayer.h"
 #include "AerospikeDBLayer.h"
+#include "RedisClusterDBLayer.h"
 
 #include <SPL/Runtime/ProcessingElement/ProcessingElement.h>
 #include <SPL/Runtime/ProcessingElement/PE.h> // non-kosher
@@ -158,6 +159,8 @@ namespace distributed
 		db_.reset(new CouchbaseDBLayer());
 	} else if (noSqlKvStoreProductName.compare("aerospike") == 0) {
 		db_.reset(new AerospikeDBLayer());
+	} else if (noSqlKvStoreProductName.compare("redis-cluster") == 0) {
+		db_.reset(new RedisClusterDBLayer());
 	} else {
 		// Invalid no-sql store product name configured. Abort now.
 		std::string error = "Invalid NoSQL store product name is specified in the configuration file: " + noSqlKvStoreProductName;

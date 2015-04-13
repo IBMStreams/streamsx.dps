@@ -3,5 +3,4 @@ spl/1.1.0
 058_data_sharing_between_non_fused_spl_custom_and_cpp_primitive_operators/1.0.0
 061_data_sharing_between_non_fused_spl_custom_operators_and_a_native_function/1.0.0
 062_data_sharing_between_non_fused_spl_custom_and_java_primitive_operators/1.0.0
-com.ibm.streams.db/1.4.0
-com.ibm.streamsx.dps/1.0.8
+com.ibm.streamsx.dps/1.0.9
