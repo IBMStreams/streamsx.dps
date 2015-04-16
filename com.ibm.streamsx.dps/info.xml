@@ -3,8 +3,8 @@
   <info:identity>
     <info:name>com.ibm.streamsx.dps</info:name>
     <info:description></info:description>
-    <info:version>1.0.9</info:version>
-    <info:requiredProductVersion>2.0.0</info:requiredProductVersion>
+    <info:version>2.0.9</info:version>
+    <info:requiredProductVersion>4.0.0.0</info:requiredProductVersion>
   </info:identity>
   <info:dependencies/>
 </info:toolkitInfoModel>

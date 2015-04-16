@@ -22,7 +22,9 @@ Following are the NoSQL K/V stores supported by the DPS toolkit:
  
 A companion IBM developerWorks article about this toolkit: http://tinyurl.com/nxrf3gg
 
-[Apr/12/2015]                  [DPS toolkit version 1.0.9]                  [Share and prosper]
+This version of the DPS toolkit works with Streams 4.x and higher versions.
+
+[Apr/15/2015]                  [DPS toolkit version 2.0.9]                  [Share and prosper]
 ================================================================================================
 This usage tips file provides high-level implementation details about the Streams DPS toolkit.
 Main effort here is to provide a Streams toolkit that will allow data sharing
@@ -132,7 +134,7 @@ DPS toolkit is routinely compiled and tested in our Streams lab using the follow
 a) RedHat Enterprise Linux 6.4 (or an equivalent CentOS version) + gcc version 4.4.7 20120313 (Red Hat 4.4.7-3) (GCC)
 b) RedHat Enterprise Linux 6.4 for IBM Power machines + gcc version 4.4.7 20120313 (Red Hat 4.4.7-3) (GCC)
    [Dec/23/2014: DPS toolkit version 1.0.6 and later can't be used with RHEL5 and CentOS5.]
-c) IBM InfoSphere Streams Version 3.x
+c) IBM InfoSphere Streams Version 4.x and higher versions
 d) memcached server version 1.4.15 with libmemcached client version 1.0.16
 e) redis server version 2.8.19 with hiredis C client version 0.12.1
 f) Cassandra server version 2.1.4 with C++ client driver 1.0.1 (April/2015) from DataStax
@@ -452,7 +454,7 @@ If you installed Cassandra, you can start Cassandra as shown below.
        1.7u25, from here and unzip it in your own directory and set the JAVA_HOME environment variable to that new Java directory.
        
        http://www.oracle.com/technetwork/java/javase/downloads/jdk7-downloads-1880260.html
-       (As of April/2015, the latest version of Java SDK from this URL is 1.7.0_75)
+       (As of April/2015, the latest version of Java SDK from this URL is 1.7.0_79)
        
     d) You can now start Cassandra to run in the background using this command: $CASSANDRA_HOME/bin/cassandra
     
@@ -970,9 +972,16 @@ you can skip steps 1 and 2 below.
    This will create a new dps-helper.jar file in the impl/java/bin directory. This is needed to access the DPS
    functions from a Java primitive operator.
 
-4) Switch to <your_base_dir>/com.ibm.streamsx.dps/samples/dps_test1/bin directory and run this script: ./build-distributed.sh.
-5) You have to edit the <your_base_dir>/com.ibm.streamsx.dps/samples/dps_test1/etc/no-sql-kv-store-servers.cfg file and add the names or the
-   IP addresses of your memcached or redis or Cassandra or Cloudant or HBase or Mongo servers. Then, save the file.
+4) You have to edit the <your_base_dir>/com.ibm.streamsx.dps/samples/dps_test1/etc/no-sql-kv-store-servers.cfg file and add the names or the
+   IP addresses of your memcached or redis or Cassandra or Cloudant or HBase or Mongo or Couchbase or Aerospike or Redis-Cluster servers.
+   Then, save the file.
+5) Switch to <your_base_dir>/com.ibm.streamsx.dps/samples/dps_test1/bin directory and run this script: ./build-distributed.sh.
+   [Note: Whenever you change the DPS configuration file as shown in step 4, you must build the application and ensure that
+    the application bundle (sab) file in the output directory has a new file modification time. If that file's modification time
+    indicates that the sab file never got updated, then you must completely remove 
+    <your_base_dir>/com.ibm.streamsx.dps/samples/dps_test1/output directory and build again. If you don't do this, your DPS configuration
+    changes will not take effect. As of Apr/2015, this is a new requirement/restriction in Streams 4.x to update the
+    application bundle with your modified DPS configuration file. This requirement/restriction will be eliminated in a future release.]
 6) To test the application, you can run this script from <your_base_dir>/com.ibm.streamsx.dps/samples/dps_test1/bin: ./run-distributed.sh -i <YOUR_STREAMS_INSTANCE_NAME>
 7) You can verify the application results in the Streams PE log files.
    --> You have to first read the SPLMM file and understand which operator writes what in the PE log files.

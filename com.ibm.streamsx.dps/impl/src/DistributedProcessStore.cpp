@@ -74,9 +74,19 @@ namespace distributed
     conf /= "../etc/no-sql-kv-store-servers.cfg";
     std::string confFile = conf.string();
     */
-    // Refer to the etc directory with a relative path from the default current directory (i.e. data directory)
-	std::string confFile = "../etc/no-sql-kv-store-servers.cfg";
- 
+	std::string appDirectory = ProcessingElement::pe().getApplicationDirectory();
+	/*
+	std::string dataDirectory = ProcessingElement::pe().getDataDirectory();
+	std::string outputDirectory = ProcessingElement::pe().getOutputDirectory();
+	std::string toolkitDirectory = ProcessingElement::pe().getToolkitDirectory();
+	cout << "App directory=" << appDirectory << endl;
+	cout << "Data directory=" << dataDirectory << endl;
+	cout << "Output directory=" << outputDirectory << endl;
+	cout << "Toolkit directory=" << toolkitDirectory << endl;
+	*/
+	// Refer to the etc directory with a relative path from the application directory.
+	std::string confFile = appDirectory + "/etc/no-sql-kv-store-servers.cfg";
+
     // Format of this file is as shown below.
     // Several comment lines beginning with a # character.
     // Then, the very first non-comment line will tell us the
