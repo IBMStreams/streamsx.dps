@@ -1,0 +1,8 @@
+com.ibm.streamsx.dps/impl/ext
+com.ibm.streamsx.dps/impl/java/classes
+*.o
+*.so
+*.jar
+toolkit.xml
+output
+

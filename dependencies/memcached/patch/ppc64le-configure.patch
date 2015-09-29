@@ -1,0 +1,12 @@
+--- libmemcached-1.0.16.orig/configure	2013-01-31 19:15:31.000000000 -0500
++++ libmemcached-1.0.16/configure	2015-10-15 14:53:46.560453411 -0400
+@@ -7267,6 +7267,9 @@
+ 	  x86_64-*linux*)
+ 	    LD="${LD-ld} -m elf_i386"
+ 	    ;;
++          ppc64le*-*linux*|powerpc64le*-*linux*)
++            LD="${LD-ld} -m elf64lppc"
++            ;;
+ 	  ppc64-*linux*|powerpc64-*linux*)
+ 	    LD="${LD-ld} -m elf32ppclinux"
+ 	    ;;
