@@ -2,7 +2,81 @@
 <info:toolkitInfoModel xmlns:common="http://www.ibm.com/xmlns/prod/streams/spl/common" xmlns:info="http://www.ibm.com/xmlns/prod/streams/spl/toolkitInfo">
   <info:identity>
     <info:name>com.ibm.streamsx.dps</info:name>
-    <info:description></info:description>
+    <info:description>The Distributed Process Store (DPS) toolkit enables multiple applications running processing elements (PEs) on one or more machines to share application specific state information.  
+The shared information is stored in an external Redis®  NoSQL Key-Value (K/V) data store. The toolkit thus allows non-fused SPL, C++ and Java operators running on different machines to share information.
+The toolkit currently officially supports Redis 2.8.2+ and Redis 3.  Thus,using the DPS toolkit requires you to have a  Redis server infrastructure. 
+
+The toolkit consists of a set of native functions that provide access to shared state, and additional locking functionality to provide safe, concurrent access to the shared data.
+These functions can be used from anywhere inside a Streams application, whether it be SPL code, SPL functions, SPL native functions, C++ primitive operators.  They also have counterparts written in Java that can be used from a Java primitive operator.
+The actual state information is stored separately in the Redis distributed back-end in-memory store which is transparent to the Streams application. 
+
+# Conceptual Overview
+The following diagram provides a conceptual overview of the interaction between the Streams application, the DPS toolkit, and the Redis distributed back-end in-memory store. Each green box represents a processing element (PE) of the application. These interconnected PEs have access to the DPS logical container as well as full access to the data store APIs. 
+In the logical view layer, code abstraction is done for these four important aspects:
+* 1.	Serialization required before storing the user data in the store
+* 2.	Deserialization required after fetching the data from the store and just before returning it to the user
+* 3.	In-memory database abstraction in order to integrate the Redis store with the Distributed Process Store
+* 4.	Platform dependent implementation necessary to communicate with the Redis back-end in-memory store 
+Any PE, regardless of whether it originally created the store and populated it with its original contents (if any), can safely access the store (shown in the physical view layer) to save and retrieve contents. To access the store, the PE requires a valid store name or a store handle. 
+
+{icons/overview.png}
+
+As shown in the following figure, an instance of the DPS accommodates one or more user-created stores. 
+Each store can hold an unlimited number of data items stored as key-value pairs created using any SPL type as a key and any SPL type as a value.
+Additionally, a DPS instance contains a store factory that can manufacture stores on demand.
+Similarly, any store can be accessed concurrently by any number of PEs running on different machines. 
+In order to ensure safe access (i.e. store operations do not override each other), each DPS instance contains a lock factory enabling you to create sharable locks for the purpose of locking a store during a critical private operation and then releasing the lock once that critical store operation has completed.
+
+
+# Toolkit overview
+
+The functions provided by the DPS toolkit are divided into 3 categories:
+
+* 1. APIs to work with the User created stores, 
+* 2. APIs to work with the TTL global store in which K/V pairs can be configured to expire after a certain time period
+* 3. APIs to work with the distributed locks
+Note: The toolkit provides the aforementioned functionality as native functions that can be used from C++ and SPL applications and as a separate Java library.  
+The comments below apply regardless of the programming language being used.  
+See the section on using the DPS toolkit in Java for information on how to use these functions in Java.
+See the samples included in the product for detailed examples on how to use the toolkit within SPL.
+Consult the documentation and Javadoc for a detailed descriptionfull list of the API.
+
+# User Created Stores
+A DPS store is a container in which K/V pairs can be created, retrieved from, updated and deleted. 
+You can perform Create, Read, Update, Delete (CRUD) operations simultaneously on numerous stores that you own, share, and manage within the context of one or more Streams applications.
+You can create your own stores and share application-specific data across multiple Streams processing elements (PEs) and across multiple Streams applications running on one or more machines.
+The key-value pairs are kept inside each individual user-created stores. Applications can create and use many such user specified stores at the same time. There is also support for running arbitrary one-way data store commands from within your application. See the `dpsRunDataStoreCommand()` functions.
+The core functions needed to manage the lifecycle of a DPS store in a C++ or SPL application are in the com.ibm.streamsx.store.distributed namespace.
+These functions allow you to perform operations such as create/get/remove stores, put/get/check key value pairs, iterate over the store, serialize/deserialize stores.  
+
+# Time to Live (TTL) Store
+
+The toolkit also provides a set of functions for storing K/V pairs that are configured to expire after a certain time period.  
+When the pre-assigned TTL value expires, these data items will be automatically removed from the data store.  Key Value pairs stored and obtained using these functions will not belong to any user created stores. Instead, they will be stored at the top level global area of the configured Redis back-end.
+When applications have a need to put data items with a TTL value and get them back, you can use these functions without having to create individual stores.  These functions are also in the  com.ibm.streamsx.store.distributed namespace but have names of the form `dps**TTL()`.
+These ephemeral key value pairs can only be used with the aforementioned functions and cannot be used with  any functions that take store name or store id as a function argument.
+
+A non-zero TTL value passed to these functions will automatically remove the K/V pairs at the end of their specified lifetime.
+A TTL value of zero will keep the K/V pair in the back-end data store forever or until such time as they are removed manually using the `dpsRemoveTTL()` function.
+
+These functions will return true or false indicating whether the operation succeeded or not. In the case of a false return value, an error code and an error string can be obtained. 
+In the Redis back-end data store, TTL based data items can coexist with other user created stores containing data items that could live forever. 
+Such TTL based APIs only provide a limited set of functions (put, get, has, and remove), but at the same time will have a slightly lower overhead than the feature rich non-TTL based functions.
+
+
+# Distributed Locking API
+
+The DPS Toolkit also provides the following distributed locking functions which can be used for accessing stores from multiple threads and multiple processes safely without overriding each other. 
+This is achieved using a trust based cooperative locking scheme to gain exclusive access into the stores for performing a set of transaction based store activities.
+The locking related functions for use in SPL or C++ are in the com.ibm.streamsx.lock.distributed namespace.
+
+
+There are also functions that can be called when an error occurs to return the last error code and a message describing the error. 
+The correct function to call after an operation depends on the operation that was last executed.
+* For errors relating to the store functions, use `dpsGetLastStoreErrorCode()` and `dpsGetLastStoreErrorString()`.
+* For errors related to the TTL functions, use `dpsGetLastStoreErrorCodeTTL()` and `dpsGetLastStoreErrorStringTTL()`
+* For locking related errors, use `dlGetLastDistributedLockErrorCode()` and `dlGetLastDistributedLockErrorString()`
+</info:description>
     <info:version>2.0.9</info:version>
     <info:requiredProductVersion>4.0.0.0</info:requiredProductVersion>
   </info:identity>

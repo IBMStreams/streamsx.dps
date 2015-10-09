@@ -81,7 +81,8 @@
         <prototype>public stateful boolean dpsRemoveStore(uint64 store, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Put a new key-value pair into a store.  This function has better performance than `dpsPutSafe` since no safety checks are done. The specified **key** and **item** must be of the same type as those used to create the store in `dpsCreateStore`  or `dpsCreateOrGetStore`, otherwise, store operations will produce undesired results.
+        <description>Put a new key-value pair into a store.  This function has better performance than `dpsPutSafe` since no safety checks are done to ensure that there is a valid user created store present. Hence, use the dpsPut (faster version) API only when there is 
+a user created store present in the back-end DB infrastructure. If this rule is violated, the back-end infrastructure will have inconsistent data items.  The specified **key** and **item** must be of the same type as those used to create the store in `dpsCreateStore`  or `dpsCreateOrGetStore`, otherwise, store operations will produce undesired results.
 @param store The handle specifying the store.        
 @param key The key for the new pair.        
 @param item The value for the new pair. Must be the same type as the **value** that was provided when the store was created.
