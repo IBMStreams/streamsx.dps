@@ -5,10 +5,12 @@
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 */
-// Any errors during distribute lock (dl) operation will result in this exception getting thrown.
-// Users of the dps facility can then catch the exception and obtain the error code and error message.
-package com.ibm.streamsx.dl;
 
+package com.ibm.streamsx.dl;
+/**
+* Any errors during distribute lock (dl) operation will result in this exception getting thrown.
+ * Users of the dps facility can then catch the exception and obtain the error code and error message.
+ */
 public class LockException extends Exception {
 	private long errorCode;
 	private String errorMessage;

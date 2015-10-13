@@ -8,7 +8,7 @@
 @param name the name of the store to create
 @param key this variable should be provided to indicate the type of the key to use in the store.
 @param value this variable indicates the type of the values in the store. 
-@param err  mutable variable provided that will contain the error code, if an error occurs. Will be set to '0' if the store was created successfully, or a non-zero value otherwise.  To get detailed information about the most recent store related error, call the `dpsGetLastStoreErrorCode()` and the `dpsGetLastStoreErrorString()` functions.      
+@param err  mutable variable provided that will contain the error code, if an error occurs. Will be set to '0' if the store was created successfully, or a non-zero value otherwise.  
 @return the process store handle if created. It is advisable to cache the store id in your application.  The return value will be '0' if a process store with the same name already exists, and undefined if there is an error.
 
 	  mutable uint64 err = 0ul;
@@ -31,7 +31,7 @@
 @param name the name of the store to retrieve, or to create if it doesn't already exist.
 @param key this variable should be provided to indicate the type of the key to use in the store.
 @param value this variable indicates the type of the values in the store.
-@param err mutable variable provided that will contain the error code, if an error occurs. Will be set to '0' if the store was created successfully, or a non-zero value otherwise.  To get detailed information about the most recent store related error, call the `dpsGetLastStoreErrorCode()` and the `dpsGetLastStoreErrorString()` functions.      
+@param err mutable variable provided that will contain the error code, if an error occurs. Will be set to '0' if the store was created successfully, or a non-zero value otherwise.  
 @return the process store handle of the created store.  If an error occurs, the return value of this function is undefined. It is recommended that the store id is cached in your application. 
      
 
@@ -86,12 +86,13 @@ a user created store present in the back-end DB infrastructure. If this rule is 
 @param store The handle specifying the store.        
 @param key The key for the new pair.        
 @param item The value for the new pair. Must be the same type as the **value** that was provided when the store was created.
-@param err Will be set to '0' on success, and will be non-zero otherwise. To get detailed information about the most recent store related error, call the `dpsGetLastStoreErrorCode()` and the `dpsGetLastStoreErrorString()` functions.       
+@param err Will be set to '0' on success, and will be non-zero otherwise. 
 @return If no error occurs, returns false if the item previously existed in the store, and true if the store did not contain an item with the same key.
      
 		rstring dummyRstring = "";
 		uint32 dummyUint32 = 0u;
 		mutable uint64 err = 0ul;
+		mutable uint64 dbStore_handle = 0ul;
 		dbStore_handle = dpsCreateStore("myDBStore1", dummyRstring, dummyUint32, err);
 
 		//..perform error checks	
@@ -121,7 +122,7 @@ a user created store present in the back-end DB infrastructure. If this rule is 
 @param key the key with which to associate the given value
 @param item the value to associate with the key
 @param ttl the amount of time, in seconds, this pair will be kept in the global store before it is automatically removed. A value of '0' means that this pair will be in the store indefinitely until manually removed via `dpsRemoveTTL`.
-@param err will be set to '0' if the operation was successful, and a non-zero value otherwise.   To get detailed information about the most recent TTL store related error, call the `dpsGetLastErrorCodeTTL` and the `dpsGetLastErrorStringTTL` functions.    
+@param err will be set to '0' if the operation was successful, and a non-zero value otherwise.   
 @return true if the operation is successful, false otherwise.
         
         mutable rstring myKey = "", myValue = "";
@@ -144,7 +145,7 @@ a user created store present in the back-end DB infrastructure. If this rule is 
 @param store the handle identifying the store in question.
 @param key the key of the item to look up
 @param item if the key exists in the store and has a value of the same type, this parameter will be set to the key's value.         
-@param err contains the non-zero error code, if an error occurs, or will have a value of '0'.  To get detailed information about the most recent store related error, call the `dpsGetLastStoreErrorCode()` and the `dpsGetLastStoreErrorString()` functions.
+@param err contains the non-zero error code, if an error occurs, or will have a value of '0'.  
 @return  true if the if the operation was successful and the store contains an item with the given key and a matching type, and false if the key-value pair wasn't found.
        </description>
         <prototype>&lt;any T1, any T2> public stateful boolean dpsGet(uint64 store, T1 key, mutable T2 item, mutable uint64 err)</prototype>
@@ -158,7 +159,7 @@ it does safety checks and is therefore slower.</description>
         <description>Get an item that was stored with a TTL (Time To Live in seconds) value.
 @param key the key to look up
 @param item will receive the saved value for the given key.
-@param err will receive the error code if an error occurs, or will be set to '0' otherwise.  If an error occurs, use the `dpsGetLastStoreErrorCodeTTL()` and the `dpsGetLastStoreErrorStringTTL()` functions to get more information.
+@param err will receive the error code if an error occurs, or will be set to '0' otherwise.  
 @return true if the store did contain an item with the given key and a matching type, false otherwise or if an error occurs.
 
 
@@ -184,7 +185,7 @@ it does safety checks and is therefore slower.</description>
         <description>Remove an item from the given store.
 @param store handle of the store from which the key will be removed
 @param key the key to remove.  Can be a valid SPL type.
-@param err contains the non-zero error code, if an error occurs, or will have a value of '0'.  To get detailed information about the most recent store related error, call the `dpsGetLastStoreErrorCode()` and the `dpsGetLastStoreErrorString()` functions.
+@param err contains the non-zero error code, if an error occurs, or will have a value of '0'.  
 @return true if the store did contain an item with the given key, false otherwise.
 
 	mutable uint64 err = 0ul;
@@ -211,14 +212,14 @@ it does safety checks and is therefore slower.</description>
       <function>
         <description>Check if an item exists in the given store.
 @param store the store handle representing the store to check.
-@param err contains the error code for this function call.  Will be '0' if no error occurs, otherwise will have a non-zero value.  To get detailed information about the most recent store related error, call the `dpsGetLastStoreErrorCode()` and the `dpsGetLastStoreErrorString()` functions.
+@param err contains the error code for this function call.  Will be '0' if no error occurs, otherwise will have a non-zero value.
 @return true if the given store does contain an item with the given key, false otherwise.</description>
         <prototype>&lt;any T1> public stateful boolean dpsHas(uint64 store, T1 key, mutable uint64 err)</prototype>
       </function>
       <function>
         <description>Check if an item exists that was stored with a TTL (Time To Live in seconds) value.
 @param key the key to look up. Can be any SPL type.
-@param err mutable parameter that receives the error code for this function call. If the error code is non-zero, an error has occurred and more details are available via the `dpsGetLastStoreErrorCodeTTL()` and the `dpsGetLastStoreErrorStringTTL()` functions.
+@param err mutable parameter that receives the error code for this function call. If the error code is non-zero, an error has occurred.
 @return true if an TTL item with the given key exists, false if no such item exists or if an error occurs.
 
 
@@ -243,13 +244,13 @@ it does safety checks and is therefore slower.</description>
       <function>
         <description>Clear the given store.
 @param store the handle of the store to clear
-@param err Contains the error code describing the result of the operation.  Will be '0' if the store was successfully emptied, otherwise will have a non-zero value.  To get detailed information about the most recent store related error, call the `dpsGetLastStoreErrorCode()` and the `dpsGetLastStoreErrorString()` functions.
+@param err Contains the error code describing the result of the operation.  Will be '0' if the store was successfully emptied, otherwise will have a non-zero value.  
 </description>
         <prototype>public stateful void dpsClear(uint64 store, mutable uint64 err)</prototype>
       </function>
       <function>
         <description>Get the total number of key-value pairs in the given store.
-@param err contains the error code for this function call.  Will be '0' if no error occurs, otherwise will have a non-zero value.  To get detailed information about the most recent store related error, call the `dpsGetLastStoreErrorCode()` and the `dpsGetLastStoreErrorString()` functions.
+@param err contains the error code for this function call.  Will be '0' if no error occurs, otherwise will have a non-zero value. 
 @return the size of the store. The return value of this function is undefined if an error occurs.
 </description>
         <prototype>public stateful uint64 dpsSize(uint64 store, mutable uint64 err)</prototype>
@@ -257,7 +258,7 @@ it does safety checks and is therefore slower.</description>
       <function>
         <description>This function gets a store iterator that can be used to iterate over all the K/V pairs in a given store id. No other operations that can modify the state can be used until after `dpsEndIteration()` is called for this same store.   Once a store iterator is obtained, it must be released by calling `dpsEndIteration()` once the iterator is no longer needed.  See the documentation for `dpsGetNext()` for a complete example of how to use the iterator.
 @param store handle of the store for which an iterator is needed.
-@param err Contains the error code describing the result of the function call.  Will be '0' if no error occured, otherwise will have a non-zero value.  To get detailed information about the most recent store related error, call the `dpsGetLastStoreErrorCode()` and the `dpsGetLastStoreErrorString()` functions.
+@param err Contains the error code describing the result of the function call.  Will be '0' if no error occured, otherwise will have a non-zero value. 
 @return an value representing an iterator that can be used with the two other store iteration functions, `dpsGetNext()` and `dpsEndIteration()`.</description>
         <prototype>public stateful uint64 dpsBeginIteration(uint64 store, mutable uint64 err)</prototype>
       </function>
@@ -267,8 +268,8 @@ it does safety checks and is therefore slower.</description>
 @param iterator the iterator handle, must have been created from a previous call to `dpsBeginIteration()`
 @param key a mutable variable to store the next key for the current key-value pair in the iteration sequence
 @param value a mutable variable to store the value for the current key-value pair
-@param err Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise.  To get detailed information about the most recent store related error, call the `dpsGetLastStoreErrorCode()` and the `dpsGetLastStoreErrorString()` functions.
-@return true if the next key-value pair was successfully returned, or if store is empty, and false if the end of the iteration was reached. If this method returns false becasue the store is empty or the end of the iteration was reached, the **err** parameter will have a value of '0'. If an error occurs, the function will return false and the **err** parameter will have a non-zero value.
+@param err Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise.  
+@return true if the next key-value pair was successfully returned, or if store is empty, and false if the end of the iteration was reached. If this method returns false because the store is empty or the end of the iteration was reached, the **err** parameter will have a value of '0'. If an error occurs, the function will return false and the **err** parameter will have a non-zero value.
 
 
 	mutable uint64 err = 0ul;
@@ -295,7 +296,7 @@ it does safety checks and is therefore slower.</description>
         <description>This function must be called once all iteration is complete.
 @param store the handle of the store.
 @param iterator the store iterator id obtained from `dpsBeginIteration()`.
-@param err Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise.  To get detailed information about the most recent store related error, call the `dpsGetLastStoreErrorCode()` and the `dpsGetLastStoreErrorString()` functions.
+@param err Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise. 
 </description>
         <prototype>public stateful void dpsEndIteration(uint64 store, uint64 iterator, mutable uint64 err)</prototype>
       </function>
@@ -305,7 +306,7 @@ it does safety checks and is therefore slower.</description>
 @param data a mutable blob that will contain all the key-value pairs in the store once the serialization is complete.
 @param dummyKey a dummy variable to indicate the type of the key
 @param dummyValue @param dummyValue used to indicate the type of the values in the store
-@param err a mutable variable that will contain the error code describing the result of the serialization.  Will be '0' if no error occurs, and a non-zero value otherwise.  To get detailed information about the most recent store related error, call the `dpsGetLastStoreErrorCode()` and the `dpsGetLastStoreErrorString()` functions.
+@param err a mutable variable that will contain the error code describing the result of the serialization.  Will be '0' if no error occurs, and a non-zero value otherwise.  
 
 </description>
         <prototype>&lt;any T1, any T2> public stateful void dpsSerialize(uint64 store, mutable blob data, T1 dummyKey, T2 dummyValue, mutable uint64 err)</prototype>
@@ -316,7 +317,7 @@ it does safety checks and is therefore slower.</description>
 @param data the data to deserialize and save into the specified store.
 @param dummyKey variable indicating the type of the keys in the store
 @param dummyValue varaible indicating the type of the values in the store
-@param err a mutable variable that will contain the error code describing the result of the deserialization.  Will be '0' if deserialization was successful, and a non-zero value otherwise.  To get detailed information about the most recent store related error, call the `dpsGetLastStoreErrorCode()` and the `dpsGetLastStoreErrorString()` functions.
+@param err a mutable variable that will contain the error code describing the result of the deserialization.  Will be '0' if deserialization was successful, and a non-zero value otherwise.
 
 	mutable uint64 err = 0ul;
 	rstring dummyRstring = "";
@@ -410,7 +411,7 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
       <function>
         <description>This function can be used to execute simple arbitrary back-end data store (fire and forget) native commands. This includes any Redis native commands that don't have to fetch and return K/V pairs or return size of the database, like Insert and Delete. However, key and value can only have string types. 
 @param cmd the Redis command to execute.
-@param err a mutable variable that will contain the error code in case an error occurs executing the command. Will be '0' on success and non-zero otherwise.  To get detailed information about the most recent store related error, call the `dpsGetLastStoreErrorCode()` and the `dpsGetLastStoreErrorString()` functions.
+@param err a mutable variable that will contain the error code in case an error occurs executing the command. Will be '0' on success and non-zero otherwise.
 @return true if the one way command was successful, and false otherwise.
 
 

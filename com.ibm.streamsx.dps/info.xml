@@ -4,7 +4,7 @@
     <info:name>com.ibm.streamsx.dps</info:name>
     <info:description>The Distributed Process Store (DPS) toolkit enables multiple applications running processing elements (PEs) on one or more machines to share application specific state information.  
 The shared information is stored in an external Redis®  NoSQL Key-Value (K/V) data store. The toolkit thus allows non-fused SPL, C++ and Java operators running on different machines to share information.
-The toolkit currently officially supports Redis 2.8.2+ and Redis 3.  Thus,using the DPS toolkit requires you to have a  Redis server infrastructure. 
+The toolkit currently officially supports Redis 2.8.2+ and Redis 3.  Thus, using the DPS toolkit requires you to have installed and configured a Redis server infrastructure. 
 
 The toolkit consists of a set of native functions that provide access to shared state, and additional locking functionality to provide safe, concurrent access to the shared data.
 These functions can be used from anywhere inside a Streams application, whether it be SPL code, SPL functions, SPL native functions, C++ primitive operators.  They also have counterparts written in Java that can be used from a Java primitive operator.
@@ -28,25 +28,25 @@ Similarly, any store can be accessed concurrently by any number of PEs running o
 In order to ensure safe access (i.e. store operations do not override each other), each DPS instance contains a lock factory enabling you to create sharable locks for the purpose of locking a store during a critical private operation and then releasing the lock once that critical store operation has completed.
 
 
+	
 # Toolkit overview
 
 The functions provided by the DPS toolkit are divided into 3 categories:
 
-* APIs to work with the user created stores, 
-* APIs to work with the TTL global store in which K/V pairs can be configured to expire after a certain time period
-* APIs to work with the distributed locks
-Note: The toolkit provides the aforementioned functionality as native functions that can be used from C++ and SPL applications and as a separate Java library.  
+* User created data stores, 
+* TTL global store, in which K/V pairs can be configured to expire after a certain time period
+* Distributed lock API
+Note: The toolkit provides the aforementioned functionality as native functions that can be used from C++ and SPL applications and  through a fully object oriented Java API. See the "Getting Started" and Javadoc for more information. 
 The comments below apply regardless of the programming language being used.  
-See the section on using the DPS toolkit in Java for information on how to use these functions in Java.
 See the samples included in the product for detailed examples on how to use the toolkit within SPL.
-Consult the documentation and Javadoc for a detailed descriptionfull list of the API.
+Consult the documentation and Javadoc for more details.
 
 # User Created Stores
-A DPS store is a container in which K/V pairs can be created, retrieved from, updated and deleted. 
+A DPS store is a container in which K/V pairs can be created, retrieved from, updated and deleted. The keys and values must be a SPL primitive type, such as `rstring` or `int32`, or a composite type such as a `map`. 
 You can perform Create, Read, Update, Delete (CRUD) operations simultaneously on numerous stores that you own, share, and manage within the context of one or more Streams applications.
 You can create your own stores and share application-specific data across multiple Streams processing elements (PEs) and across multiple Streams applications running on one or more machines.
 The key-value pairs are kept inside each individual user-created stores. Applications can create and use many such user specified stores at the same time. There is also support for running arbitrary one-way data store commands from within your application. See the `dpsRunDataStoreCommand()` functions.
-The core functions needed to manage the lifecycle of a DPS store in a C++ or SPL application are in the com.ibm.streamsx.store.distributed namespace.
+The core functions needed to manage the lifecycle of a DPS store in a SPL application are in the com.ibm.streamsx.store.distributed namespace.
 These functions allow you to perform operations such as create/get/remove stores, put/get/check key value pairs, iterate over the store, serialize/deserialize stores.  
 
 # Time to Live (TTL) Store
@@ -68,15 +68,107 @@ Such TTL based APIs only provide a limited set of functions (put, get, has, and 
 
 The DPS Toolkit also provides the following distributed locking functions which can be used for accessing stores from multiple threads and multiple processes safely without overriding each other. 
 This is achieved using a trust based cooperative locking scheme to gain exclusive access into the stores for performing a set of transaction based store activities.
-The locking related functions for use in SPL or C++ are in the com.ibm.streamsx.lock.distributed namespace.
+The locking related functions for use in SPL are in the com.ibm.streamsx.lock.distributed namespace.
 
 
-There are also functions that can be called when an error occurs to return the last error code and a message describing the error. 
+
+# Error Handling in C++ and SPL
+Most C++ functions include a mutable **err** parameter that will contain the result of executing the function.  If an error occurs, this variable's value will be non-zero.
+It is the caller's responsibility to provide a mutable parameter to contain the error code and check its value afterwards.
+
+In addition, there are functions that can be called when an error occurs to return the last error code and a message describing the error. 
 The correct function to call after an operation depends on the operation that was last executed.
 * For errors relating to the store functions, use `dpsGetLastStoreErrorCode()` and `dpsGetLastStoreErrorString()`.
 * For errors related to the TTL functions, use `dpsGetLastStoreErrorCodeTTL()` and `dpsGetLastStoreErrorStringTTL()`
 * For locking related errors, use `dlGetLastDistributedLockErrorCode()` and `dlGetLastDistributedLockErrorString()`
-</info:description>
+
+The following example shows how to check for errors after creating a lock:
+	mutable uint64 lock_id = 0ul;
+	mutable uint64 err = 0ul;
+	lock_id = dlCreateOrGetLock("My Sentinel Lock1", err);
+	if (err != 0ul) {
+		rstring msg = dlGetLastDistributedLockErrorString();
+		uint64 rc = dlGetLastDistributedLockErrorCode();
+		printStringLn("Error creating lock, rc = " + (rstring)(rc) + ", msg =" + msg );
+	}
+
+
+
+
+# Getting Started
+The following snippets demonstrate the basic usage of the toolkit from SPL and Java. 
+
+SPL:
+
+	rstring dummyRstring = "";
+	uint32 dummyUint32 = 0u;
+	mutable uint64 err = 0ul;
+	mutable uint64 dbStore_handle = 0ul;
+	dbStore_handle = dpsCreateStore("myDBStore1", dummyRstring, dummyUint32, err);
+	
+	if (err == 0ul ) { //no error occured
+	//create lock for the store
+		err = 0ul;
+		mutable uint64 lock_id = dlCreateOrGetLock("My db store lock", err);
+		// Acquire the newly created lock, specifying a lease time and maximum time to wait to acquire the lock.
+		float64 max_wait = 10.0;
+		float64 lease_time = 10.0;
+		dlAcquireLock(lock_id, lease_time, max_wait, err);
+		//add a key/value pair to the store
+		err = 0ul;
+		mutable boolean result = true;
+		rstring key = "IBM";
+		uint32 value = 399;
+		err = 0ul;
+		result = dpsPut(dbStore_handle, key, value, err);
+		
+		if (err != 0ul) {
+			//use  dpsGetLastStoreErrorCode() and  dpsGetLastStoreErrorString() as needed
+		}
+		// finished our store operations, release the lock
+		err = 0ul;
+		dlReleaseLock(lock_id, err);	
+	}
+
+
+Java:	
+
+	StoreFactory sf = DistributedStores.getStoreFactory();
+	Store store = null;
+	
+	try {
+	   //specify the SPL types for the keys and values in the store
+	   String keyType = "rstring";
+	   String valueType = "int32";
+	   store = sf.createOrGetStore("Java Test Store1", keyType, valueType);
+	} catch (StoreFactoryException sfe) {
+		// use	sfe.getErrorCode() and  sfe.getErrorMessage()) for more info
+	}
+	
+	...
+	//once ready to access the store,
+	//get the lock for the store, may have previously been created
+	   LockFactory lf = DistributedLocks.getLockFactory(); 
+	   Lock myLock = lf.createOrGetLock("Lock_For_Test_Store1");
+	
+	// Acquire the lock
+	try {
+	 	myLock.acquireLock();
+	} catch (LockException le) {
+		System.out.print("Unable to acquire the lock named 'Lock_For_Test_Store1'");
+		System.out.println(" Error = " + le.getErrorCode() + ", Error msg = " + le.getErrorMessage());
+	    throw le;
+	}
+	
+	//perform store operations
+	store.put("IBM", 39);
+	store.put("Lenovo", 50);
+	//release the lock  when finished
+	myLock.releaseLock();
+	
+Note that the above examples only have minimum error checking.
+
+  </info:description>
     <info:version>2.0.9</info:version>
     <info:requiredProductVersion>4.0.0.0</info:requiredProductVersion>
   </info:identity>

@@ -10,7 +10,7 @@
         <description>Create a new distributed lock with a given name or get it if it already exists.
 @param name the name of the lock to create or retrieve
 @param err a mutable variable that will retain the error code in event of a problem. On failure, **err** is assigned a non-zero value.  
-@return 0 on error, or the id of the lock otherwise. This id can then be used as a parameter to other lock related functions.  If an error occurs, call `dlGetLastDistributedLockErrorCode` and `dlGetLastDistributedLockErrorString` to get more information if an error occurs.
+@return 0 on error, or the id of the lock otherwise. This id can then be used as a parameter to other lock related functions.  
 
 
 			mutable uint64 lock_id = 0ul;
@@ -32,7 +32,7 @@
 Do it only when you are sure that no one is using the lock at the time of removing it.
 @param lock the id of the lock to remove.
 @param err a mutable variable to receive the error code.
-@return 'true' on success, 'false' otherwise. In the case of an error, a non-zero value is assigned to the **err**  variable.  Call `dlGetLastDistributedLockErrorCode` and `dlGetLastDistributedLockErrorString` to get more information if an error occurs.
+@return 'true' on success, 'false' otherwise. In the case of an error, a non-zero value is assigned to the **err**  variable.
 
 
 
@@ -55,9 +55,9 @@ Do it only when you are sure that no one is using the lock at the time of removi
 **IMPORTANT NOTE:**
 
 Once called, this API could spin loop for a very long time (three or four minutes) until it acquires the distributed lock or it times out due to the distributed lock being not yet available.  Another important factor is that once the lock is granted, it is given to you for an infinite period of time. Hence, it is your responsibility to properly release the lock at the end of your task. There is no external mechanism to take the lock back from you in case your code crashes after acquiring the lock.
-An alternative overloaded function is available that allows you to specify a maximum time to wait, and also allows lock ownership to expire after a given amount of time.  This function is also called `dlAcquireLock`.
+An alternative overloaded function is available that allows you to specify a maximum time to wait, and also allows lock ownership to expire after a given amount of time.  This alternative function is also called `dlAcquireLock`.
 @param lock the id of the lock to acquire.
-@param err a mutable variable to receive a non-zero error code in the event of a problem acquiring the lock.  Will be set to '0' on success.  To get detailed information about the most recent DL API error, call the `dlGetLastDistributedLockErrorCode` and the `dlGetLastDistributedLockErrorString` functions.
+@param err a mutable variable to receive a non-zero error code in the event of a problem acquiring the lock.  Will be set to '0' on success. 
 
 
 		mutable uint64 lk = 0ul;
@@ -88,16 +88,16 @@ This overloaded function can be used to acquire a given distributed lock id.  Th
 First of all, callers can pass a fixed lease time for the lock, indicating that the lock will be needed at most for a specified period before which the caller will relinquish this lock.  
 In addition, the caller can also specify how long the caller is willing to wait to acquire the lock.
 @param lock the id of the lock to acquire, must have been previously created using `dlCreateOrGetLock`.
-@param leaseTime the length of time, in seconds, for which the lock is needed.  If the lock is not released after the requested lease time due to a program crash or a programmatic error, the lock will be automatically released and made available for others to acquire.
+@param leaseTime the length of time, in seconds, for which the lock is needed. Must be greater than 0. If the lock is not released after the requested lease time due to a program crash or a programmatic error, the lock will be automatically released and made available for others to acquire.
 @param maxWaitTimeToAcquireLock Maximum time to wait to acquire the lock, in seconds. If the lock acquisition is not done within the specified max wait time, this API will exit with an error instead of spin looping forever.
-@param err a mutable variable to receive a non-zero error code in the event of a problem acquiring the lock.  Will be set to '0' on success.  To get detailed information about the most recent DL API error, call the `dlGetLastDistributedLockErrorCode` and the `dlGetLastDistributedLockErrorString` functions.
+@param err a mutable variable to receive a non-zero error code in the event of a problem acquiring the lock.  Will be set to '0' on success.
       </description>
         <prototype><![CDATA[ public stateful void dlAcquireLock(uint64 lock, float64 leaseTime, float64 maxWaitTimeToAcquireLock, mutable uint64 err) ]]></prototype>
       </function>
       <function>
         <description>Release the given distributed lock id.
 @param lock the id of the lock to release.  The specified lock will be made available for other callers to acquire.
-@param err a mutable variable to receive a non-zero error code in the event of a problem releasing the lock.  Will be set to '0' on success.  To get detailed information about the most recent DL API error, call the `dlGetLastDistributedLockErrorCode` and the `dlGetLastDistributedLockErrorString` functions.
+@param err a mutable variable to receive a non-zero error code in the event of a problem releasing the lock.  Will be set to '0' on success.  
 
 </description>
         <prototype><![CDATA[ public stateful void dlReleaseLock(uint64 lock, mutable uint64 err) ]]></prototype>
@@ -106,7 +106,7 @@ In addition, the caller can also specify how long the caller is willing to wait 
         <description>Get the process id that is currently holding a given lock.  This function can be used for test, diagnostic or informational purposes.
 @param name the name of the distributed lock in question.
 @param err stores the error code if an error occurs, or '0' otherwise.
-@return the id of the Linux process id of the processing element (PE) that currently owns the lock, or '0' if no one owns the lock.  To get detailed information about the most recent DL API error, call the `dlGetLastDistributedLockErrorCode` and the `dlGetLastDistributedLockErrorString` functions.
+@return the id of the Linux process id of the processing element (PE) that currently owns the lock, or '0' if no one owns the lock.  
 		
 		mutable uint32 pid = dlGetPidForLock("file_lock", err);
 		if (err != 0ul) {
