@@ -51,11 +51,11 @@ Do it only when you are sure that no one is using the lock at the time of removi
         <prototype><![CDATA[ public stateful boolean dlRemoveLock(uint64 lock, mutable uint64 err) ]]></prototype>
       </function>
       <function>
-        <description> This function can be called to acquire a distributed lock. Acquiring a lock before performing a write/delete operation into a data store that is shared by multiple applications is a good way to ensure safe access of the shared resource.  This function can be used to acquire such a lock before in order to gain exclusive access for a shared resource. Locks acquired through this function will be owned until the lock is released via `dlReleaseLock`.   
+        <description> This function can be called to acquire a distributed lock. Acquiring a lock before performing a write/delete operation into a data store that is shared by multiple applications is a good way to ensure safe access of the shared resource.  This function can be used to acquire such a lock before in order to gain exclusive access for a shared resource. Locks acquired through this function will be owned until the lock is released via [dlReleaseLock(uint64,uint64)].   
 **IMPORTANT NOTE:**
 
 Once called, this API could spin loop for a very long time (three or four minutes) until it acquires the distributed lock or it times out due to the distributed lock being not yet available.  Another important factor is that once the lock is granted, it is given to you for an infinite period of time. Hence, it is your responsibility to properly release the lock at the end of your task. There is no external mechanism to take the lock back from you in case your code crashes after acquiring the lock.
-An alternative overloaded function is available that allows you to specify a maximum time to wait, and also allows lock ownership to expire after a given amount of time.  This alternative function is also called `dlAcquireLock`.
+An alternative overloaded function is available that allows you to specify a maximum time to wait, and also allows lock ownership to expire after a given amount of time.  This alternative function is also called [dlAcquireLock(uint64, float64, float64,  uint64 ) |dlAcquireLock].
 @param lock the id of the lock to acquire.
 @param err a mutable variable to receive a non-zero error code in the event of a problem acquiring the lock.  Will be set to '0' on success. 
 
@@ -84,10 +84,10 @@ An alternative overloaded function is available that allows you to specify a max
       </function>
       <function>
         <description>Acquire lock, with an explicit lease time in seconds and a maximum time to wait to acquire the lock. 
-This overloaded function can be used to acquire a given distributed lock id.  This function has two advantages over the other `dlAcquireLock` function.  
+This overloaded function can be used to acquire a given distributed lock id.  This function has two advantages over the other [dlAcquireLock(uint64, uint64)|dlAcquireLock] function.  
 First of all, callers can pass a fixed lease time for the lock, indicating that the lock will be needed at most for a specified period before which the caller will relinquish this lock.  
 In addition, the caller can also specify how long the caller is willing to wait to acquire the lock.
-@param lock the id of the lock to acquire, must have been previously created using `dlCreateOrGetLock`.
+@param lock the id of the lock to acquire, must have been previously created.
 @param leaseTime the length of time, in seconds, for which the lock is needed. Must be greater than 0. If the lock is not released after the requested lease time due to a program crash or a programmatic error, the lock will be automatically released and made available for others to acquire.
 @param maxWaitTimeToAcquireLock Maximum time to wait to acquire the lock, in seconds. If the lock acquisition is not done within the specified max wait time, this API will exit with an error instead of spin looping forever.
 @param err a mutable variable to receive a non-zero error code in the event of a problem acquiring the lock.  Will be set to '0' on success.
