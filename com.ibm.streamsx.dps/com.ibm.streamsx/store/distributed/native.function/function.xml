@@ -112,6 +112,10 @@ a user created store present in the back-end DB infrastructure. If this rule is 
       </function>
       <function>
         <description>Put an item into the given store. This function is identical to `dpsPut`, however, it performs additional safety checks.  As a result, this function will be slower than `dpsPut`.
+@param store The handle specifying the store.        
+@param key The key for the new pair.        
+@param item The value for the new pair. Must be the same type as the **value** that was provided when the store was created.
+@param err Will be set to '0' on success, and will be non-zero otherwise. 
 @return If no error occurs, returns false if the item previously existed in the store, and true if the store did not contain an item with the same key.
 </description>
         <prototype>&lt;any T1, any T2> public stateful boolean dpsPutSafe(uint64 store, T1 key, T2 item, mutable uint64 err)</prototype>
@@ -203,6 +207,7 @@ it does safety checks and is therefore slower.</description>
       </function>
       <function>
         <description>Remove an item that was stored with a TTL (Time To Live in seconds) value.
+@param key the key to remove.
 @param err will receive the error code if an error occurs or will be set to '0' if the remove was successful.
 @return true if an item with the given key was removed, false otherwise.</description>
         <prototype>&lt;any T1> public stateful boolean dpsRemoveTTL(T1 key, mutable uint64 err)</prototype>
@@ -210,6 +215,7 @@ it does safety checks and is therefore slower.</description>
       <function>
         <description>Check if an item exists in the given store.
 @param store the store handle representing the store to check.
+@param key the key to look up.
 @param err contains the error code for this function call.  Will be '0' if no error occurs, otherwise will have a non-zero value.
 @return true if the given store does contain an item with the given key, false otherwise.</description>
         <prototype>&lt;any T1> public stateful boolean dpsHas(uint64 store, T1 key, mutable uint64 err)</prototype>
@@ -248,6 +254,7 @@ it does safety checks and is therefore slower.</description>
       </function>
       <function>
         <description>Get the total number of key-value pairs in the given store.
+@param store the handle of the store in question.
 @param err contains the error code for this function call.  Will be '0' if no error occurs, otherwise will have a non-zero value. 
 @return the size of the store. The return value of this function is undefined if an error occurs.
 </description>
