@@ -203,7 +203,7 @@ In addition to Redis, the DPS toolkit requires installation of one of the follow
 On Linux x86_64: 
 * RedHat Enterprise Linux 6.4 (or an equivalent CentOS version) + gcc version 4.4.7 20120313 (Red Hat 4.4.7-3) (GCC)
 * RedHat Enterprise Linux 7.1 (or an equivalent CentOS version) + gcc version 4.8.3 20140911 (Red Hat 4.8.3-9) (GCC)
-
+* SUSE Linux Enterprise Server (SLES)) 11  + gcc version 4.3.4 ) 
 On Linux for IBM Power 8 Little Endian: 
 * RedHat Enterprise Linux 7.1 + gcc version 4.8.3 20140911 (Red Hat 4.8.3-9) (GCC)
 On Linux for IBM Power 7 Big Endian: 
