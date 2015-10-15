@@ -4,189 +4,481 @@
     <headerFileName>DistributedProcessStoreWrappers.h</headerFileName>
     <functions>
       <function>
-        <description>Create a new process store with a given name. Return the
-        process store handle if created, 0 otherwise (a process store with the same name exists).</description>
+        <description>Create a new process store with a given name.
+@param name the name of the store to create
+@param key this variable should be provided to indicate the type of the key to use in the store.
+@param value this variable indicates the type of the values in the store. 
+@param err  mutable variable provided that will contain the error code, if an error occurs. Will be set to '0' if the store was created successfully, or a non-zero value otherwise.  
+@return the process store handle, if created. It is advisable to cache the store id in your application.  The return value will be '0' if a process store with the same name already exists, and undefined if there is an error.
+
+	  mutable uint64 err = 0ul;
+	  mutable uint64 s = 0ul;
+	  rstring dummyRstring = &quot;&quot;;
+	  uint32 dummyUint32 = 0u;
+	  s = dpsCreateStore(&quot;myDBStore1&quot;, dummyRstring, dummyUint32, err);
+	
+	  if (err != 0ul) {
+             uint64 rc = dpsGetLastStoreErrorCode;
+             rstring msg = dpsGetLastStoreErrorString();
+             printStringLn(&quot;Unexpected error in creating a store named myDBStore1: rc = &quot; + (rstring)rc + &quot;, msg = &quot; + msg);
+       }
+			
+</description>
         <prototype>&lt;any T1, any T2> public stateful uint64 dpsCreateStore(rstring name, T1 key, T2 value, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Create a new process store with a given name or get it if
-        it already exists. Return the process store handle.</description>
+        <description>Create a new process store with a given name or simply return its handle it already exists.
+@param name the name of the store to retrieve, or to create if it doesn't already exist.
+@param key this variable should be provided to indicate the type of the key to use in the store.
+@param value this variable indicates the type of the values in the store.
+@param err mutable variable provided that will contain the error code, if an error occurs. Will be set to '0' if the store was created successfully, or a non-zero value otherwise.  
+@return the process store handle of the created store.  If an error occurs, the return value of this function is undefined. It is recommended that the store id is cached in your application. 
+     
+
+
+	   mutable uint64 err = 0ul;
+	   mutable uint64 s = 0ul;
+           rstring dummyRstring = &quot;&quot;;
+	   uint32 dummyUint32 = 0u;
+	   s = dpsCreateOrGetStore(&quot;myDBStore1&quot;, dummyRstring, dummyUint32, err);
+
+           if (err != 0ul) {
+             uint64 rc = dpsGetLastStoreErrorCode;
+             rstring msg = dpsGetLastStoreErrorString();
+             printStringLn(&quot;Unexpected error in creating a store named myDBStore1: rc = &quot; + (rstring)rc + &quot;, msg = &quot; + msg);
+           }
+
+
+
+   </description>
         <prototype>&lt;any T1, any T2> public stateful uint64 dpsCreateOrGetStore(rstring name, T1 key, T2 value, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Find a process store given its name. Return the process
-        store handle if found, 0 otherwise.</description>
+        <description>Find a process store given its name. 
+@param name The name of the store to look up.        
+@param err This parameter will be set by the function to contain the error code if an error occurs finding the store, and '0' otherwise.        
+@return The process store handle if found, 0 otherwise.</description>
         <prototype>public stateful uint64 dpsFindStore(rstring name, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Remove a process store given its handle. Return true if the
-       store was there.</description>
+        <description>Remove a process store given its handle.
+@param store The process store handle identifying the store to remove.
+@param err This parameter will contain the error code, if an error occurs. Or will be set '0' if the remove operation was successful.         
+@return true if the store existed and was succesfully removed.
+	
+	
+	mutable boolean result = true;
+	result = dpsRemoveStore(dbStore_handle, err);
+
+	if (err != 0ul) {
+		uint64 rc = dpsGetLastStoreErrorCode();
+		printStringLn(&quot;Unexpected error in removing a store: rc = &quot; + (rstring)rc + &quot;, msg = &quot; + dpsGetLastStoreErrorString());
+	}	
+		
+
+</description>
         <prototype>public stateful boolean dpsRemoveStore(uint64 store, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Put an item into the given store. Returns true if the store did
-       not contain an item with the same key, false otherwise.
-        (A better performing version with no safety checks)</description>
+        <description>Put a new key-value pair into a store.  This function has better performance than `dpsPutSafe` since no safety checks are done to ensure that there is a valid user created store present. Hence, use the `dpsPut()` function only when there is 
+a user created store present in the back-end DB infrastructure. If this rule is violated, the back-end infrastructure will have inconsistent data items.  The specified **key** and **item** must be of the same type as those used to create the store in `dpsCreateStore`  or `dpsCreateOrGetStore`, otherwise, store operations will produce undesired results.
+@param store The handle specifying the store.        
+@param key The key for the new pair.        
+@param item The value for the new pair. Must be the same type as the **value** that was provided when the store was created.
+@param err Will be set to '0' on success, and will be non-zero otherwise. 
+@return If no error occurs, returns false if the item previously existed in the store, and true if the store did not contain an item with the same key.
+     
+		rstring dummyRstring = &quot;&quot;;
+		uint32 dummyUint32 = 0u;
+		mutable uint64 err = 0ul;
+		mutable uint64 dbStore_handle = 0ul;
+		dbStore_handle = dpsCreateStore(&quot;myDBStore1&quot;, dummyRstring, dummyUint32, err);
+
+		//..perform error checks	
+		
+		mutable uint64 err = 0ul;
+		mutable boolean result = true;
+		rstring key = &quot;IBM&quot;;
+		uint32 value = 399;
+		err = 0ul;
+		result = dpsPut(dbStore_handle, key, value, err);
+		
+		if (err != 0ul) {
+			//use  dpsGetLastStoreErrorCode() and  dpsGetLastStoreErrorString() as needed
+		}		
+		     
+         </description>
         <prototype>&lt;any T1, any T2> public stateful boolean dpsPut(uint64 store, T1 key, T2 item, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Put an item into the given store. Returns true if the store did
-       not contain an item with the same key, false otherwise.
-        (A version with safety checks that will have performance overhead)</description>
+        <description>Put an item into the given store. This function is identical to `dpsPut`, however, it performs additional safety checks.  As a result, this function will be slower than `dpsPut`.
+@param store The handle specifying the store.        
+@param key The key for the new pair.        
+@param item The value for the new pair. Must be the same type as the **value** that was provided when the store was created.
+@param err Will be set to '0' on success, and will be non-zero otherwise. 
+@return If no error occurs, returns false if the item previously existed in the store, and true if the store did not contain an item with the same key.
+</description>
         <prototype>&lt;any T1, any T2> public stateful boolean dpsPutSafe(uint64 store, T1 key, T2 item, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Put an item with a TTL (Time To Live in seconds) value into the global area of the back-end data store.
-        Returns true if the operation is successful, false otherwise.</description>
+        <description>Put an key-value pair with in a TTL (Time To Live in seconds) value into the global area of the back-end data store. The **key** and **value** can be any SPL type.
+@param key the key with which to associate the given value
+@param item the value to associate with the key
+@param ttl the amount of time, in seconds, this pair will be kept in the global store before it is automatically removed. A value of '0' means that this pair will be in the store indefinitely until manually removed via `dpsRemoveTTL`.
+@param err will be set to '0' if the operation was successful, and a non-zero value otherwise.   
+@return true if the operation is successful, false otherwise.
+        
+        mutable rstring myKey = &quot;&quot;, myValue = &quot;&quot;;
+	myKey = &quot;New York&quot;;
+	myValue = &quot;Albany&quot;;
+	mutable uint64 err = 0ul;
+	// Put a key-value pair with 5 seconds of TTL.
+	boolean res = dpsPutTTL(myKey, myValue, 5u, err);
+                    
+	if (res == false) {
+               //handle error using dpsGetLastErrorCodeTTL() and  dpsGetLastErrorStringTTL());
+	}
+        
+        </description>
         <prototype>&lt;any T1, any T2> public stateful boolean dpsPutTTL(T1 key, T2 item, uint32 ttl, mutable uint64 err)</prototype>
-      </function>           
+      </function>
       <function>
-        <description>Get an item from the given store. Returns true if the store did
-       contain an item with the given key and a matching type, false otherwise.
-       (A better performing version with no safety checks)</description>
+        <description>Given a key, retrieves its value from the given store. This function has better performance than `dpsGetSafe` since it doesn't carry out any safety checks.
+@param store the handle identifying the store in question.
+@param key the key of the item to look up
+@param item if the key exists in the store and has a value of the same type, this parameter will be set to the key's value.         
+@param err contains the non-zero error code, if an error occurs, or will have a value of '0'.  
+@return  true if the if the operation was successful and the store contains an item with the given key and a matching type, and false if the key-value pair wasn't found.
+       </description>
         <prototype>&lt;any T1, any T2> public stateful boolean dpsGet(uint64 store, T1 key, mutable T2 item, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Get an item from the given store. Returns true if the store did
-       contain an item with the given key and a matching type, false otherwise.
-       (A version with safety checks that will have performance overhead)</description>
+        <description>Given a key, retrieve its value from the given store. Returns true if the store did contain an item with the given key and a matching type, false otherwise.  This function is identical to `dpsGet`, with the exception that
+it does safety checks and is therefore slower.</description>
         <prototype>&lt;any T1, any T2> public stateful boolean dpsGetSafe(uint64 store, T1 key, mutable T2 item, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Get an item that was stored with a TTL (Time To Live in seconds) value into the global area of the back-end data store.
-        Returns true if the store did contain an item with the given key and a matching type, false otherwise.</description>
+        <description>Get an item that was stored with a TTL (Time To Live in seconds) value.
+@param key the key to look up
+@param item will receive the saved value for the given key.
+@param err will receive the error code if an error occurs, or will be set to '0' otherwise.  
+@return true if the global TTL store did contain an item with the given key and a matching type, false otherwise or if an error occurs.
+
+
+	mutable rstring myKey = &quot;&quot;, myValue = &quot;&quot;;
+	myKey = &quot;New York&quot;;
+	myValue = &quot;&quot;;
+	mutable uint64 err = 0ul;
+	boolean res = dpsGetTTL(myKey, myValue, err);
+				    
+	if (res == true) {
+	   printStringLn(&quot;TTL based key-value pair is read successfully. Key=&quot; + 
+	      myKey + &quot;, Value=&quot; + myValue);
+	} else {
+	  //handle error using dpsGetLastErrorCodeTTL() and dpsGetLastErrorStringTTL())
+	}
+
+
+
+</description>
         <prototype>&lt;any T1, any T2> public stateful boolean dpsGetTTL(T1 key, mutable T2 item, mutable uint64 err)</prototype>
-      </function>      
+      </function>
       <function>
-        <description>Remove an item from the given store. Returns true if the store did
-       contain an item with the given key, false otherwise.</description>
+        <description>Remove an item from the given store.
+@param store handle of the store from which the key will be removed
+@param key the key to remove.  Can be a valid SPL type.
+@param err contains the non-zero error code, if an error occurs, or will have a value of '0'.  
+@return true if the store did contain an item with the given key, false otherwise.
+
+	mutable uint64 err = 0ul;
+	mutable boolean result = true;
+	rstring key = &quot;IBM&quot;;
+	result = dpsRemove(store_id, key, err);
+	
+        if (res==true &amp;&amp; err==0ul) {
+             // remove has succeeded 
+        } else {
+             //handle error using dpsGetLastStoreErrorCode() and  dpsGetLastStoreErrorString() 
+        }       
+
+
+</description>
         <prototype>&lt;any T1> public stateful boolean dpsRemove(uint64 store, T1 key, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Remove an item that was stored with a TTL (Time To Live in seconds) value into the global area of the back end data store.
-        Returns true if an item with the given key was removed, false otherwise.</description>
+        <description>Remove an item that was stored with a TTL (Time To Live in seconds) value.
+@param key the key to remove.
+@param err will receive the error code if an error occurs or will be set to '0' if the remove was successful.
+@return true if an item with the given key was removed, false otherwise.</description>
         <prototype>&lt;any T1> public stateful boolean dpsRemoveTTL(T1 key, mutable uint64 err)</prototype>
-      </function>        
+      </function>
       <function>
-        <description>Check if an item exists. Returns true if the given store does
-       contain an item with the given key, false otherwise.</description>
+        <description>Check if an item exists in the given store.
+@param store the store handle representing the store to check.
+@param key the key to look up.
+@param err contains the error code for this function call.  Will be '0' if no error occurs, otherwise will have a non-zero value.
+@return true if the given store does contain an item with the given key, false otherwise.</description>
         <prototype>&lt;any T1> public stateful boolean dpsHas(uint64 store, T1 key, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Check if an item exists that was store with a TTL (Time To Live in seconds) value. 
-        Returns true if an TTL item with the given key exists, false otherwise.</description>
+        <description>Check if an item exists that was stored with a TTL (Time To Live in seconds) value.
+@param key the key to look up. Can be any SPL type.
+@param err mutable parameter that receives the error code for this function call. If the error code is non-zero, an error has occurred.
+@return true if a TTL item with the given key exists, false if no such item exists or if an error occurs.
+
+
+
+
+	mutable rstring myKey = &quot;&quot;;
+	myKey = &quot;New York&quot;;
+	mutable uint64 err = 0ul;
+	boolean res = dpsHasTTL(myKey, err);
+				    
+	if (res == true) {
+	   printStringLn(&quot;Unexpected error: TTL based key-value pair 'New York':'Albany' is still present after the TTL expiration.&quot;);
+	} else if (err == 0ul) {
+	 //no error occurred and the element was not found
+	   printStringLn(&quot;key-value pair 'New York':'Albany' was not found, this may be because it was removed after its TTL expiration.&quot;);
+	}            
+
+
+</description>
         <prototype>&lt;any T1> public stateful boolean dpsHasTTL(T1 key, mutable uint64 err)</prototype>
-      </function>        
+      </function>
       <function>
-        <description>Clear the given store.</description>
+        <description>Clear the given store.
+@param store the handle of the store to clear
+@param err Contains the error code describing the result of the operation.  Will be '0' if the store was successfully emptied, otherwise will have a non-zero value.  
+</description>
         <prototype>public stateful void dpsClear(uint64 store, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Get the size of the given store.</description>
+        <description>Get the total number of key-value pairs in the given store.
+@param store the handle of the store in question.
+@param err contains the error code for this function call.  Will be '0' if no error occurs, otherwise will have a non-zero value. 
+@return the size of the store. The return value of this function is undefined if an error occurs.
+</description>
         <prototype>public stateful uint64 dpsSize(uint64 store, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Begin the iteration on a given store. No other operations that can modify
-        the state can be used until after a matching gsEndIteration()
-        call. Returns the iterator.</description>
+        <description>This function gets a store iterator that can be used to iterate over all the key-value pairs in a given store id. No other operations that can modify the state can be used until after  [dpsEndIteration(uint64 , uint64 ,  uint64 )|dpsEndIteration()] is called for this same store.   Once a store iterator is obtained, it must be released by calling `dpsEndIteration()` once the iterator is no longer needed.  See the documentation for [dpsGetNext(uint64, uint64 ,  T1 ,  T2 ,  uint64 )|dpsGetNext()]  for a complete example of how to use the iterator.
+@param store handle of the store for which an iterator is needed.
+@param err Contains the error code describing the result of the function call.  Will be '0' if no error occured, otherwise will have a non-zero value. 
+@return an value representing an iterator that can be used with the two other store iteration functions, [dpsGetNext(uint64, uint64 ,  T1 ,  T2 ,  uint64 )|dpsGetNext()] and [dpsEndIteration(uint64 , uint64 ,  uint64 )|dpsEndIteration()].</description>
         <prototype>public stateful uint64 dpsBeginIteration(uint64 store, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Get the next key and value of given types in the given store. Returns true if an item was
-        found, false otherwise.</description>
+        <description>This function is used to get the next key and value of given types in the given store when iterating over all the items in the store.  The **key** and **value** parameters must be of the same type that was used when the store was originally created using either `dpsCreateStore()` or `dpsCreateOrGetStore()`.
+@param store the store being iterated over
+@param iterator the iterator handle, must have been created from a previous call to `dpsBeginIteration()`
+@param key a mutable variable to store the next key for the current key-value pair in the iteration sequence
+@param value a mutable variable to store the value for the current key-value pair
+@param err Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise.  
+@return true if the next key-value pair was successfully returned, or if store is empty, and false if the end of the iteration was reached. If this method returns false because the store is empty or the end of the iteration was reached, the **err** parameter will have a value of '0'. If an error occurs, the function will return false and the **err** parameter will have a non-zero value.
+
+
+	mutable uint64 err = 0ul;
+	uint64 it = dpsBeginIteration(s, err); 
+	mutable rstring key = &quot;&quot;;
+	mutable rstring value = &quot;&quot;;
+						
+	while (dpsGetNext(s, it, key, value, err)) {
+	   printStringLn(&quot;'&quot; + key + &quot;' => &quot; + value);
+	}
+	if (err != 0){ 
+		//an error occurred during iteration
+	}
+	dpsEndIteration(s, it, err);
+			 
+
+
+
+
+</description>
         <prototype>&lt;any T1, any T2> public stateful boolean dpsGetNext(uint64 store, uint64 iterator, mutable T1 key, mutable T2 value, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>End the iteration on the given store.</description>
+        <description>This function must be called once all iteration is complete.
+@param store the handle of the store.
+@param iterator the store iterator id obtained from `dpsBeginIteration()`.
+@param err Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise. 
+</description>
         <prototype>public stateful void dpsEndIteration(uint64 store, uint64 iterator, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Serialize all the items in the given store.</description>
+        <description> This function serializes all the key-value pairs in a given store id into a blob. The blob can be used to recreate all the key-value pairs into another store. This is a useful technique for copying an entire store into a different store.  See `dpsDeserialize()` for a detailed example on how to use the serialization functions to copy a store.
+@param store the handle of the store to serialize.
+@param data a mutable blob that will contain all the key-value pairs in the store once the serialization is complete.
+@param dummyKey a dummy variable to indicate the type of the key
+@param dummyValue @param dummyValue used to indicate the type of the values in the store
+@param err a mutable variable that will contain the error code describing the result of the serialization.  Will be '0' if no error occurs, and a non-zero value otherwise.  
+
+</description>
         <prototype>&lt;any T1, any T2> public stateful void dpsSerialize(uint64 store, mutable blob data, T1 dummyKey, T2 dummyValue, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Deserialize the items from the serialized store.</description>
+        <description>This function deserializes a given blob containing one or more serialized key-value pairs. The specified store will be populated with the deserialized data.  This technique can be used to copy the contents of one store into another.
+@param store the handle of the store into which the deserialized data will be saved.
+@param data the data to deserialize and save into the specified store.
+@param dummyKey variable indicating the type of the keys in the store
+@param dummyValue varaible indicating the type of the values in the store
+@param err a mutable variable that will contain the error code describing the result of the deserialization.  Will be '0' if deserialization was successful, and a non-zero value otherwise.
+
+	mutable uint64 err = 0ul;
+	rstring dummyRstring = &quot;&quot;;
+	list&lt;rstring> dummyRstringList = [&quot;1&quot;, &quot;2&quot;];
+	mutable blob sData = [];
+	dpsSerialize(s1, sData, dummyRstring, dummyRstringList, err);
+
+	if (err == 0ul) {
+	   //now deserialize it into another store.
+	   dpsDeserialize(store2, sData, dummyRstring, dummyRstringList, err);
+		
+	   if (err != 0ul) {
+	 	//perform error handling using dpsGetLastStoreErrorCode() and dpsGetLastStoreErrorString()
+       }
+			         
+ </description>
         <prototype>&lt;any T1, any T2> public stateful void dpsDeserialize(uint64 store, blob data, T1 dummyKey, T2 dummyValue, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Get the description of the last store error.</description>
+        <description>Get the description of the last store error.
+@return the error message, or the empty string if the last data store operation was successful.</description>
         <prototype>public stateful rstring dpsGetLastStoreErrorString()</prototype>
       </function>
       <function>
-        <description>Get the description of the last error occurred for a TTL data item.</description>
+        <description>Get the description of the last error that occurred involving data stored with a Time To Live (TTL).
+@return the error message, or the empty string if the last TTL store operation was successful.        </description>
         <prototype>public stateful rstring dpsGetLastErrorStringTTL()</prototype>
-      </function>  
+      </function>
       <function>
-        <description>Get the error code of the last store error.</description>
+        <description>Get the error code of the last store error.
+@return the error code for the last store operation or '0' if the last operation was successful.        </description>
         <prototype>public stateful uint64 dpsGetLastStoreErrorCode()</prototype>
       </function>
       <function>
-        <description>Get the error code of the last error ocuured for a TTL data item.</description>
+        <description>Get the error code of the last error ocuured involving data that was stored with a Time To Live (TTL).
+@return the error code, or '0' if the last TTL store operation was successful.        </description>
         <prototype>public stateful uint64 dpsGetLastErrorCodeTTL()</prototype>
-      </function>  
+      </function>
       <function>
-        <description>Get the store name for a given store id.</description>
+        <description>Get the store name for a given store id.
+@param store the store to look up
+@return the name used to create the store, if it exists.        </description>
         <prototype>public stateful rstring dpsGetStoreName(uint64 store)</prototype>
       </function>
       <function>
-        <description>Get the SPl type name for the key of a given store id.</description>
+        <description>Get the SPL type name for the key of a given store id.
+@param store the handlef or the store in question.
+@return the type for the keys in the store.        </description>
         <prototype>public stateful rstring dpsGetSplTypeNameForKey(uint64 store)</prototype>
       </function>
       <function>
-        <description>Get the SPl type name for the value of a given store id.</description>
+        <description>Get the SPL type name for the value of a given store id.
+@param store the handle for the store in question
+@return the type for the values in the store
+</description>
         <prototype>public stateful rstring dpsGetSplTypeNameForValue(uint64 store)</prototype>
       </function>
       <function>
-        <description>Get the name of the NoSQL DB product being used.</description>
+        <description>Get the name of the NoSQL database product being used.</description>
         <prototype>public stateful rstring dpsGetNoSqlDbProductName()</prototype>
       </function>
       <function>
-        <description>Get the name of the machine and its CPU architecture where this operator is running.</description>
+        <description>Get details of the client machine where this operator is running.  
+The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be assigned to the corresponding parameters
+@param machineName the value of this parameter will be set to the machine's name.
+@param osVersion the value of this parameter will be set to the Linux OS version.
+@param cpuArchitecture the value of this parameter will be set to the CPU architecture of the client.
+
+	rstring dbProductName = dpsGetNoSqlDbProductName();
+	// Get the details about the machine where this operator is running.
+	mutable rstring machineName = &quot;&quot;, osVersion = &quot;&quot;, cpuArchitecture = &quot;&quot;;
+	dpsGetDetailsAboutThisMachine(machineName, osVersion, cpuArchitecture);
+	// Display the NoSQL DB product name being used 
+	printStringLn(&quot;=====================================================&quot;);
+	printStringLn(&quot;Details about this DPS client machine:&quot;);
+	printStringLn(&quot;NoSQL key-value store product name: &quot; + dbProductName);
+	printStringLn(&quot;Machine name: &quot; + machineName);
+	printStringLn(&quot;OS version: &quot; + osVersion);
+	printStringLn(&quot;CPU architecture: &quot; + cpuArchitecture);
+	printStringLn(&quot;=====================================================&quot;);
+                 
+
+
+
+</description>
         <prototype>public stateful void dpsGetDetailsAboutThisMachine(mutable rstring machineName, mutable rstring osVersion, mutable rstring cpuArchitecture)</prototype>
-      </function>      
+      </function>
       <function>
-        <description>
-           If users want to execute simple arbitrary back-end data store (fire and forget)
-           native commands, this API can be used. This covers any Redis or Cassandra(CQL)
-           native commands that don't have to fetch and return K/V pairs or return size of the db etc.
-           (Insert and Delete are the more suitable ones here. However, key and value can only
-            have string types.)
-        </description>
+        <description>This function can be used to execute simple arbitrary back-end data store (fire and forget) native commands. This includes any Redis native commands that don't have to fetch and return key-value pairs or return size of the database, like Insert and Delete. However, key and value can only have string types. 
+@param cmd the Redis command to execute.
+@param err a mutable variable that will contain the error code in case an error occurs executing the command. Will be '0' on success and non-zero otherwise.
+@return true if the one way command was successful, and false otherwise.
+
+
+	// Insert a key-value pair by using the popular Redis set command.
+	cmd = &quot;set foo bar&quot;;
+	err = 0ul;
+	res = dpsRunDataStoreCommand(cmd, err);
+						  
+	if (res == true) {
+	   printStringLn(&quot;Running a Redis native command 'set foo bar' worked correctly.&quot;);
+	} else {
+	   uint64 rc = dpsGetLastStoreErrorCode();
+           rstring msg = dpsGetLastStoreErrorString();
+	   printStringLn(&quot;Error in running a Redis native command 'set foo bar'. Error code=&quot; + 
+			(rstring)rc + &quot;, msg = &quot; + msg);
+	}
+
+
+
+</description>
         <prototype>public stateful boolean dpsRunDataStoreCommand(rstring cmd, mutable uint64 err)</prototype>
-      </function> 
+      </function>
       <function>
-        <description>
-           If users want to execute arbitrary back-end data store two way
-           native commands, this API can be used. This is a variation of the previous API with
-           overloaded function arguments. As of Nov/2014, this API is supported in the dps toolkit only
-           when Cloudant or HBase NoSQL DB is used as a back-end data store. It covers any Cloudant HTTP/JSON based
-           native commands that can perform both database and document related Cloudant APIs that are very
-           well documented for reference on the web or it covers the HBase related REST APIs.
+        <description>This is an advanced function that can be used to execute arbitrary back-end data store two way native commands for database technologies that work with cURL. A HTTP request is sent to the server and the response is saved in the **jsonResponse** paramter. This function is not supported with Redis.  Therefore, this function can only be used with database technologies that are currently not officially supported by Streams, such as HBase. See the samples for this toolkit for a detailed example.
         </description>
-        <prototype>public stateful boolean dpsRunDataStoreCommand(uint32 cmdType, rstring httpVerb,
-        	rstring baseUrl, rstring apiEndpoint, rstring queryParams, rstring jsonRequest,
-        	mutable rstring jsonResponse, mutable uint64 err)</prototype>
-      </function>   
+        <prototype>public stateful boolean dpsRunDataStoreCommand(uint32 cmdType, rstring httpVerb, rstring baseUrl, rstring apiEndpoint, rstring queryParams, rstring jsonRequest, mutable rstring jsonResponse, mutable uint64 err)</prototype>
+      </function>
       <function>
-        <description>
-           Base64 encode a given string. Encoded result will be returned in a
-           user provided mutable string passed as a second function argument.
-        </description>
+        <description>Base64 encode a given string. 
+@param str the string to encode
+@param encodedResultStr mutable parameter that will contain the encoded result.
+
+
+	mutable list&lt;rstring>[5] cn = [];
+	dpsBase64Encode(&quot;cf1:Company&quot;, cn[0]);
+	dpsBase64Encode(&quot;IBM&quot;, cn[1]);
+	dpsBase64Encode(&quot;Microsoft&quot;, cn[2]);
+	dpsBase64Encode(&quot;Amazon&quot;, cn[3]);
+	dpsBase64Encode(&quot;Google&quot;, cn[4]);
+	
+	//the cn array will now contain the decoded values
+</description>
         <prototype>public stateful void dpsBase64Encode(rstring str, mutable rstring encodedResultStr)</prototype>
       </function>
       <function>
-        <description>
-           Base64 decode a given string. Decoded result will be returned in a
-           user provided mutable string passed as a second function argument.
-        </description>
+        <description>Base64 decode a given string. 
+@param str the string to decode
+@param decodedResultStr mutable parameter that will contain the decoded result.
+
+
+	rstring base64EncodedString = &quot;bXlEQlN0b3JlMQ==&quot;;
+	mutable rstring base64DecodedString = &quot;&quot;;
+	// base64DecodedString will have a value o:f &quot;myDBStore1&quot;
+	dpsBase64Decode(rowKey, base64DecodedString);           
+
+
+</description>
         <prototype>public stateful void dpsBase64Decode(rstring str, mutable rstring decodedResultStr)</prototype>
-      </function>       
+      </function>
     </functions>
     <dependencies>
       <library>
         <cmn:description>Distributed process store library</cmn:description>
         <cmn:managedLibrary>
-		  <cmn:lib>DistributedProcessStoreLib</cmn:lib>
+          <cmn:lib>DistributedProcessStoreLib</cmn:lib>
           <cmn:lib>memcached</cmn:lib>
           <!-- <cmn:lib>sds</cmn:lib> -->
           <cmn:lib>hiredis</cmn:lib>
