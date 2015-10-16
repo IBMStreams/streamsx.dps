@@ -1,0 +1,83 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+  <HEAD>
+    <TITLE>Distributed Process Store (DPS) Java API Overview</TITLE>
+  </HEAD>
+  <BODY>
+
+
+The Distributed Process Store (DPS) toolkit enables multiple applications running processing elements (PEs) on one or more machines to share application specific state information.  
+The shared information is stored in an external key-value data store, such as <a href="http://redis.io">Redis</a>.
+<p>
+The Java API enables access to shared data in an external store, and additional locking functionality to provide safe, concurrent access to the shared data.
+See the toolkit documentation in the Knowledge Center for details on configuring the toolkit.
+Using the API, you can create and populate your own data stores, represented by {@link com.ibm.streamsx.dps.Store} objects and created using a {@link com.ibm.streamsx.dps.StoreFactory}.
+Concurrency is supported via the classes in the {@link com.ibm.streamsx.dl} package, specifically using a {@link com.ibm.streamsx.dl.LockFactory} to create {@link com.ibm.streamsx.dl.Lock} objects.
+These locks can be shared across processes to synchronize access to the same user created stores, for example. 
+There is also a global store that allows data to automatically expire after a specified amount of time, or to be kept indefinitely.  This is the Time To Live (TTL) store.
+</p>
+<p>
+The following are examples of how to use the API.  You can create an individual store for your application, or use the global data store.
+This example shows how to create and populate a {@link com.ibm.streamsx.dps.Store}.
+<pre>
+<code>
+
+	StoreFactory sf = DistributedStores.getStoreFactory();
+	Store store = null;
+	
+	try {
+	   //specify the SPL types for the keys and values in the store
+	   String keyType = "rstring";
+	   String valueType = "int32";
+	   store = sf.createOrGetStore("Java Test Store1", keyType, valueType);
+	} catch (StoreFactoryException sfe) {
+		// use	sfe.getErrorCode() and  sfe.getErrorMessage()) for more info
+	}
+	
+	...
+	//once ready to access the store,
+	//get the lock for the store, may have previously been created
+	   LockFactory lf = DistributedLocks.getLockFactory(); 
+	   Lock myLock = lf.createOrGetLock("Lock_For_Test_Store1");
+	
+	// Acquire the lock
+	try {
+	 	myLock.acquireLock();
+	} catch (LockException le) {
+		System.out.print("Unable to acquire the lock named 'Lock_For_Test_Store1'");
+		System.out.println(" Error = " + le.getErrorCode() + ", Error msg = " + le.getErrorMessage());
+	    throw le;
+	}
+	
+	//perform store operations
+	store.put("IBM", 39);
+	store.put("Lenovo", 50);
+	//release the lock  when finished
+	myLock.releaseLock();
+	
+</code>
+</pre>
+</p>
+This example shows how to use the global Time To Live (TTL) store.
+<pre>
+<code>
+StoreFactory  sf = DistributedStores.getStoreFactory();
+RString myKey = new RString(""), myValue = new RString("");
+myKey = new RString("New Jersey");
+myValue = new RString("Trenton");
+
+try {
+   // Put a K/V pair with 5 seconds of TTL.  
+   // We must provide the SPL type names for our key and value as literal strings as shown below.
+   sf.putTTL(myKey, myValue, 5, "rstring", "rstring");
+} catch (StoreFactoryException sfe) {
+   System.out.println("Unexpected error in putTTL. Error code=" + 
+      sfe.getErrorCode() + ", Error msg=" + sfe.getErrorMessage());
+}
+
+</code>
+</pre>
+
+
+  </BODY>
+</HTML>
