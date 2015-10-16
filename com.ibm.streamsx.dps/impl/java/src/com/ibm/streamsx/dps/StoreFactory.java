@@ -58,9 +58,9 @@ Store store = null;
 	 * @param name name of the new store
 	 * @param keySplTypeName the name of the SPL type for the keys, e.g. <pre>rstring </pre>
 	 * @param valueSplTypeName name of the SPL type for the values, e.g. <pre>{@code  map<rstring,int32>}</pre>
-	 * @param valueSplTypeName
+	 * @param valueSplTypeName the name of the SPL type of the values in the store
 	 * @return the created or retrieved {@link Store}
-	 * @throws StoreFactoryException
+	 * @throws StoreFactoryException if an error occurs.
 	 */
 	public Store createOrGetStore(String name, String keySplTypeName, String valueSplTypeName) throws StoreFactoryException;
 
@@ -126,9 +126,11 @@ try {
 	 * @param ttl The amount of time, in seconds, to keep the pair in the store. It will be automatically removed after {@code ttl} seconds.
 	 * A value of '0' means that this pair will be in the store indefinitely until manually removed via removeTTL. 
 	 * @param keySplTypeName name of the SPL type of the key
+	 * @param value the value to insert
 	 * @param valueSplTypeName name of the SPL type of the value
+	 * 
 	 * @return true on success.
-	*
+	*@throws StoreFactoryException if an error occured
 	*
 	*
 	*
@@ -163,20 +165,26 @@ try {
 	 */
 	public <T1> boolean removeTTL(T1 key, String keySplTypeName) throws StoreFactoryException;
 	/**Check if a TTL based K/V pair for a given key exists in the global area of the back-end data store.
+	 * @param <T1> an object of the type specified when creating the store.
+	 * @param key the key to look up
+	 * @param keySplTypeName the name of the type of the key, e.g. "rstring"
 	 * @return whether or not the key exists
 	 * @throws StoreFactoryException if an error occurs.*/
 	public <T1> boolean hasTTL(T1 key, String keySplTypeName) throws StoreFactoryException;
 
 	/**@return the name of the NoSQL DB product being used as a back-end data store.
+	 * @throws StoreFactoryException  if an error occurs
 	 * */
 	public String getNoSqlDbProductName() throws StoreFactoryException;
 	/**Get the details of the machine where this operator is running.
 	 * @return an array containing the machine name, Linux OS version, and CPU architecture of the current machine, in that order.
-	 * 
+	 * @throws StoreFactoryException if an error occurs
 	 * */
 	public String[] getDetailsAboutThisMachine() throws StoreFactoryException;
 	/**Run native commands on the chosen back-end data store.
-	 * @return true on success, false otherwise*/
+	 * @param cmd the command to run, e.g. "set foo bar"
+	 * @return true on success, false otherwise.
+	 * @throws StoreFactoryException if running the command failed.*/
 	public boolean runDataStoreCommand(String cmd) throws StoreFactoryException;
 	/*If users want to execute arbitrary back-end data store two way
     native commands, this API can be used. This is a variation of the previous API with
@@ -187,22 +195,28 @@ try {
 	 */
 	/**This is an advanced function that can be used to execute arbitrary back-end data store two way native commands for database technologies that work with cURL.  A HTTP request is sent to the server and the response is saved in the jsonResponse paramter.   This function is not supported with Redis. Therefore, this function can only be used with database technologies that are currently not officially supported by Streams, such as HBase. See the samples for this toolkit for a detailed example.
 	 *     
-	 * @param cmdType
-	 * @param httpVerb
-	 * @param baseUrl
-	 * @param apiEndpoint
-	 * @param queryParams
-	 * @param jsonRequest
-	 * @param httpResponseCode
-	 * @return
-	 * @throws StoreFactoryException
+	 * @param cmdType 1 or 2 for Cloudant database or document type API, respectively 
+	 * @param httpVerb HTTP command, e.g. GET, POST, e.t.c. COPY is not supported.
+	 * @param baseUrl: For the public cloud based Cloudant service, it must be in this format:
+					  http://user:password@user.cloudant.com
+					 For the "Cloudant Local" on-premises infrastructure, it must be in this format: 
+				   http://user:password@XXXXX where XXXXX is a name or IP address of your on-premises "Cloudant Local" load balancer machine.
+	     NOTE: If you give an empty string for the URL, then the Cloudant server configured
+		  in the SPL project directory's etc/no-sql-kv-store-servers.cfg file will be used.
+		@param apiEndpoint: It should be a Cloudant DB or document related portion of the URL path as documented in the Cloudant APIs.
+		@param queryParams: It should be in this format name1=value1&amp;name2=value2
+		@param jsonRequest: This is your JSON request needed by the Cloudant API you are executing. Please ensure that any special  characters such as double quotes are properly escaped using the backslash character.     
+	 * @param httpResponseCode On succesful execution of the command, then this will be the HTTP response code returned by the Cloudant server.
+	 You have to interpret the meaning of the returned HTTP response code and make your further logic from there. 
+	 * @return the json response string.
+	 * @throws StoreFactoryException if an error occurs.
 	 */
 	
 	public String runDataStoreCommand(int cmdType, String httpVerb,
 			String baseUrl, String apiEndpoint, String queryParams, String jsonRequest, long[] httpResponseCode) throws StoreFactoryException;
 	/** Base64 encode the given string.
 	 * @param str string to encode
-	 * return the encoded representation of the given string
+	 * @return the encoded representation of the given string
 	 * @throws StoreFactoryException on error
 
 	public String base64Encode(String str) throws StoreFactoryException;

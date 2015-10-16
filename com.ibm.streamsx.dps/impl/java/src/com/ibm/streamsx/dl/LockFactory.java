@@ -40,7 +40,7 @@ public interface LockFactory {
  * }</pre>
  * @param lock the lock to remove
  * @return true if the lock was successfully removed.
- * @throws LockFactoryException
+ * @throws LockFactoryException if an error occurs removing the lock.
  */
 
 	public boolean removeLock(Lock lock) throws LockFactoryException;
