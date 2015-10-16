@@ -79,13 +79,17 @@ try {
 }
 </code>
 	 * </pre>
-	 * @param <T1> the key to store with the value
+	 * @param <T1>  the key to store with the value
 	 * @param <T2> value associated with the key
 	 * @return true on success, false otherwise
 	 * @throws StoreException on failure or error.
 	 */
 	public <T1, T2> boolean put(T1 key, T2 value) throws StoreException;
 	/** Same function as put, but slower due to overhead arising from internal safety checks.
+	 *  * @param <T1> the key to store with the value
+	 * @param <T2> value associated with the key
+	 * @return true on success, false otherwise
+	 * @throws StoreException on failure or error.
 	 * */
 	public <T1, T2> boolean putSafe(T1 key, T2 value) throws StoreException;
 	/**Get the value associated with the given key.
@@ -95,28 +99,31 @@ try {
 	 * @throws StoreException if an error occurs
 	 */
 	public <T1> Object get(T1 key) throws StoreException;
-	/**Similar to <code>get</code> but with higher overhead arising from internal safety checks.*/
+	/**Similar to <code>get</code> but with higher overhead arising from internal safety checks.
+	 * * @param <T1> the key to look up
+	 * @return the saved value associated with the key
+	 * @throws StoreException if an error occurs*/
 	public <T1> Object getSafe(T1 key) throws StoreException;
 	/**Removes the given key from the store.
-	 * 
+	 * @param <T1>  the key to remove
 	 * @return true if the key was successfully removed
-	 * @throws StoreException
+	 * @throws StoreException if an error occurs.
 	 */
 	public <T1> boolean remove(T1 key) throws StoreException;
 	/***Check if the store contains a value for the given key
 	 * 
-	 * @param <T1> the key to look up
+	 * @param <T1>  the key to look up
 	 * @return whether or not if the store has a value for the key
-	 * @throws StoreException
+	 * @throws StoreException if an error occurs.
 	 */
 	public <T1> boolean has(T1 key) throws StoreException;
 	/**
 	 * Deletes all the key-value pairs in this store.
-	 * @throws StoreException
+	 * @throws StoreException if an error occurs.
 	 */
 	public void clear() throws StoreException;
-	/**Returns the total number of K/V pairs stored in this store
-	 * @throws StoreException
+	/**@return the total number of K/V pairs stored in this store
+	 * @throws StoreException if an error occurs clearing the store.
 	 */
 	public long size() throws StoreException;
 	/**Serialize the contents of this store into a {@link ByteBuffer}.
@@ -171,14 +178,14 @@ System.out.println("Size of the 'XYZ' store after deserialize: " + newStore.size
  * 
  */
 	public void deserialize(ByteBuffer data) throws StoreException;
-	/**Returns the store name provided at store creation*/
+	/**@return  store name provided at store creation*/
 	public String getStoreName();
-	/**Returns the SPL type for the keys in the store**/
+	/**@return the SPL type for the keys in the store**/
 	public String getKeySplTypeName();
-	/**Returns the SPL type for each value in the store**/
+	/**@return  the SPL type for each value in the store**/
 	public String getValueSplTypeName();
 	/**
-	 * Returns a {@link StoreIterator}, which is an iterator over this store's contents, where each
+	 * @return a {@link StoreIterator}, which is an iterator over this store's contents, where each
 	 * key and value is represented by a {@link KeyValuePair}.  
 	 * The returned iterator is a subclass of {@link Iterator}
 	 * Note that this is one way to iterate over the store's contents,

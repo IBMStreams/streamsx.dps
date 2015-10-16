@@ -55,7 +55,7 @@ Once called, this function could spin loop for a very long time (three or four m
 Another important factor is that once the lock is granted, it is given to you for an infinite period of time. Hence, it is your responsibility to properly release the lock at the end of your task via <code>releaseLock</code>. There is no external mechanism to forcibly release a lock.
 If either the  behavior of waiting for four minutes to acquire the lock or the indefinite allocation of lock to yourself is undesired, then use the alternative overloaded function, {@code acquireLock}, instead.
 </p>
-	 * @throws LockException
+	 * @throws LockException if the lock could not be acquired
 	 */
 	public void acquireLock() throws LockException;
 /***Acquire a distributed lock with lease time and max wait time before accessing a critical shared resource
