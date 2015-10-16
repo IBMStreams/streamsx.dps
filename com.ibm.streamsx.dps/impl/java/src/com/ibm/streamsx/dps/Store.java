@@ -79,33 +79,33 @@ try {
 }
 </code>
 	 * </pre>
-	 * @param <T1>  the key to store with the value
+	 * @param <T1> key to store with the value
 	 * @param <T2> value associated with the key
 	 * @return true on success, false otherwise
 	 * @throws StoreException on failure or error.
 	 */
 	public <T1, T2> boolean put(T1 key, T2 value) throws StoreException;
 	/** Same function as put, but slower due to overhead arising from internal safety checks.
-	 *  * @param <T1> the key to store with the value
+	 * @param <T1> key to store with the value
 	 * @param <T2> value associated with the key
 	 * @return true on success, false otherwise
 	 * @throws StoreException on failure or error.
 	 * */
 	public <T1, T2> boolean putSafe(T1 key, T2 value) throws StoreException;
 	/**Get the value associated with the given key.
-	 * This method performas faster than getSafe because it does not do any internal safety checks.
-	 * @param <T1> the key to look up
+	 * This method performs faster than getSafe because it does not do any internal safety checks.
+	 * @param <T1> key to look up
 	 * @return the saved value associated with the key
 	 * @throws StoreException if an error occurs
 	 */
 	public <T1> Object get(T1 key) throws StoreException;
 	/**Similar to <code>get</code> but with higher overhead arising from internal safety checks.
-	 * * @param <T1> the key to look up
+	 * @param <T1> the key to look up
 	 * @return the saved value associated with the key
 	 * @throws StoreException if an error occurs*/
 	public <T1> Object getSafe(T1 key) throws StoreException;
 	/**Removes the given key from the store.
-	 * @param <T1>  the key to remove
+	 * @param <T1>  key to remove
 	 * @return true if the key was successfully removed
 	 * @throws StoreException if an error occurs.
 	 */

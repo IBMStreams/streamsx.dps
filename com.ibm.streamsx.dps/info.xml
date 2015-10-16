@@ -36,10 +36,10 @@ The functions provided by the DPS toolkit are divided into 3 categories:
 * User created data stores, 
 * TTL global store, in which  pairs can be configured to expire after a certain time period,
 * Distributed lock API
-Note: The toolkit provides the aforementioned functionality as native functions that can be used from C++ and SPL applications and  through a fully object oriented Java API. See the "Getting Started" and Javadoc for more information. 
+Note: The toolkit provides the aforementioned functionality as native functions that can be used from C++ and SPL applications and  through a fully object oriented Java API. 
 The comments below apply regardless of the programming language being used.  
-See the samples included in the product for detailed examples on how to use the toolkit within SPL.
-Consult the documentation and Javadoc for more details.
+See the "Getting Started" section below for an example.
+The native function documentation and [../../javadoc/dps/index.html|Javadoc] have more details on how to use the toolkit within SPL and Java applications respectively.
 
 # User Created Stores
 A DPS store is a container in which  pairs can be created, retrieved from, updated and deleted. The keys and values must be a SPL primitive type, such as `rstring` or `int32`, or a SPL composite type such as a `map`. 
@@ -244,7 +244,8 @@ Make any configuration changes needed to the file, based on your application's n
 
 
  
-
+# Reference information
+[../../javadoc/dps/index.html| DPS Java API Reference]
   </info:description>
     <info:version>2.0.9</info:version>
     <info:requiredProductVersion>4.0.0.0</info:requiredProductVersion>
