@@ -1,97 +1,120 @@
 <?xml version="1.0" encoding="utf-8"?>
 <project name="com.ibm.streamsx.dps" default="all">
-	<!-- Resolve the directory that this file is in -->
-  	<dirname property="com.ibm.streamsx.dps.DIR" file="${ant.file.com.ibm.streamsx.dps}"/>
+  <!-- Resolve the directory that this file is in -->
+  <dirname property="com.ibm.streamsx.dps.DIR" file="${ant.file.com.ibm.streamsx.dps}"/>
 
-	<!-- the location of the streams installation used to build the toolkit -->
-	<!-- can either be specified by one of the following:                   -->
-	<!-- $STREAMS_INSTALL environment variable (set in invoking environment)-->
-	<!-- ${STREAMS_INSTALL} ant property (set outside of this build.xml)    -->
-	
-	<!-- If STREAMS_INSTALL property is not set, set it to a "bad" value    -->
-	<condition property="STREAMS_INSTALL" value="NOTFOUND">
-		<not><isset property="STREAMS_INSTALL"/></not>
-	</condition>
-	
-	<!-- If the environment variable is set, use this, otherwise use the    -->
-	<!-- STREAMS_INSTALL property                                           -->
-	<property environment="env" />
-	<condition property="streams.install"
-			   value="${env.STREAMS_INSTALL}"
-			   else="${STREAMS_INSTALL}">
-		<isset property="env.STREAMS_INSTALL" />
-	</condition>
+  <!-- the location of the streams installation used to build the toolkit -->
+  <!-- can either be specified by one of the following:                   -->
+  <!-- $STREAMS_INSTALL environment variable (set in invoking environment)-->
+  <!-- ${STREAMS_INSTALL} ant property (set outside of this build.xml)    -->
+  
+  <!-- If STREAMS_INSTALL property is not set, set it to a "bad" value    -->
+  <condition property="STREAMS_INSTALL" value="NOTFOUND">
+    <not><isset property="STREAMS_INSTALL"/></not>
+  </condition>
+  
+  <!-- If the environment variable is set, use this, otherwise use the    -->
+  <!-- STREAMS_INSTALL property                                           -->
+  <property environment="env" />
+  <condition property="streams.install"
+             value="${env.STREAMS_INSTALL}"
+             else="${STREAMS_INSTALL}">
+    <isset property="env.STREAMS_INSTALL" />
+  </condition>
 
-	<property name="toolkit.dir" value="${com.ibm.streamsx.dps.DIR}/.."/>
-	<property name="src.dir" value="java/src" />
-	<property name="build.dir" value="java/classes" />
-        <property name="lib.dir" value="java/lib" />
-	<property name="jarfile" value="dps-helper.jar" />
+  <property name="toolkit.dir" value="${com.ibm.streamsx.dps.DIR}/.."/>
+  <property name="src.dir" value="java/src" />
+  <property name="build.dir" value="java/classes" />
+  <property name="lib.dir" value="java/lib" />
+  <property name="jarfile" value="dps-helper.jar" />
+  <!-- Override this property to put the generated javadoc somewhere else -->
+  <property name="doc.dir" value="${toolkit.dir}/doc"/>
+  <property name="javadoc.dir" value="${doc.dir}/javadoc/dps"/>
 
-	<path id="cp.compile">
-		<pathelement location="${streams.install}/lib/com.ibm.streams.operator.samples.jar" />
-	</path>
-	
-	<target name="all" unless="unsupported.os">
-          <antcall target="all-targets" inheritAll="true" inheritRefs="true"/>
-	</target>
-	
-	<target name="all-targets" depends="check,dependencies,compile,package"/>
-	
-	<target name="clean" unless="unsupported.os">
-          <antcall target="clean-targets" inheritAll="true" inheritRefs="true"/>
-	</target>
-		
-	<target name="clean-targets" depends="package-clean,compile-clean,dependencies-clean"/>
+  <path id="cp.compile">
+    <pathelement location="${streams.install}/lib/com.ibm.streams.operator.samples.jar" />
+  </path>
+  
+  <target name="all" unless="unsupported.os">
+    <antcall target="all-targets" inheritAll="true" inheritRefs="true"/>
+  </target>
+  
+  <target name="all-targets" depends="check,dependencies,compile,package,doc"/>
+  
+  <target name="clean" unless="unsupported.os">
+    <antcall target="clean-targets" inheritAll="true" inheritRefs="true"/>
+  </target>
+  
+  <target name="clean-targets" depends="doc-clean,package-clean,compile-clean,dependencies-clean"/>
 
-        <target name="check">
-          <fail message="Unable to determine streams install location.  One of either $STREAMS_INSTALL environment variable of STREAMS_INSTALL ant property must be set.">
-            <condition>
-              <equals arg1="${streams.install}" arg2="NOTFOUND"/>
-            </condition>
-          </fail>
-        </target>
-        
-        <target name="dependencies">
-        </target>
-        
-	<target name="dependencies-clean">
-	</target>
+  <target name="check">
+    <fail message="Unable to determine streams install location.  One of either $STREAMS_INSTALL environment variable of STREAMS_INSTALL ant property must be set.">
+      <condition>
+        <equals arg1="${streams.install}" arg2="NOTFOUND"/>
+      </condition>
+    </fail>
+  </target>
+  
+  <target name="dependencies">
+  </target>
+  
+  <target name="dependencies-clean">
+  </target>
 
-	<target name="compile">
-          <mkdir dir="${build.dir}"/>
-          <javac srcdir="${src.dir}"
-                 destdir="${build.dir}"
-                 classpathref="cp.compile"
-                 fork="true"
-                 includeantruntime=""
-                 debug="true"
-                 debuglevel="lines,vars,source"
-                 listfiles="true"
-                 memoryMaximumSize="256m"
-	           optimize="true">
-            <compilerarg value="-Xlint:all"/>
-            <!-- <compilerarg value="-Werror"/> -->
-          </javac>
-        </target>
-	
-        <target name="compile-clean">
-          <delete dir="${build.dir}"/>
-        </target>
+  <target name="compile">
+    <mkdir dir="${build.dir}"/>
+    <javac srcdir="${src.dir}"
+           destdir="${build.dir}"
+           classpathref="cp.compile"
+           fork="true"
+           includeantruntime=""
+           debug="true"
+           debuglevel="lines,vars,source"
+           listfiles="true"
+           memoryMaximumSize="256m"
+           optimize="true">
+      <compilerarg value="-Xlint:all"/>
+      <!-- <compilerarg value="-Werror"/> -->
+    </javac>
+  </target>
+  
+  <target name="compile-clean">
+    <delete dir="${build.dir}"/>
+  </target>
 
-        <target name="package">
-          <mkdir dir="${lib.dir}"/>
-          <jar destfile="${lib.dir}/${jarfile}" 
-               basedir="${build.dir}"
-               filesonly="true">
-            <resources>
-              <fileset dir="${src.dir}" includes="messages.properties"/>
-            </resources>
-          </jar>
-        </target>
-	
-        <target name="package-clean">
-          <delete file="${lib.dir}/${jarfile}"/>
-        </target>
+  <target name="package">
+    <mkdir dir="${lib.dir}"/>
+    <jar destfile="${lib.dir}/${jarfile}" 
+         basedir="${build.dir}"
+         filesonly="true">
+      <resources>
+        <fileset dir="${src.dir}" includes="messages.properties"/>
+      </resources>
+    </jar>
+  </target>
+  
+  <target name="package-clean">
+    <delete file="${lib.dir}/${jarfile}"/>
+  </target>
 
+  <target name="doc" depends="javadoc"/>
+
+  <target name="doc-clean" depends="javadoc-clean"/>
+
+  <target name="javadoc">
+    <javadoc sourcepath="${src.dir}"
+             destdir="${javadoc.dir}"
+             classpathref="cp.compile"
+             packagenames="com.ibm.streamsx.dps.*, com.ibm.streamsx.dl.*"
+             excludepackagenames="com.ibm.streamsx.dl.impl
+                                  com.ibm.streamsx.dps.impl"                   
+             Overview="java/src/overview.html"
+             Windowtitle="Streams Distributed Process Store (DPS) Java API">
+    </javadoc>
+  </target>
+
+  <target name="javadoc-clean">
+    <delete dir="${javadoc.dir}"/>
+  </target>
+  
 </project>

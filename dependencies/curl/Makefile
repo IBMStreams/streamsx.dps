@@ -9,9 +9,9 @@ PKG_DIR = $(PKG_NAME)-$(VERSION)
 GEN_DIR := $(shell pwd)/gen
 
 ALL_TARGETS = all-build
-ifeq ($(OS),el7)
-ALL_TARGETS = all-skip
-endif
+#ifeq ($(OS),el7)
+#ALL_TARGETS = all-skip
+#endif
 
 all: $(ALL_TARGETS)
 
@@ -35,6 +35,9 @@ $(ARCHIVE_INSTALL): $(PKG_DIR)/Makefile
 	tar -C $(GEN_DIR) -czvf $(ARCHIVE_INSTALL) ./lib ./include
 
 $(PKG_DIR)/Makefile: $(PKG_DIR)/Makefile.in
+	cd $(PKG_DIR) && patch -p1 < ../patch/ppc64le-configure.patch
+	cd $(PKG_DIR) && patch -p1 < ../patch/ppc64le-config.patch
+	cd $(PKG_DIR) && patch -p1 < ../patch/ppc64le-libtool.patch
 	cd $(PKG_DIR) && ./configure --prefix=$(GEN_DIR) --exec-prefix=$(GEN_DIR) --enable-static=no # CPPFLAGS=$(ARCH_CFLAG)
 
 $(PKG_DIR)/Makefile.in: $(ARCHIVE)

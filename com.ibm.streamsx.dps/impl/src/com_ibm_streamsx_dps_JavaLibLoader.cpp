@@ -55,14 +55,6 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsLoadBackEn
 			break;
 		}
 
-		sharedLibFileName = sharedLibDir + "/libsds.so";
-		handle = dlopen(sharedLibFileName.c_str(), RTLD_NOW|RTLD_GLOBAL);
-
-		if (handle == false) {
-			strcpy(resultString, "DpsHelper: dlopen failed for libsds.so");
-			break;
-		}
-
 		sharedLibFileName = sharedLibDir + "/libhiredis.so";
 		handle = dlopen(sharedLibFileName.c_str(), RTLD_NOW|RTLD_GLOBAL);
 
@@ -76,22 +68,6 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsLoadBackEn
 
 		if (handle == false) {
 			strcpy(resultString, "DpsHelper: dlopen failed for libuv.so");
-			break;
-		}
-
-		sharedLibFileName = sharedLibDir + "/libcrypto.so";
-		handle = dlopen(sharedLibFileName.c_str(), RTLD_NOW|RTLD_GLOBAL);
-
-		if (handle == false) {
-			strcpy(resultString, "DpsHelper: dlopen failed for libcrypto.so");
-			break;
-		}
-
-		sharedLibFileName = sharedLibDir + "/libssl.so";
-		handle = dlopen(sharedLibFileName.c_str(), RTLD_NOW|RTLD_GLOBAL);
-
-		if (handle == false) {
-			strcpy(resultString, "DpsHelper: dlopen failed for libssl.so");
 			break;
 		}
 
@@ -143,14 +119,6 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsLoadBackEn
 			break;
 		}
 
-		sharedLibFileName = sharedLibDir + "/liblua.so";
-		handle = dlopen(sharedLibFileName.c_str(), RTLD_NOW|RTLD_GLOBAL);
-
-		if (handle == false) {
-			strcpy(resultString, "DpsHelper: dlopen failed for liblua.so");
-			break;
-		}
-
 		sharedLibFileName = sharedLibDir + "/libaerospike.so";
 		handle = dlopen(sharedLibFileName.c_str(), RTLD_NOW|RTLD_GLOBAL);
 
@@ -159,9 +127,9 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsLoadBackEn
 			break;
 		}
 
-		string msg = string("DpsHelper: dlopen successful for libmemcached.so, libsds.so, libhiredis.so, ") +
-			string("libuv.so, libcrypto.so, libssl.so, libcassandra.so, libcurl.so, libjson-c.so, ") +
-			string("libbson.so, libmongoc.so, libcouchbase.so, liblua.so and libaerospike.so.");
+		string msg = string("DpsHelper: dlopen successful for libmemcached.so, libhiredis.so, ") +
+			string("libuv.so, libcassandra.so, libcurl.so, libjson-c.so, ") +
+			string("libbson.so, libmongoc.so, libcouchbase.so, and libaerospike.so.");
 		strcpy(resultString, msg.c_str());
 	} // End of the while loop.
 
