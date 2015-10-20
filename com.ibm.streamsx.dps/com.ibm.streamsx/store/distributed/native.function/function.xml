@@ -490,8 +490,8 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
           <cmn:lib>json-c</cmn:lib>
           <cmn:lib>bson</cmn:lib>
           <cmn:lib>mongoc</cmn:lib>
-          <cmn:lib>couchbase</cmn:lib>
-          <cmn:lib>aerospike</cmn:lib>
+          <!-- <cmn:lib>couchbase</cmn:lib> -->
+          <!-- <cmn:lib>aerospike</cmn:lib> -->
           <cmn:command>../../../../impl/bin/archLevel</cmn:command>
         </cmn:managedLibrary>
       </library>

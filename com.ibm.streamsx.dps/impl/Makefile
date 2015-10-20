@@ -22,11 +22,11 @@ DISTRIBUTED_PROCESS_STORE_OBJS += CassandraDBLayer.o
 DISTRIBUTED_PROCESS_STORE_OBJS += CloudantDBLayer.o
 DISTRIBUTED_PROCESS_STORE_OBJS += HBaseDBLayer.o
 DISTRIBUTED_PROCESS_STORE_OBJS += MongoDBLayer.o
-DISTRIBUTED_PROCESS_STORE_OBJS += CouchbaseDBLayer.o
+#DISTRIBUTED_PROCESS_STORE_OBJS += CouchbaseDBLayer.o
 # Aerospike not supported on ppc64/ppc64le
-ifeq (,$(findstring ppc64,$(ARCH)))
-DISTRIBUTED_PROCESS_STORE_OBJS += AerospikeDBLayer.o
-endif
+#ifeq (,$(findstring ppc64,$(ARCH)))
+#DISTRIBUTED_PROCESS_STORE_OBJS += AerospikeDBLayer.o
+#endif
 DISTRIBUTED_PROCESS_STORE_OBJS += RedisClusterDBLayer.o
 
 DISTRIBUTED_PROCESS_STORE_LIB = $(LIB)/libDistributedProcessStoreLib.so

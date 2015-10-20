@@ -1,8 +1,8 @@
 # -*- makefile -*-
 
-PACKAGES += aerospike
+#PACKAGES += aerospike
 PACKAGES += cassandra
-PACKAGES += couchbase
+#PACKAGES += couchbase
 PACKAGES += curl
 PACKAGES += hiredis
 PACKAGES += hiredis-cluster
