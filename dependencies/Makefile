@@ -15,8 +15,9 @@ PACKAGES += uv
 PWD := $(shell pwd)
 
 all: ${PACKAGES:%=%.all}
-clean: ${PACKAGES:%=%.clean}
 
+clean: ${PACKAGES:%=%.clean}
+	rm -rf $(shell pwd)/../com.ibm.streamsx.dps/impl/ext
 
 %.all : out-of-date
 	$(MAKE) -j1 -C $(*F) all

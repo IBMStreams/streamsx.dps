@@ -29,7 +29,8 @@
   <property name="jarfile" value="dps-helper.jar" />
   <!-- Override this property to put the generated javadoc somewhere else -->
   <property name="doc.dir" value="${toolkit.dir}/doc"/>
-  <property name="javadoc.dir" value="${doc.dir}/javadoc/dps"/>
+  <property name="javadoc.root" value="${doc.dir}/javadoc"/>
+  <property name="javadoc.dir" value="${javadoc.root}/dps"/>
 
   <path id="cp.compile">
     <pathelement location="${streams.install}/lib/com.ibm.streams.operator.samples.jar" />
@@ -94,7 +95,7 @@
   </target>
   
   <target name="package-clean">
-    <delete file="${lib.dir}/${jarfile}"/>
+    <delete dir="${lib.dir}"/>
   </target>
 
   <target name="doc" depends="javadoc"/>
@@ -106,15 +107,14 @@
              destdir="${javadoc.dir}"
              classpathref="cp.compile"
              packagenames="com.ibm.streamsx.dps.*, com.ibm.streamsx.dl.*"
-             excludepackagenames="com.ibm.streamsx.dl.impl
-                                  com.ibm.streamsx.dps.impl"                   
+             excludepackagenames="com.ibm.streamsx.dl.impl, com.ibm.streamsx.dps.impl"                   
              Overview="java/src/overview.html"
              Windowtitle="Streams Distributed Process Store (DPS) Java API">
     </javadoc>
   </target>
 
   <target name="javadoc-clean">
-    <delete dir="${javadoc.dir}"/>
+    <delete dir="${javadoc.root}"/>
   </target>
   
 </project>
