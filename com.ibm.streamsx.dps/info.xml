@@ -38,8 +38,6 @@ The functions provided by the DPS toolkit are divided into 3 categories:
 * Distributed lock API
 Note: The toolkit provides the aforementioned functionality as native functions that can be used from C++ and SPL applications and  through a fully object oriented Java API. 
 The comments below apply regardless of the programming language being used.  
-See the "Getting Started" section below for an example.
-The native function documentation and [../../javadoc/dps/index.html|Javadoc] have more details on how to use the toolkit within SPL and Java applications respectively.
 
 # User Created Stores
 A DPS store is a container in which  pairs can be created, retrieved from, updated and deleted. The keys and values must be a SPL primitive type, such as `rstring` or `int32`, or a SPL composite type such as a `map`. 
@@ -72,9 +70,22 @@ This is achieved using a trust based cooperative locking scheme to gain exclusiv
 
 # Using the toolkit in SPL applications
 All the functionality of the toolkit is available via the native functions in the `com.ibm.streamsx.store.distributed` and `com.ibm.streamsx.lock.distributed` namespaces. You need to include these namespaces in your SPL application via a use directive. 
+See the "Getting Started" section below and the native function documentation has more details on how to use the toolkit within applications written in SPL.
+
 
 # Using the toolkit in Java applications
-Ensure that `&lt;dps_toolkit_home&gt;/impl/java/lib/dps-helper.jar`, which contains the Java implementation of the DPS functions is accessible to your application.  Packages of interest are `com.ibm.streamsx.dps` and `com.ibm.streamsx.dl`.  See the Javadoc for full documentation.
+Ensure that `&lt;dps_toolkit_home&gt;/impl/java/lib/dps-helper.jar`, which contains the Java implementation of the DPS functions is accessible to your application.  Packages of interest are `com.ibm.streamsx.dps` and `com.ibm.streamsx.dl`.
+See the "Getting Started" section below and the  [../../javadoc/dps/index.html|Javadoc] for details on using the API from operators written in Java.
+
+ 
+**Note regarding fusing Java operators:** 
+Fusing two or more Java operators that utilize the Java DPS API requires that each operator have the same class path and the `@SharedLoader` annotation in its class definition.
+For example:
+	PrimitiveOperator(name="MyJavaOperator", namespace="com.ibm.demo",  description="Java Operator MyJavaOperator")
+	@SharedLoader(true)
+	public class MyJavaOperator extends AbstractOperator {
+		...
+	}
  
 # Using the toolkit in C++ applications
 Include the C++ header file `DistributedProcessStoreWrappers.h` found in `impl/include`.  This is the main entry point for the C++ functions, which are in the C++ namespace `com::ibm::streamsx::store::distributed`. 
