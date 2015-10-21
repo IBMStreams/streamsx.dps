@@ -1,13 +1,13 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
 <html>
-  <HEAD>
-    <TITLE>Distributed Process Store (DPS) Java API Overview</TITLE>
-  </HEAD>
-  <BODY>
+  <head>
+    <title>Distributed Process Store (DPS) Java API Overview</title>
+  </head>
+  <body>
 
 
 The Distributed Process Store (DPS) toolkit enables multiple applications running processing elements (PEs) on one or more machines to share application specific state information.  
-The shared information is stored in an external key-value data store, such as <a href="http://redis.io">Redis®</a>.
+The shared information is stored in an external key-value data store, such as <a href="http://redis.io">Redis</a>.
 <p>
 The Java API enables access to shared data in an external store, and additional locking functionality to provide safe, concurrent access to the shared data.
 See the toolkit documentation in the Knowledge Center for details on configuring the toolkit.
@@ -78,6 +78,17 @@ try {
 </code>
 </pre>
 
-
-  </BODY>
-</HTML>
+<b>Note:</b> 
+Fusing two or more Java operators that utilize the Java DPS API requires that each operator have the same class path and the <code> &#64;SharedLoader </code> annotation in its class definition.
+For example:
+<pre>
+<code>
+PrimitiveOperator(name="MyJavaOperator", namespace="com.ibm.demo",  description="Java Operator MyJavaOperator")
+&#64;SharedLoader(true)
+public class MyJavaOperator extends AbstractOperator {
+...
+}
+</code>
+</pre>
+</body>
+</html>
