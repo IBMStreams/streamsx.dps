@@ -2,9 +2,9 @@
 <info:toolkitInfoModel xmlns:common="http://www.ibm.com/xmlns/prod/streams/spl/common" xmlns:info="http://www.ibm.com/xmlns/prod/streams/spl/toolkitInfo">
   <info:identity>
     <info:name>com.ibm.streamsx.dps</info:name>
-    <info:description>The Distributed Process Store (DPS) toolkit enables multiple applications running processing elements (PEs) on one or more machines to share application specific state information.  
-The shared information is stored in an external Redis®  NoSQL Key-Value (K/V) data store. The toolkit thus allows non-fused SPL, C++ and Java operators running on different machines to share information.
-The toolkit currently officially supports Redis 2.8.2+ and Redis 3.  Thus, using the DPS toolkit requires you to have installed and configured a Redis server infrastructure.  Please note that the Redis store is an open source offering requiring acceptance of its BSD license.
+    <info:description>The Distributed Process Store (DPS) toolkit enables multiple applications running processing elements (PEs) on one or more machines to share application specific state information. 
+The shared information is stored in an external data store. This allows non-fused SPL, C++ and Java operators running on different machines to share information. 
+The Redis® NoSQL Key-Value (K/V) data store is the only officially supported data store for the DPS toolkit. Please note that the Redis store is an open source offering requiring acceptance of its BSD license. Currently, only Redis 2.8.2+ and Redis 3 are supported.  
 See the [http://redis.io/ | Redis home page] for information on how to download, install and configure a Redis server or cluster.
 The toolkit consists of a set of native functions that provide access to shared state, and additional locking functionality to provide safe, concurrent access to the shared data.
 These functions can be used from anywhere inside a Streams application, whether it be SPL code, SPL functions, SPL native functions, C++ primitive operators.  They also have counterparts written in Java that can be used from a Java primitive operator.
@@ -104,7 +104,7 @@ SPL:
 	mutable uint64 dbStore_handle = 0ul;
 	dbStore_handle = dpsCreateStore("myDBStore1", dummyRstring, dummyUint32, err);
 	
-	if (err == 0ul ) { //no error occured
+	if (err == 0ul ) { //no error occurred
 		 //create lock for the store
 		mutable uint64 lock_id = dlCreateOrGetLock("My db store lock", err);
 		// Acquire the newly created lock, specifying a lease time and maximum time to wait to acquire the lock.
@@ -238,15 +238,14 @@ The DPS Toolkit supports the Redis version 2.8.21 server and above (referred to 
 With the Redis 2.8.x store, the DPS toolkit supports a multi-server setup. If you have multiple Redis servers configured, using the DPS Time To Live (TTL) APIs will result in better scalability of your put/get requests than using the APIs that take the user created store id as a function argument. Choose the APIs according to your functional and scaling needs.
 When configuring the system to run multiple Redis server instances on a single machine for scaling purposes, take into account the total number of CPU cores available on that single machine. Start only a suitable number of Redis server instances on a single machine to give them enough CPU cycles to handle your peak workload of put/get requests.  If you require more CPU cores than are available on a single machine, run Redis server instances on multiple machines. 
 
-While running multiple Redis server instances either on a single machine or on multiple machines, the DPS logic will automatically shard (or distribute) the put/get workload to different Redis server instanc
+While running multiple Redis server instances either on a single machine or on multiple machines, the DPS logic will automatically shard (or distribute) the put/get workload to different Redis server instance.
 # Notes for Redis 3.x (redis cluster)
 Redis version 3.0.0 and higher provides a new feature to install and run a Redis cluster. You can install multiple Redis instances and configure them with a replication factor. For every master Redis instance, you can have one or more slave instances. When the DPS toolkit writes data into the Redis v3.x cluster, it will be automatically sharded and distributed among all the master Redis instances running on your Redis cluster. Also, with the Redis v3.x store, when a master Redis instance fails, its slave copy will automatically take-over the operation to ensure as much continuous operation as possible on a subset of the Redis nodes. Note that high available requires three or more instances.
 
 # Installing the Client 
 In order to run and use the DPS toolkit, it is important to have the no-sql store client software available on all the machines where the Streams applications will be running. 
 The DPS toolkit manages the client installation for you by including the Redis client libraries (.so files) in the toolkit installation. 
-The DPS toolkit uses the hiredis C client and the hiredis-cluster wrapper include files for accessing the Redis no-sql store. The library files are included in the `impl/ext/lib` sub-directory of the DPS toolkit. 
-
+The DPS toolkit uses the hiredis C client and the hiredis-cluster wrapper include files for accessing the Redis no-sql store. The required header and library files are in the `impl/ext/` sub-directory of the DPS toolkit. 
 # Configuring the DPS toolkit
 Copy the DPS toolkit sample configuration file from `STREAMS_INSTALL/samples/com.ibm.streamsx.dps/dp_test_1/etc/no-sql-kv-store-servers.cfg` to `your-project-directory/etc/no-sql-kv-store-servers.cfg`.
 If using the Redis v2.8.x store, specify `redis` in the configuration file; if using the Redis v3.x store, specify `redis-cluster` in the configuration file.
