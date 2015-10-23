@@ -30,12 +30,27 @@ $(ARCHIVE_INSTALL): $(PKG_DIR)/Makefile
 	tar -C $(GEN_DIR) -czvf $(ARCHIVE_INSTALL) ./lib ./include
 
 $(PKG_DIR)/Makefile: $(PKG_DIR)/Makefile.in
-#	cd $(PKG_DIR) && patch -p1 < ../patch/ppc64le-configure.patch
-#	cd $(PKG_DIR) && patch -p1 < ../patch/ppc64le-libtool.patch
-#	cd $(PKG_DIR) && patch -p1 < ../patch/libbson-ppc64le-configure.patch
-#	cd $(PKG_DIR) && patch -p1 < ../patch/libbson-ppc64le-libtool.patch
+	cd $(PKG_DIR) && patch -p1 < ../patch/ppc64le-configure.patch
+	cd $(PKG_DIR) && patch -p1 < ../patch/ppc64le-libtool.patch
+	cd $(PKG_DIR) && patch -p1 < ../patch/libbson-ppc64le-configure.patch
+	cd $(PKG_DIR) && patch -p1 < ../patch/libbson-ppc64le-libtool.patch
 	cd $(PKG_DIR) && ./configure --prefix=$(GEN_DIR) --exec-prefix=$(GEN_DIR) \
 		--enable-static=no # CPPFLAGS=$(ARCH_CFLAG)
+# Something to do with the patches we use for ppc64le above + AT compiler
+ifeq ($(ARCH),ppc64le)
+	cd $(PKG_DIR) && sed -i 's/aclocal-1\.14/aclocal-1\.13/g' ./config.status
+	cd $(PKG_DIR) && sed -i 's/aclocal-1\.14/aclocal-1\.13/g' ./config.log
+	cd $(PKG_DIR) && sed -i 's/aclocal-1\.14/aclocal-1\.13/g' ./Makefile
+	cd $(PKG_DIR) && sed -i 's/aclocal-1\.14/aclocal-1\.13/g' ./src/libbson/config.status
+	cd $(PKG_DIR) && sed -i 's/aclocal-1\.14/aclocal-1\.13/g' ./src/libbson/config.log
+	cd $(PKG_DIR) && sed -i 's/aclocal-1\.14/aclocal-1\.13/g' ./src/libbson/Makefile
+	cd $(PKG_DIR) && sed -i 's/automake-1\.14/automake-1\.13/g' ./config.status
+	cd $(PKG_DIR) && sed -i 's/automake-1\.14/automake-1\.13/g' ./config.log
+	cd $(PKG_DIR) && sed -i 's/automake-1\.14/automake-1\.13/g' ./Makefile
+	cd $(PKG_DIR) && sed -i 's/automake-1\.14/automake-1\.13/g' ./src/libbson/config.status
+	cd $(PKG_DIR) && sed -i 's/automake-1\.14/automake-1\.13/g' ./src/libbson/config.log
+	cd $(PKG_DIR) && sed -i 's/automake-1\.14/automake-1\.13/g' ./src/libbson/Makefile
+endif
 
 $(PKG_DIR)/Makefile.in: $(ARCHIVE)
 	tar -xvzf $(ARCHIVE) 

@@ -38,15 +38,15 @@
 
 	   mutable uint64 err = 0ul;
 	   mutable uint64 s = 0ul;
-           rstring dummyRstring = &quot;&quot;;
+       rstring dummyRstring = &quot;&quot;;
 	   uint32 dummyUint32 = 0u;
 	   s = dpsCreateOrGetStore(&quot;myDBStore1&quot;, dummyRstring, dummyUint32, err);
 
-           if (err != 0ul) {
+       if (err != 0ul) {
              uint64 rc = dpsGetLastStoreErrorCode;
              rstring msg = dpsGetLastStoreErrorString();
              printStringLn(&quot;Unexpected error in creating a store named myDBStore1: rc = &quot; + (rstring)rc + &quot;, msg = &quot; + msg);
-           }
+       }
 
 
 
@@ -64,7 +64,7 @@
         <description>Remove a process store given its handle.
 @param store The process store handle identifying the store to remove.
 @param err This parameter will contain the error code, if an error occurs. Or will be set '0' if the remove operation was successful.         
-@return true if the store existed and was succesfully removed.
+@return true if the store existed and was successfully removed.
 	
 	
 	mutable boolean result = true;
@@ -263,7 +263,7 @@ it does safety checks and is therefore slower.</description>
       <function>
         <description>This function gets a store iterator that can be used to iterate over all the key-value pairs in a given store id. No other operations that can modify the state can be used until after  [dpsEndIteration(uint64 , uint64 ,  uint64 )|dpsEndIteration()] is called for this same store.   Once a store iterator is obtained, it must be released by calling `dpsEndIteration()` once the iterator is no longer needed.  See the documentation for [dpsGetNext(uint64, uint64 ,  T1 ,  T2 ,  uint64 )|dpsGetNext()]  for a complete example of how to use the iterator.
 @param store handle of the store for which an iterator is needed.
-@param err Contains the error code describing the result of the function call.  Will be '0' if no error occured, otherwise will have a non-zero value. 
+@param err Contains the error code describing the result of the function call.  Will be '0' if no error occurred, otherwise will have a non-zero value. 
 @return an value representing an iterator that can be used with the two other store iteration functions, [dpsGetNext(uint64, uint64 ,  T1 ,  T2 ,  uint64 )|dpsGetNext()] and [dpsEndIteration(uint64 , uint64 ,  uint64 )|dpsEndIteration()].</description>
         <prototype>public stateful uint64 dpsBeginIteration(uint64 store, mutable uint64 err)</prototype>
       </function>
@@ -271,7 +271,7 @@ it does safety checks and is therefore slower.</description>
         <description>This function is used to get the next key and value of given types in the given store when iterating over all the items in the store.  The **key** and **value** parameters must be of the same type that was used when the store was originally created using either `dpsCreateStore()` or `dpsCreateOrGetStore()`.
 @param store the store being iterated over
 @param iterator the iterator handle, must have been created from a previous call to `dpsBeginIteration()`
-@param key a mutable variable to store the next key for the current key-value pair in the iteration sequence
+@param key a mutable variable to store the key for the current key-value pair in the iteration sequence
 @param value a mutable variable to store the value for the current key-value pair
 @param err Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise.  
 @return true if the next key-value pair was successfully returned, or if store is empty, and false if the end of the iteration was reached. If this method returns false because the store is empty or the end of the iteration was reached, the **err** parameter will have a value of '0'. If an error occurs, the function will return false and the **err** parameter will have a non-zero value.
@@ -321,7 +321,7 @@ it does safety checks and is therefore slower.</description>
 @param store the handle of the store into which the deserialized data will be saved.
 @param data the data to deserialize and save into the specified store.
 @param dummyKey variable indicating the type of the keys in the store
-@param dummyValue varaible indicating the type of the values in the store
+@param dummyValue variable indicating the type of the values in the store
 @param err a mutable variable that will contain the error code describing the result of the deserialization.  Will be '0' if deserialization was successful, and a non-zero value otherwise.
 
 	mutable uint64 err = 0ul;
@@ -357,7 +357,7 @@ it does safety checks and is therefore slower.</description>
         <prototype>public stateful uint64 dpsGetLastStoreErrorCode()</prototype>
       </function>
       <function>
-        <description>Get the error code of the last error ocuured involving data that was stored with a Time To Live (TTL).
+        <description>Get the error code of the last error occurred involving data that was stored with a Time To Live (TTL).
 @return the error code, or '0' if the last TTL store operation was successful.        </description>
         <prototype>public stateful uint64 dpsGetLastErrorCodeTTL()</prototype>
       </function>
@@ -369,7 +369,7 @@ it does safety checks and is therefore slower.</description>
       </function>
       <function>
         <description>Get the SPL type name for the key of a given store id.
-@param store the handlef or the store in question.
+@param store the handle for the store in question.
 @return the type for the keys in the store.        </description>
         <prototype>public stateful rstring dpsGetSplTypeNameForKey(uint64 store)</prototype>
       </function>
@@ -437,7 +437,7 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
         <prototype>public stateful boolean dpsRunDataStoreCommand(rstring cmd, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>This is an advanced function that can be used to execute arbitrary back-end data store two way native commands for database technologies that work with cURL. A HTTP request is sent to the server and the response is saved in the **jsonResponse** paramter. This function is not supported with Redis.  Therefore, this function can only be used with database technologies that are currently not officially supported by Streams, such as HBase. See the samples for this toolkit for a detailed example.
+        <description>This is an advanced function that can be used to execute arbitrary back-end data store two way native commands for database technologies that work with cURL. A HTTP request is sent to the server and the response is saved in the **jsonResponse** parameter. This function is not supported with Redis.  Therefore, this function can only be used with database technologies that are currently not officially supported by Streams, such as HBase. See the samples for this toolkit for a detailed example.
         </description>
         <prototype>public stateful boolean dpsRunDataStoreCommand(uint32 cmdType, rstring httpVerb, rstring baseUrl, rstring apiEndpoint, rstring queryParams, rstring jsonRequest, mutable rstring jsonResponse, mutable uint64 err)</prototype>
       </function>
