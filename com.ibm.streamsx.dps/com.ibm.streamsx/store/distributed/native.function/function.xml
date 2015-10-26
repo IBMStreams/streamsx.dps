@@ -485,6 +485,7 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
           <cmn:lib>uv</cmn:lib>
           <cmn:lib>crypto</cmn:lib>
           <cmn:lib>ssl</cmn:lib>
+          <cmn:lib>ldap_r</cmn:lib>
           <cmn:lib>cassandra</cmn:lib>
           <cmn:lib>curl</cmn:lib>
           <cmn:lib>json-c</cmn:lib>

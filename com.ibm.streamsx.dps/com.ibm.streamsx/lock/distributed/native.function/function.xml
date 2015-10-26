@@ -141,6 +141,7 @@ In addition, the caller can also specify how long the caller is willing to wait 
           <cmn:lib>uv</cmn:lib>
           <cmn:lib>crypto</cmn:lib>
           <cmn:lib>ssl</cmn:lib>
+          <cmn:lib>ldap_r</cmn:lib>
           <cmn:lib>cassandra</cmn:lib>
           <cmn:lib>curl</cmn:lib>
           <cmn:lib>json-c</cmn:lib>
