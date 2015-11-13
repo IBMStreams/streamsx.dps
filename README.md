@@ -23,4 +23,3 @@ DPS toolkit for the purpose of sharing application state in a distributed manner
 There are plenty of details available about the installation, configuration, API description,
 built-in example etc. Please refer to the com.ibm.streamsx.dps/doc/dps-usage-tips.txt file
 for getting a good start in using this toolkit.  
-
