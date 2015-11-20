@@ -28,7 +28,7 @@ copied into the impl/lib directory within the OS specific sub-directory.
 */
 #include "DBLayer.h"
 
-#include <json-c/json.h>
+#include <json/json.h>
 #include <libbson-1.0/bson.h>
 #include <libmongoc-1.0/mongoc.h>
 #include <set>

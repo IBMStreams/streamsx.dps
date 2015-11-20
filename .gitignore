@@ -1,9 +1,0 @@
-com.ibm.streamsx.dps/impl/ext
-com.ibm.streamsx.dps/impl/java/classes
-com.ibm.streamsx.dps/doc/spldoc
-*.o
-*.so
-*.jar
-toolkit.xml
-output
-

@@ -48,7 +48,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "DBLayer.h"
 
-#include "hiredis/hiredis.h"
+#include "hiredis.h"
 #include <tr1/memory>
 #include <set>
 #include <vector>

@@ -45,7 +45,7 @@ if [ "$1" == "libPath" ]; then
     fi
 
     # construct a library pathname
-    OSSTR="${MACH}.${OSLVL%%.*}"
+    OSSTR="$here/../lib/${MACH}.${OSLVL%%.*}"
     
   else
 
@@ -54,15 +54,12 @@ if [ "$1" == "libPath" ]; then
   fi
 
   # return a library pathname, but warn if it does not exist
-  # [ -d $OSSTR ] || echo warning: non-existant library path $OSSTR 1>&2
-  echo $here/../lib # /${OSSTR}
-  echo $here/../ext/lib #/${OSSTR}
+  [ -d $OSSTR ] || echo warning: non-existant library path $OSSTR 1>&2
+  echo ${OSSTR}
 
 elif [ "$1" == "includePath" ]; then
   # echo any computed include paths here, if needed
-  here=$( cd ${0%/*} ; pwd )
-  echo $here/../include
-  echo $here/../ext/lib
+  echo ../../../../impl/include
 
 elif [ "$1" == "lib" ]; then
   # echo any computed library names here, if needed

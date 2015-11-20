@@ -1,0 +1,2775 @@
+================================================================================================
+"We are what we repeatedly do. Excellence, therefore, is not an act, but a habit." -- Aristotle
+
+"If you want to achieve excellence, you can get there today.
+ As of this second, quit doing less-than-excellent work." -- Thomas J. Watson (Founder of IBM)
+================================================================================================
+Using the IBM InfoSphere Streams with NoSQL Key/Value data stores.
+
+Streams Distributed Process Store (DPS) toolkit provides a way to share data
+between non-fused Streams operators by using an external NoSQL K/V data store.
+
+Following are the NoSQL K/V stores supported by the DPS toolkit:
+1) memcached
+2) Redis           [version 2.x that doesn't have a built-in cluster feature]
+3) Cassandra
+4) IBM Cloudant
+5) Apache HBase
+6) Mongo
+7) Couchbase
+8) Aerospike
+9) Redis-Cluster   [New cluster feature is available in Redis version 3 and above]
+ 
+A companion IBM developerWorks article about this toolkit: http://tinyurl.com/nxrf3gg
+
+This version of the DPS toolkit works with Streams 4.x and higher versions.
+
+[Apr/15/2015]                  [DPS toolkit version 2.0.9]                  [Share and prosper]
+================================================================================================
+This usage tips file provides high-level implementation details about the Streams DPS toolkit.
+Main effort here is to provide a Streams toolkit that will allow data sharing
+between non-fused operators running as PEs within one or more Streams applications deployed
+across one or more Streams instances configured to run on one or more machines.
+
+The Distributed Process Store (DPS) toolkit is implemented via the Streams C++ native
+function feature. That makes it very easy to call the DPS APIs universally from anywhere within the
+SPL operator code segments, SPL functions, C++/Java native functions and C++/Java primitive operators.
+There are specific examples that show how the DPS APIs can be called from anywhere within
+a Streams application. You can refer to the example packaged inside this toolkit to get a 
+good grasp of the available DPS APIs. For learning specifically about calling the DPS APIs
+from SPL native functions, C++ and Java primitive operators, visit the following URL.
+
+http://tinyurl.com/3apa97q
+
+Then, download the SPL-Examples-For-Beginners.tar.gz file from there and find
+the various examples in it that show how to call the DPS APIs from different parts of 
+a Streams application. In particular, you may want to check the following three examples.
+
+058_data_sharing_between_non_fused_spl_custom_and_cpp_primitive_operators
+061_data_sharing_between_non_fused_spl_custom_operators_and_a_native_function
+062_data_sharing_between_non_fused_spl_custom_and_java_primitive_operators
+
+Main motivation behind the DPS toolkit is that the Streams application designers/developers
+will be able to do neat things with its distributed data sharing facility.
+
+The DPS toolkit provides a comprehensive set of APIs. Streams application developers can
+perform the following  CRUD (Create, Read, Update, Delete) operations simultaneously on
+numerous stores that they might own, share, and manage within the context of 
+one or more Streams applications.
+
+Available DPS APIs
+------------------
+Following functions are associated with the user created stores. In this case, key value pairs
+are kept inside the individual user specified stores. Applications can create and use many 
+such user specified stores at the same time. These stores allow users to perform operations
+such as create/get/remove stores, put/get/check key value pairs, iterate over the store,
+serialize/deserialize stores etc. On any store related operational error, developers can get the
+last error code and last error string. (In the list below, please note that there is
+an API that allows you to run any arbitrary native (one way) data store commands from within
+your Streams application. In some NoSQL back-end data stores, two way native commands are
+also supported via that API.) APPENDIX A below in this file provides a detailed documentation
+for each of these APIs.
+
+******************************************************************************************
+* dpsCreateStore, dpsCreateOrGetStore, dpsFindStore, dpsRemoveStore, dpsPut, dpsPutSafe, *
+* dpsGet, dpsGetSafe, dpsRemove, dpsHas, dpsClear, dpsSize,                              *
+* dpsBeginIteration, dpsGetNext, dpsEndIteration, dpsSerialize, dpsDeserialize,          *
+* dpsGetStoreName, dpsGetSplTypeNameForKey, dpsGetSplTypeNameForValue,                   *
+* dpsGetNoSqlDbProductName, dpsGetDetailsAboutThisMachine, dpsRunDataStoreCommand,       *
+* dpsBase64Encode, dpsBase64Decode, dpsGetLastStoreErrorCode, dpsGetLastStoreErrorString *
+******************************************************************************************
+
+A special note about dpsPut:
+[
+   In order to gain extra performance boost, we made two versions of the put function.
+   One API version (dpsPut) is lightweight and the other (dpsPutSafe) has an extra overhead.
+   dpsPut is a faster version and it doesn't do any safety checks to ensure that there is a valid
+   user created store present. Hence, use the dpsPut (faster version) API only when there is 
+   a user created store present in the back-end DB infrastructure. If this rule is violated,
+   DPS back-end infrastructure will have inconsistent data items. A second API dpsPutSafe is
+   slower in performance and it does all the safety checks before writing K/V pairs into the store.
+   In summary, use the dpsPut API for better performance and ensure to follow the rule stated above.
+]
+
+Following functions are special functions that allow put and get operations with a
+TTL (Time To Live in seconds) value. Key Value pairs stored and obtained via these functions
+will not belong to any user created stores. Instead, they will be stored at the top level
+global area of the configured back-end NoSQL K/V store product. When the preassigned TTL value
+expires, these data items will be automatically removed from the back-end data store.
+When applications have a need to put data items with TTL value and get them back, developers can
+use these functions without having to create individual stores. With these ephemeral key value pairs,
+no other APIs can be used that take store name or store id as a function argument.
+For working with the TTL based key value pairs, one can only use the functions mentioned below.
+These functions will return true or false indicating whether the operation succeeded or not.
+In case of a false return value, an error code and an error string can be obtained.
+In the back-end data store (memcached or redis or cassandra or hbase or mongo or 
+couchbase or aerospike or redis-cluster), such TTL based data items can coexist along with other
+user created stores containing data items that could live forever. Such TTL based APIs only provide
+a limited set of functions (put, get, has, and remove), but at the same time will have a slightly
+low overhead when compared to the feature rich non TTL based APIs.
+(Note: A non zero TTL value passed to these functions will automatically remove the K/V pairs
+at the end of their specified lifetime. A TTL value of zero will keep the K/V pair in 
+the back-end data store forever and they have to be removed manually via the dpsRemoveTTL API.)
+
+******************************************************************************************
+* dpsPutTTL, dpsGetTTL, dpsHasTTL, dpsRemoveTTL,                                         *
+* dpsGetLastErrorCodeTTL, dpsGetLastErrorStringTTL                                       *
+******************************************************************************************
+
+We also provide the following distributed locking functions. They can be used for 
+accessing stores from multiple threads and multiple processes safely without overriding
+with each other by following a trust based cooperative locking scheme to gain exclusive
+access into the stores for performing a set of transaction based store activities.
+
+Available distributed lock native functions
+-------------------------------------------
+****************************************************************************
+* dlCreateOrGetLock, dlRemoveLock, dlAcquireLock, dlReleaseLock,           *
+* dlGetLastDistributedLockErrorString, dlGetLastDistributedLockErrorCode,  * 
+* dlGetPidForLock                                                          *
+****************************************************************************
+
+DPS toolkit is routinely compiled and tested in our Streams lab using the following test environment.
+
+a) RedHat Enterprise Linux 6.4 (or an equivalent CentOS version) + gcc version 4.4.7 20120313 (Red Hat 4.4.7-3) (GCC)
+b) RedHat Enterprise Linux 6.4 for IBM Power machines + gcc version 4.4.7 20120313 (Red Hat 4.4.7-3) (GCC)
+   [Dec/23/2014: DPS toolkit version 1.0.6 and later can't be used with RHEL5 and CentOS5.]
+c) IBM InfoSphere Streams Version 4.x and higher versions
+d) memcached server version 1.4.15 with libmemcached client version 1.0.16
+e) redis server version 2.8.19 with hiredis C client version 0.12.1
+f) Cassandra server version 2.1.4 with C++ client driver 1.0.1 (April/2015) from DataStax
+g) Cloudant cloud service with libcurl and libjson-c client libraries.  
+h) Apache HBase version 0.98.8 for Hadoop2 with libcurl and libjson-c client libraries.
+   (Tested with Hadoop version 2.5.1 and Zookeeper version 3.4.6)
+i) MongoDB version 2.6.7 with MongoDB client Library for C version 1.0.2
+j) Couchbase Server version 3.0.2 with Couchbase C SDK 2.4.5
+k) Aerospike Server version 3.4.1 with Aerospike C client
+l) redis-cluster server version 3.0.0 with hiredis C client version 0.12.1 coupled with the hiredis-cluster wrapper include files
+
+Streams DPS toolkit is enabled out of the box to work with either memcached or redis or cassandra or cloudant or hBase or 
+mongodb or couchbase or aerospike or redis-cluster back-end data store. You can specify the type of your external NoSQL K/V store product 
+(memcached or redis or cassandra or cloudant or hbase or mongodb or couchbase or aerospike or redis-cluster) in a very simple configuration file 
+(<YOUR-SPL-PROJECT-DIRECTORY>/etc/no-sql-kv-store-servers.cfg). For the SPL projects you create newly, you can simply
+take a copy of this file from the example provided in the DPS toolkit to the etc directory inside of your SPL project directory.
+Then, you can make your configuration changes in that file based on your application's needs.
+
+Following are the files that can be found in this DPS toolkit directory:
+
+com.ibm.streamsx.dps                 (Top-level toolkit directory)
+
+a) doc
+      --> dps-usage-tips.txt         (The file you are reading now)
+                                      
+b) com.ibm.streamsx/lock/dist*       (Distributed Locking)
+      --> native.function            (SPL Native Function directory)
+      --> function.xml               (SPL Native Function Model file)
+                                               
+c) com.ibm.streamsx/store/dist*      (Distributed Store)
+      --> native.function            (SPL Native Function directory)
+         --> function.xml            (SPL Native Function Model file)
+         
+d) impl/include                      (Directory where the include files for the DPS will be present)
+                                     (Streams Native Function Model file is configured to look here for the include files)
+      --> DistributedProcessStore.h  (C++ class interface file)
+      --> Distributed*Wrappers.h     (C++ include file that contains the Streams native function entry point code)
+      --> DBLayer.h                  (C++ abstract interface file for the Data Store layer)
+      --> PersistenceError.h         (C++ interface to represent the db layer return code and error messages)
+      --> MemcachedDBLayer.h         (C++ interface for Memcached no-sql store access logic)
+      --> RedisDBLayer.h             (C++ interface for Redis no-sql store access logic)
+      --> CassandraDBLayer.h         (C++ interface for Cassandra data store access logic)   
+      --> CloudantDBLayer.h          (C++ interface for Cloudant data store access logic)   
+      --> HBaseDBLayer.h             (C++ interface for HBase data store access logic)   
+      --> MongoDBLayer.h             (C++ interface for MongoDB data store access logic)
+      --> CouchbaseDBLayer.h         (C++ interface for Couchbase data store access logic)
+      --> AerospikeDBLayer.h         (C++ interface for Aerospike data store access logic) 
+      --> RedisClusterDBLayer.h      (C++ interface for Redis-Cluster no-sql store access logic)  
+      --> DpsConstants.h             (C++ include file with constants used for interfacing with 
+                                      memcached or redis or cassandra or cloudant or hbase or mongo or couchbase or aerospike or redis-cluster no-sql store)
+      --> com*_DpsHelper.h           (Automatically generated JNI C++ include file for use by the Java primitive operators)
+
+e) impl/src                          (Directory where the CPP files for the DPS will be present)
+     --> DistributedProcessStore.cpp (C++ class implementation file for the DPS serialization/deserialization layer)
+     --> MemcachedDBLayer.cpp        (C++ class implementation for the Memcached no-sql store access logic)
+     --> RedisDBLayer.cpp            (C++ class implementation for the Redis no-sql store access logic)
+     --> CassandraDBLayer.cpp        (C++ class implementation for the Cassandra data store access logic)
+     --> CloudantDBLayer.cpp         (C++ class implementation for the Cloudant data store access logic)
+     --> HBaseDBLayer.cpp            (C++ class implementation for the HBase data store access logic)
+     --> MongoDBLayer.cpp            (C++ class implementation for the MongoDB data store access logic)
+     --> CouchbaseDBLayer.cpp        (C++ class implementation for the Couchbase data store access logic)
+     --> AerospikeDBLayer.cpp        (C++ class implementation for the Aerospike data store access logic)
+     --> RedisClusterDBLayer.cpp     (C++ class implementation for the Redis-Cluster no-sql store access logic)
+     --> com*_DpsHelper.cpp          (JNI C++ bridge for Java code to call directly into the common C++ DPS implementation)
+     --> com*_JavaLibLoader.cpp      (JNI C++ bridge for loading the back-end .so libraries from within the DpsHelper.java file)
+
+f) impl/java/src
+      --> com.ibm.*/DpsHelper.java   (Java DpsHelper class needed to access DPS APIs from Java primitive operators)
+      --> build_dps_helper.sh        (A script to build the DpsHelper class file and generate the dps-helper.jar file)
+      
+g) impl/java/bin
+      --> dps-helper.jar             (JAR file for the dps-helper that should be added to a Java primitive operator's Java build path)
+
+h) impl/mk                           (A shell script to build the shared object library of the C++ code shown above) 
+
+i) impl/lib                          (Linux platform specific directory into which the .so library built above will be copied)
+                                     (Streams Native Function Model file is configured to load .so from this directory)
+                                     (Inside this directory, we also ship the necessary client libraries for memcached and redis, cassandra,
+                                      cloudant, hbase, couchbase, aerospike and redis-cluster)
+j) samples/dps_test_1 
+      --> DpsTest1.splmm             (Simple test application SPL file that invokes native functions to
+                                      show the various DPS features.)
+      --> etc                        (SPL test application's etc directory)
+         --> no-sql*.cfg             (Configuration file containing memcached or redis or cassandra or cloudant or 
+                                      hbase or mongo or couchbase or aerospike or redis-cluster server names)
+      --> bin                                        
+         --> build-distributed.sh    (Script that will build a Distributed Streams executable - It requires the Streams runtime)
+         --> run-distributed.sh      (Script that will run the distributed executable of this example application)
+         --> stop-streams-app.sh     (Script that will stop all the running Streams jobs)
+         --> stop-str*-instance.sh   (Script that will stop a specified Streams instance)
+  
+High-level code details about this toolkit
+------------------------------------------
+As explained above, this toolkit consists of C++ code for generating the DPS shared object (.so) file and 
+SPL code for a Streams test driver example application. 
+
+Inside this toolkit, impl/src and impl/include directories contain the C++ source code for the
+DPS API logic. Primarily, it provides the serialization/deserialization code and the
+memcached or redis or cassandra or cloudant or hbase or mongodb or couchbase or aerospike or 
+redis-cluster interface layer code.
+A Wrapper include (.h) file is an important one and that file provides an entry point for the 
+SPL application to directly call a C++ class method. All the C++ logic will be compiled into a 
+shared object library (.so) file and will be available to any SPL application that will have a
+dependency on this toolkit.
+
+This toolkit also contains a simple test SPL flow graph that is constructed to make a call chain to exercise
+different DPS APIs. Inside the DPS toolkit directory, a native function model XML file outlines
+the meta information needed to directly call a C++ class method from SPL. This detail includes the 
+C++ wrapper include file name, C++ namespace containing the wrapper functions, 
+C++ wrapper function prototype expressed using SPL syntax/types, name of the shared object library 
+created within this toolkit, location of the shared object library, location of the wrapper 
+include file etc. SPL test application code in this toolkit demonstrates how two different PEs can share their
+data between themselves using the DPS APIs. In addition, there is code to do 10 parallel writers and
+10 parallel readers to write and read data to/from memcached or redis or cassandra or cloudant or hbase or 
+mongodb or couchbase or aerospike or redis-cluster data store. Please refer to the top of the SPLMM 
+and the C++ source files for additional commentary.
+
+Installing memcached or redis or cassandra or cloudant or hbase or mongo or couchbase or aerospike or redis-cluster server(s)
+-----------------------------------------------------------------------------------------------------------------------------
+Before you can do anything with this toolkit, you should have either the memcached or the redis or the cassandra or 
+cloudant or hbase or mongodb or couchbase or aerospike or redis-cluster server infrastructure up and running.
+memcached has been around since 2003 and it has been put to use in many commercial environments. It is a pure 
+distributed cache capable of running on several dozens of machines to provide a massive no-sql in-memory store.
+On the other hand, redis and redis-cluster are nimble cousins of memcached that came into existence in 2009. Features of redis and
+redis-cluster are very rich: supports complex types (lists, sets, hashes etc.), replicates with a single master and multiple slaves,
+persists periodic snapshots of the store contents on disk, AOF (Append Only File) feature that journals all the changes made to
+the store contents thereby recovering the entire store after a machine crash, clustering support for running on multiple machines etc.
+Cassandra is an Apache project and it is a highly touted distributed database. Cassandra provides high availability, replication,
+persistence, and clustering support in a big way out of the box. Cassandra can be used if several terra bytes of data needs to be
+kept in an external data store to be used by Streams. Cloudant is a cloud based DBaaS (Database as a service) sold by IBM.
+It relieves the users from the installation/configuration/maintenance work required to have a NoSQL database function. With Cloudant,
+users can simply focus on their application to put/get data to/from Cloudant without worrying about managing their own DB infrastructure.
+Apache HBase is an open source data store that is popular in the Hadoop user community. Like Cassandra, it is a column-oriented
+data store with clustering and H/A capabilities. It works in conjunction with Hadoop2 and Zookeeper. MongoDB is a very popular 
+documented based NoSQL data store option available with its sharding, replication and cluster capabilities. Couchbase is another
+NoSQL data store with replication/peristence/clustering features. It is built using the technologies from memcached and CouchDB.
+Aerospike is a great NoSQL K/V store that can work effectively using DRAM or SSD flash drives or both.
+You can choose either one of these data stores and it will serve you very well.
+
+memcached, redis, cassandra, cloudant, hbase, mongodb, couchbase, aerospike and redis-cluster are very easy to install either on a single machine or on 
+multiple machines. You can follow the instructions below for installing memcached (OR) redis (OR) cassandra (OR) cloudant (OR)
+hbase (OR) mongodb (OR) couchbase (OR) aerospike (OR) redis-cluster that we used for testing this toolkit in our Streams lab. 
+Please note that memcached and redis are open source offerings and they carry a BSD license. Cassandra carries an 
+Apache open source software license. Cloudant is a cloud service available from IBM for free as well as for a subscription fee 
+when a dedicated Cloudant setup is needed. HBase carries an Apache open source software license. MongoDB carries an 
+AGPL license for the server and an Apache license for its client libraries. Couchbase server and client libraries are 
+available under the Apache license. Aerospike server is available under the GNU AGPL license and its C client is available
+under the Apache license. If the license terms of these K/V stores suit your deployment needs, you can use them with the Streams DPS toolkit.
+
+You can install the memcached server by following step (1) below.
+(OR)
+You can install the redis server by following step (2) below.
+(OR)
+You can install the Cassandra server by following step (3) below.
+(OR)
+You can install Cloudant by following step (4) below.
+(OR)
+You can install HBase by following step (5) below.
+(OR)
+You can install MongoDB by following step(6) below.
+(OR)
+You can install Couchbase by following step(7) below.
+(OR) 
+You can install Aerospike by following step (8) below.
+(OR)
+You can install redis-cluster by following step (9) below.
+
+If you want to go with memcached, proceed right below here. If you want to go with redis, proceed from step (2). If you want to
+use Cassandra, please proceed to step (3). If you want to use Cloudant, please proceed to step (4). If you want to use HBase,
+please proceed to step (5). If you want to use MongoDB, please proceed to step (6). If you want to use Couchbase, please
+proceed to step (7). If you want to use Aerospike, please proceed to step (8). If you want to use redis-cluster, 
+please proceed to step (9). 
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+Decide about which machine(s) [one or more] will be used to run the memcached server (e-g: server1 and server2 or more the merrier)
+
+1A) Install libevent package as described below:
+   a) Login as root and install one at a time on each of those machines.
+   b) Download the latest stable tar.gz file from http://libevent.org/
+   c) Unzip the tar.gz file
+   d) Change to the new unzipped directory
+   e) ./configure
+   f) make
+   g) make verify (Optional step that can be skipped)
+   h) make install
+   i) Logout as root and login as the regular user.
+   j) In the regular user's .bashrc, add this line: export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+   k) source ~/.bashrc
+
+1B) Install the memcached server by following these steps:
+   a) Ensure that you are logged in as root and install on each of your server machines.
+   b) wget http://memcached.org/latest
+   c) tar -xvzf memcached-1.x.x.tar.gz
+   d) cd memcached-1.x.x
+   e) ./configure --prefix=/usr/local/memcached
+   f) make
+   g) make test (Optional step that can be skipped)
+   h) make install
+   i) Logout as root
+
+1C) If you installed memcached, you can start memcached on one or more servers as shown below. 
+   a) On every memcached server machine, do this: export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+   b) Run memcached with at least 512 MB of memory cache: /usr/local/memcached/bin/memcached -m 512 -d -v -M
+      (For real-world applications, you may want to start it with several gigabytes of memory for the -m option.
+      The -d option will daemonize and run the memcached server in the background, the -v option will do logging
+      with a minimal verbosity, and the -M option will tell memcached not to delete existing data items when
+      memory is full and to simply return an error.)
+   c) If you have netcat installed on your Linux machine, you can do a quick test from a memcached client machine: 
+      echo "stats settings" | nc <memcached server name goes here> 11211 
+   d) Whenever you want to stop memcached, you can simply run:  killall memcached
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+2) Install the redis server by following these steps (This is for Redis 2.x that doesn't provide built-in 
+   multi-server cluster facility. However, DPS toolkit provides a way to achieve multi-server setup using Redis 2.x):
+   (No root access needed. You can install it in the regular Linux userid's home directory.)
+   a) wget http://download.redis.io/releases/redis-2.8.19.tar.gz
+   b) tar -xvzf redis-2.8.19.tar.gz
+   c) cd redis-2.8.19
+   d) unset ARCH
+   e) make
+   f) That is it. The binaries that are now compiled are available in the src directory for you to run the redis server.
+
+If you installed redis, you can start redis as shown below.
+
+a) You can configure redis at the least with these options.
+   i) In the src/redis.conf file, change the "daemonize" parameter from no to yes (It will make redis to run in the background).
+  ii) You can decide if you want "appendonly" to be yes (in order to protect your store data from machine crashes). [For initial tests, you may set this to no.]
+ iii) You can also search in this file for the following string (When you search, please add a space character next to the string that spells save):
+      
+      save 
+      
+      You will find three matching lines. For your initial tests, you may comment out these three lines and 
+      simply add a line above them as shown below:
+      
+      save ""
+      
+      This will avoid taking snapshots of memory contents to your disk. 
+  iv) At this time you may consider to configure other optional configurations such as master/slave, redis cluster, delete the dump.rdb file etc. or skip such options for now.
+  v)  After making a base configuration file as in the previous steps, you may make a copy of that file many times in that same directory as
+      redis.conf.1, redis.conf.2, redis.conf.3 etc. to start as many Redis servers you want to start on a single machine. In each of those files,
+      you must change the port number to a unique value and the PID file to a unique file name. While planning to run multiple Redis server
+      instances on a single machine for scaling purposes, take into account the total number of CPU cores available on that single machine.
+      Start only a suitable number of Redis server instances on a single machine to give them enough CPU cycles for handling your 
+      high workload of put/get requests. If you think, there are not enough CPU cores on a single machine, then you can consider running
+      Redis server instances on multiple machines. While running multiple Redis server instances either on a single machine or 
+      on multiple machines, the DPS logic will automatically shard (a.k.a spread) the put/get workload to different Redis server instances.
+b) After the above-mentioned configuration, from the redis-2.8.19/src directory, run this command:
+   ./redis-server  ../redis.conf
+   (If you are running multiple Redis server instances, you have to start each of them separately using their specific configuration file.)
+c) You can quickly verify if your redis installation works by doing these checks:
+   i) From the redis-2.8.19/src directory, run this command: redis-cli
+  ii) Once you are inside the redis client shell, type these commands:
+      redis> set foo bar
+      OK
+      redis> get foo
+      "bar"
+      redis> del foo
+      redis> exit
+d) Whenever you want to stop redis, you can simply run: killall redis-server
+e) Redis DPS API usage tips:
+   [With Redis 2.x, our DPS toolkit supports a multi-server setup. When there are multiple Redis servers configured,
+   using the dpsXXXXTTL APIs will provide a good scaling factor for your put/get requests than using the APIs that
+   take the user created store id as a function argument. You are encouraged to choose the APIs according to your
+   functional and scaling needs.] 
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+3) Install the Cassandra server by following these steps:
+   (No root access needed. You can install it in the regular Linux userid's home directory.)
+   [
+    Cassandra can be installed from RPM or from a tarball. It can also be installed in a cluster
+    configuration on multiple machines. To test the DPS functions, we only outline steps needed to
+    install Cassandra on a single machine version. You have to learn about Cassandra cluster installation and
+    do that on your own if a cluster configuration is needed.
+    
+    Cassandra is not a pure in-memory data store such as memcached and Redis. Cassandra is a NoSQL DB.
+    It provides replication, persistence, fault tolerance, and scaling to multiple machines by serving 
+    multiple concurrent client processes. Because of its writes/reads to/from hard disks/SSDs, its 
+    performance may be inferior to memcached and Redis. Since Cassandra uses both memory and 
+    hard disks for storing data, you have to configure your Cassandra cluster deployment for achieving
+    high read/write performance. Use of the SSD drives over regular hard drives is preferable. There are claims
+    and white papers by the famous Web companies that they have achieved 1 Million writes/sec within their 
+    Cassandra infrastruture by heavily parallalizing their put/get requests via multiple clients. We will
+    leave it to you in configuring your Cassandra environment the best way possible to get an acceptable performance.
+    Please test thoroughly to ensure your Cassandra environment is suitable for your Streams application performance
+    needs when you are thinking of using the DPS toolkit configured with Cassandra.
+    
+    Please be aware of the following details:
+       * For the Cassandra client driver, the DPS toolkit uses the CPP driver from DataStax. This driver's
+         version number is 1.0.1 (released in April/2015). In our extensive tests, this driver version
+         worked well on a single Cassandra server for all the DPS functions. We also did limited testing of this
+         driver on a 6 node Cassandra cluster.
+         
+       * Since Cassandra provides tunable consistency, an immediate read from a thread of a K/V pair right after it
+         was written by another thread in a Cassandra cluster may not return the newest value. Please read about
+         how Cassandra satisfies the AP properties in the CAP theorem.
+   ]
+    
+    a) wget http://www.eng.lsu.edu/mirrors/apache/cassandra/2.1.4/apache-cassandra-2.1.4-bin.tar.gz
+       [Or a later version if available.]
+    b) tar -xvzf apache-cassandra-2.1.4-bin.tar.gz
+    c) That is it. The binaries are now available in the apache-cassandra-2.1.4 directory for you to run the Cassandra server.
+    
+If you installed Cassandra, you can start Cassandra as shown below.
+    a) cd apache-cassandra-2.1.4/conf
+    b) Edit the cassandra.yaml file and see if you want to change any of the configuration values.
+       (Most importantly the data_file_directories, commitlog_directory, and saved_caches directory.
+        If you don't want to modify them, then you should export CASSANDRA_HOME in your .bashrc file to
+        point to the base Cassandra install directory. Then, all those three directories will default to
+        $CASSANDRA_HOME/data/data, $CASSANDRA_HOME/data/commitlog, $CASSANDRA_HOME/data/saved_caches directories.
+        You must ensure these directories exist on your Cassandra server. In addition, you will also have to
+        create a directory named $CASSANDRA_HOME/logs directory.)
+        In this configuration file, you may also want to verify the seeds, listen_address, rpc_address,
+        and broadcast_rpc_address fields. If you don't want the default 127.0.0.1 address, then you have to change it to
+        the correct IP address of your Cassandra server machine in those fields.
+    c) Cassandra 2.x requires that you have Java version 1.7u25 or later. If your machine doesn't have that version of Java,
+       running the Cassandra server will result in an error. You can get the latest version of Java that is greater than
+       1.7u25, from here and unzip it in your own directory and set the JAVA_HOME environment variable to that new Java directory.
+       
+       http://www.oracle.com/technetwork/java/javase/downloads/jdk7-downloads-1880260.html
+       (As of April/2015, the latest version of Java SDK from this URL is 1.7.0_79)
+       
+    d) You can now start Cassandra to run in the background using this command: $CASSANDRA_HOME/bin/cassandra
+    
+    e) You can quickly verify if your Cassandra installation works by doing these checks.
+       i)  From a terminal window, run $CASSANDRA_HOME/bin/cqlsh
+       ii) Type these commands inside the CQL shell:
+           describe keyspaces;
+           use keyspace system;
+           desc tables;
+           exit;
+
+    f) IMPORTANT FIRST STEP THAT USERS MUST PERFORM IN ORDER TO USE CASSANDRA AS A DATA STORE IN DPS.
+       i)   Pick any one of your Cassandra machines in your Cassandra environment.
+       ii)  On that machine, change directory to <CASSANDRA_INSTALL_DIR>/bin
+       iii) Run this command: ./cqlsh
+       iv)  In the CQL shell prompt, correctly type or copy/paste the following command and press enter.
+		    (If you have only one Cassandra server, substitute 1 in place of XXXX below. If you have
+		     more than one Cassandra server, substitute 2 in place of XXXX below. This value decides the
+		     number of replicas you want to have for your data inside Cassandra.)
+
+		    create keyspace com_ibm_streamsx_dps with replication = { 'class': 'SimpleStrategy', 'replication_factor': 'XXXX' };
+
+	   v) In that same CQL shell session, correctly type or copy/paste the following command and press enter.
+
+		   create table com_ibm_streamsx_dps.t1(r_key text, c_key text, b_val blob, t_val text, dbsig text, info text, PRIMARY KEY (r_key, c_key));
+
+	   vi) Type or copy/paste the following CQL shell commands one at a time to ensure that we got everything correctly.
+
+		   desc keyspaces;
+		   use com_ibm_streamsx_dps;
+		   desc tables;
+		   quit;
+
+    g) Whenever you want to stop Cassandra, you can run this command: pkill -f CassandraDaemon
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+    
+4) Install the Cloudant server by following these steps:
+   a) Beauty of Cloudant is, there is absolutely no installation needed.
+      One can go to cloudant.com and sign up for a user id that will immediately give free access for limited usage.
+      That is it. After that, you can configure your personalized cloudant URL in the ./etc/no-sql-kv-store-servers.cfg file and
+      start using the DPS APIs to read/write from/to the cloud based Cloudant DBaaS (Database as a service).
+      [IBM Cloudant provides both multi-tenant shared servers (free as well as fee based Gold support) and single-tenant
+       enterprise-grade dedicated servers. Depending on your scaling and performance needs, you can sign up for the 
+       appropriate DBaaS offering at the IBM Cloudant web site.]
+      
+   b) If you want an on-premises Cloudant solution, then you have to buy "Cloudant Local" from IBM and install/configure it
+      on your own machines placed within your firewall. Once that is working, you can configure the ./etc/no-sql-kv-store-servers.cfg
+      file with your "Cloudant Local" personalized URL and go from there.
+      
+   c) Since Cloudant uses HTTP round-trip and JSON for data exchange between the client applications and the Cloudant service,
+      performance may not be the same as Redis which is typically installed locally inside your company network and accessed via
+      C library APIs. For heavy real time workloads, you have to do your own detailed testing to see whether Cloudant will 
+      give you the required throughput and latency. However, Cloudant will be a very good fit for document based
+      data storage needs and transactional workloads. Those Streams users who don't want to maintain their own
+      NoSQL database and handle all the time intensive DB administrative tasks can evaluate the
+      Streams-->DPS-->Cloudant combination and see if that path will deliver you the optimal business value and ROI.
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+5) Install the HBase server by following these steps:
+   a) HBase installation is somewhat an involved process because it requires installing Hadoop, Zookeeper and then HBase. 
+      Since there are detailed steps needed for installing and configuring Hadoop, Zookeeper and HBase, we 
+      will not be able to cover them here. We let you figure out on your own to install and configure your environment
+      with Hadoop 2.5.1 or higher, Zookeeper 3.4.6 or higher and HBase 0.98.8 or higher. (If you want to know how we
+      installed and configured our HBase lab cluster to test the DPS toolkit, you may contact the author of the
+      DPS toolkit and obtain an informal set of instructions scribbled in a notebook.)
+   
+   b) DPS toolkit uses the REST APIs supported by HBase. After installing your Hadoop, Zookeeper, and HBase on one or more
+      machines, you can start all three of them. After starting them, you must start one or more instances of the
+      HBase REST server in your HBase infrastructure by using the following command.
+      
+      <YOUR_HBASE_INSTALL_DIR>/bin/hbase-daemon.sh  start rest -p <port>               [Default port is 8080] 
+      
+   c) Once your HBase servers are started along with the REST server instance(s), you can configure the
+       etc/no-sql-kv-store-servers.cfg file inside your SPL project directory with the HBase REST server
+       address(es) and go from there.
+       
+   d) HBase performance: Like the other NoSQL K/V stores (Cassandra and Cloudant), HBase also uses disk drives for
+      the read/write of K/V pairs instead of being a pure in-memory based solution. Because of that, HBase performance
+      will be subject to the disk access latencies. Then, the DPS way of accessing HBase via the REST APIs will also
+      influence the HBase performance that will be in-line with what is typically expected from the REST based access pattern.
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+    
+6A) Install the MongoDB server in a single server mode:
+   a) Download the 2.6.7 or a later version from the web or via the wget command 
+      https://www.mongodb.org/downloads
+      (OR)
+      wget http://downloads.mongodb.org/linux/mongodb-linux-x86_64-2.6.7.tgz
+       
+   b) Unzip the installation file in the Streams user's home directory: 
+      tar -xvzf mongodb-linux-x86_64-2.6.7.tgz
+       
+   c) Add the mongodb binaries to the path in your .bashrc file and then source the modified .bashrc file:
+      export PATH=<your-mongodb-install-directory>/bin:$PATH    
+       
+   d) Create data and log directories in the Streams user's home directory:  
+       mkdir   -p   ~/mongo-data/db   
+       mkdir   -p   ~/mongo-data/log
+       
+   e) Start MongoDB:
+      mongod --dbpath $HOME/mongo-data/db --logpath $HOME/mongo-data/log/mongod.log --fork --port 27017 --quiet
+   
+   f) When MongoDB is running, you can start its shell and play with the following commands to check if your installation is working.
+   
+      --> From your terminal command prompt, type this command to start the shell: mongo
+      --> Once inside the shell, type these commands:
+          show dbs
+          use mydb
+          j = {name: 'mongo'}
+          k = {x: 45}
+          db.testData.insert(j)
+          db.testData.insert(k)
+          show collections
+          db.testData.find()
+          db.testData.find({x: 45})
+          db.testData.drop()
+          show collections
+          db.dropDatabase()
+          show dbs
+          exit 
+
+   g) Stop MongoDB:
+      mongod --dbpath $HOME/mongo-data/db --shutdown
+
+6B) Install the MongoDB server with multiple instances on one or more machines as a Replica Set:
+
+If you want to have multiple instances of the MongoDB servers running on one or machines, you can
+install and configure the MongoDB Replica Set. It is very easy to do. Official MongoDB documentation
+recommends the following. 
+
+"Three member replica sets provide enough redundancy to survive most network partitions and other system failures.
+These sets also have sufficient capacity for many distributed read operations. Replica sets should always have
+an odd number of members. This ensures that elections will proceed smoothly."
+
+DPS toolkit was tested with a three member MongoDB replica set in the IBM Streams lab and it worked well.
+
+(If you want to know how we installed and configured our Mongo replica set to test the DPS toolkit, you may
+contact the author of the DPS toolkit and obtain an informal set of instructions scribbled in a notebook.)
+
+(OR)
+
+You can install and configure a three member replica set on your own by following these official MongoDB instructions:
+http://docs.mongodb.org/manual/tutorial/deploy-replica-set-for-testing
+
+When you are ready to use your Mongo replica set with the DPS toolkit, you must configure the 
+etc/no-sql-kv-store-servers.cfg file inside your SPL project directory with the replica members'
+addresses and go from there.
+
+6C) Install the MongoDB sharded cluster
+
+If you want to have a sharded cluster with multiple Mongo instances providing load balancing,
+high availability and fail-over features, you have to perform the required Mongo installation steps.
+
+DPS toolkit was tested on a 5 machine sharded cluster with a total of 20 shards where each shard is
+made of a three member replica set i.e. with a total of 60 replica members. 
+
+If you want to know how we installed and configured our Mongo sharded cluster to test the DPS toolkit, you may
+contact the author of the DPS toolkit and obtain an informal set of instructions scribbled in a notebook.)
+
+(OR)
+
+You can install and configure a sharded cluster on your own by following these official MongoDB instructions:
+http://docs.mongodb.org/manual/tutorial/deploy-shard-cluster
+
+When you are ready to use your Mongo sharded cluster with the DPS toolkit, you must configure the 
+etc/no-sql-kv-store-servers.cfg file inside your SPL project directory with the mongos query router
+addresses and go from there.
+
+Important tips about Sharding enablement for the DPS database and the DPS created collections in Mongo:
+
+If you are using a sharded cluster, then you must manually enable sharding for the ibm_dps database and
+the collections created by the DPS in Mongo. When you run your Streams application that uses the DPS APIs, 
+a Mongo database named ibm_dps will be automatically created. All the stores you create via the DPS APIs 
+inside your Streams application will be held within that database as Mongo collections. For the high volume
+stores for which you want to enable sharding to achieve load balancing, fail-over and HA features, 
+the following suggestion will be applicable.
+[Following steps are also explained well in the sharded cluster Mongo tutorial URL shown above.]
+
+a) Start your Streams application and create the high volume stores via the DPS APIs during the warm-up phase of
+   your application initialization. Ideally, your stores should be empty until we manually perform the steps below.
+   
+b) From a terminal window, connect to your mongos (query router) instance:
+   mongo --host <hostname of machine running mongos> --port <port mongos listens on>
+
+c) Inside the mongos shell, type this command to enable sharding for the DPS database in Mongo:
+   use ibm_dps
+   show collections
+   sh.enableSharding("ibm_dps")
+
+d) Inside the mongos shell, type this command to enable sharding for your high volume stores (i.e. Mongo collections):
+   sh.shardCollection("ibm_dps.XXXXXXXX", { "_id": "hashed" } )
+   
+   In the command shown above, you must substitute XXXXXXXX with the mongo collection name of your DPS high volume store.
+   e-g: sh.shardCollection("ibm_dps.dps_ttl_kv_global_store", { "_id": "hashed" } )
+   
+   The command shown above to shard a collection will work only when that collection is empty.
+   If your Mongo collection already has data (K/V pairs) in it, then you must first create an index on that collection
+   as shown below. After that, you have to run the sh.shardCollection command shown above.
+   db.YOUR_COLLECTION_NAME.ensureIndex( { _id: 1 } )
+   
+e) Following is a screen capture of the results for those two commands we issued while testing the DPS toolkit in the IBM Streams lab:
+
+mongos> sh.enableSharding("ibm_dps")
+{ "ok" : 1 }
+mongos> sh.shardCollection("ibm_dps.dps_ttl_kv_global_store", {"_id": "hashed"})
+{ "collectionsharded" : "ibm_dps.dps_ttl_kv_global_store", "ok" : 1 }
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+7) Install the Couchbase server:
+   a) Download the Couchbase 3.0.2 or a later version via the wget command in the Streams user's home directory.
+       wget   http://packages.couchbase.com/releases/3.0.2/couchbase-server-enterprise-3.0.2-centos6.x86_64.rpm
+       
+   b) If you have root access, you can follow the regular RPM install procedure found in the Couchbase documentation.
+      But, in our IBM Streams lab, we did a non-root installation by using the steps described here.
+      
+      --> Create a directory for couchbase in your Linux home directory:   mkdir    ~/couchbase
+      --> Move the RPM file (as downloaded in the previous step) into this couchbase directory.
+      --> Create a directory called ~/couchbase/m1 and change to the ~/couchbase/m1 directory.
+      
+   c) Install Couchbase (non-root installation)
+      --> Run this command (It will take about 2 minutes to extract the files): 
+          time    rpm2cpio      ~/couchbase/couchbase-server-enterprise-3.0.2-centos6.x86_64.rpm      |      cpio     --extract      --make-directories      --no-absolute-filenames
+          [In the directory where the files were extracted, the opt and etc subdirectories are available now.] 
+      --> Download the OpenSSL RPM file from this URL into the ~/couchbase directory:
+           wget        http://ftp.pbone.net/mirror/ftp.centos.org/6.5/os/x86_64/Packages/openssl098e-0.9.8e-17.el6.centos.2.x86_64.rpm
+      --> Change to the directory ~/couchbase/m1/opt/couchbase and give the following command to extract the contents of the OpenSSL RPM file:
+           time    rpm2cpio       ~/couchbase/openssl098e-0.9.8e-17.el6.centos.2.x86_64.rpm       |     cpio     --extract     --make-directories    --no-absolute-filenames
+      --> Move the extracted files to the /lib directory for Couchbase Server:    mv      usr/lib64/*        lib/
+      --> From the ~/couchbase/m1/opt/couchbase directory, run the following password-related script: 
+          ./bin/install/reloc.sh        `pwd` 
+          [This enables you to continue the installation and other Couchbase start/stop operations  as a non-root, non-sudo user.]
+      
+   d) Run the server now from the   ~/couchbase/m1/opt/couchbase directory:
+      ./bin/couchbase-server       \--      -noinput     -detached 
+      [This command will start around 14 background processes. Wait for all of them to get started.]
+       
+   e) If you want to install a cluster of five Couchbase servers on multiple machines, you can create additional directories 
+      ~/couchbase/m2, ~/couchbase/m3, ~/couchbase/m4, ~/couchbase/m5 and you can follow the steps (c) through (d) after 
+      changing to a particular directory (m2, m3, m4, and m5) to get them up and running on all the five servers.
+
+   f) Point a web browser to your Couchbase server:    http://couchbase-server-name:8091
+      Go through all the setup process steps shown below: 
+      i)    In the opening web page, click on Setup.
+      ii)   In the resulting page, enter your fully qualified machine name of your Couchbase server or a valid IP address of your Couchbase server in the Hostname field.
+      iii)  In the same page, adjust the Per Server RAM Quota under the "Start a new cluster" as needed.  (i.e. do this if you are 
+            configuring your very first Couchbase server) (OR) If this is your additional Couchbase server to an existing cluster,
+            then click on "Join a cluster now" and fill in your first Couchbase server name or IP address with your
+            cluster admin userid and password.
+      iv)   Click Next.
+      v)    In the resulting page you can ignore configuring sample buckets and click Next.
+      vi)   In the resulting page, it will force you to create a default bucket. We will configure it now and delete it later as we
+            don't need this bucket to take all the memory.
+            Change the Per Node RAM Quota for the default bucket to be 100 MB and click Next.
+      vii)  In the resulting page, you may disable the "Enable software update notifications'. Then agree to the terms and click Next.
+      viii) In the resulting page, you must create your Couchbase cluster admin userid and password. (This information will be
+            required later to configure the DPS toolkit).
+            Click Next to finish configuring your very first Couchbase server.
+      ix)   You can now click on the "Data Buckets" tab at the top.
+            Expand the arrow that is displayed to the left side of the default bucket.
+            In the expanded GUI panel, click on Edit.
+            In the resulting dialog box, scroll to the bottom and click on the Delete button to get rid of the default bucket completely.      
+      x)    If you are doing a Couchbase cluster installation, then you can click on "Server Nodes" at the top and in the resulting page
+            click on "Add Server" to add your remaining servers to the cluster.
+            After completely adding all your servers to the cluster, remember to click on "Rebalance" button to rebalance your cluster.
+      xi)   Now that your single or multi-machine Couchbase infrastructure is up and running, you can go ahead and configure the
+            DPS toolkit with your Couchbase server details in the following file.
+            (Edit your SPL project's etc/no-sql-kv-store-servers.cfg file. There are instructions in this file about how to specify 
+             your Couchbase server details.)
+                                                                                                                                                                                    
+   g) Whenever you want to stop the Couchbase server, give this command from the  ~/couchbase/opt/couchbase directory.   
+      ./bin/couchbase-server     -k
+      
+   h) Additional general tips about Couchbase you should be aware of before using Couchbase with the Streams DPS toolkit:
+      --> Since Couchbase uses the CouchDB open source technology for its storage backend, its overall
+          performance is in-line with other disk based NoSQL technologies such as Cloudant, HBase, Cassandra etc. 
+          If that kind of performance results are fine for your Streams applications, you may consider
+          using Couchbase. Otherwise, it is not as fast as Redis.
+      --> libEvent RPM is expected to be there on the RHEL6 machines to install and work with Couchbase.
+          e-g: libevent-1.4.13-4.el6.x86_64
+      --> Couchbase uses 8091 for web admin server and 8092 for working with bucket views.
+          (Ensure other web apps don't conflict with these ports.)
+      --> In the DPS toolkit, Couchbase RAM bucket quota is hard coded to a specific size per machine. (100 MB per machine)
+          If a bigger size is needed, you must rebuild the DPS .so library.
+      --> Couchbase allows only a maximum of 10 buckets to exist at any given time. If you need more than 10 stores to be
+          active at the same time, Couchbase may not be a suitable technology for your needs. (This is valid as of Jan/2015)
+      --> Couchbase inherits from memcached roots. As in memcached, Couchbase also has a limitation of maximum key length to be
+          250 bytes. Certain use cases that require keys greater than 250 bytes will fail when Couchbase is used as a 
+          back-end data store in the Streams DPS toolkit.
+      --> Some of the Couchbase client APIs require HTTP REST acceess which will need your Couchbase admin userid and password.
+          Hence, in the DPS toolkit configuration file, you must give the userid:password information as explained in that .cfg file.
+      --> Since creating, deleting, and getting the size of Couchbase buckets are done through HTTP REST, these APIs will complete
+          and return successfully. However, the actual creation, deletion and getting the size of buckets via memory and disks will take
+          extra time to be really ready after completing those operations. When we tried to do something immediately after those REST
+          APIs return back, we observed critical API errors getting returned in our repeated tests. Hence, inside the DPS toolkit,
+          we are artificially imposing a 10 seconds delay after the Couchbase create/delete/getSize operations on buckets.
+          That artificial delay needs to be accounted for when you plan about the overall end-to-end performance of your Streams 
+          applications with Couchbase configured as a DPS back-end data store.
+      --> Couchbase client libraries are not supported on IBM Power machines. Hence, you can use the Streams DPS tookit configured with
+          the Couchbase NoSQL server(s) only on Intel x86 servers and not on IBM Power machines.
+      --> In rare cases, after a repeated sequence of store operations using Couchbase, you may notice stale locks or 
+          stores never getting deleted after you are completely done with them. If you observe that condition, you can manually
+          and carefully delete the leftover Couchbase documents/buckets in the DPS stores using the Couchbase web console.
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+8) Install the Aerospike server:
+   
+   Installing and running the Aerospike NoSQL DB either in a single server mode or in a multi-server cluster mode is very simple.
+   Following steps are for installing Aerospike on a single x86 machine. To install Aerospike on a cluster of machines, you can
+   simply repeat the same steps described below on every machine in your cluster.
+   
+   IMPORTANT
+   ---------
+   To install and start Aerospike, it is necessary to have either root access or sudo permissions to the
+   user id that will be used to run the Streams application.
+   
+   a) At first, ensure that your RHEL6 x86 server has the following OpenSSL RPM installed. Aerospike depends on that.
+      openssl-1.0.1e-30.el6  or a later verion is needed.
+
+   b) From the Streams user's home directory, give the following command:
+      wget        -O       aerospike.tgz         'http://aerospike.com/download/server/latest/artifact/el6'
+      (It will fetch the latest Aerospike Community Edition [3.4.1 or a higher version])
+   
+   c) From your home directory, extract the contents of the downloaded file:
+      tar      -xvzf        aerospike.tgz
+      
+   d) Change to this Aerospike installation package directory:
+      cd        ~/aerospike-server-community-*-el6
+      
+   e) Give this command to install the RPMs for Aerospike server and tools:
+      sudo         ./asinstall
+      
+   f) Give this command to start the Aerospike server:
+      sudo          service          aerospike         start
+      
+   g) To confirm that Aerospike started correctly, type this command 10 seconds after running the previous command:
+      sudo     cat      /var/log/aerospike/aerospike.log      |        grep    -i   cake
+      
+      If you see this message, then Aerospike started successfully:       "service ready: soon there will be cake!"
+
+      (OR)  You can try this command as well:
+      sudo         service          aerospike          status
+
+   h) You can use the Aerospike CLI tool to verify the basic functions by typing the following CLI commands:
+      (Insert commands)
+      cli     -h    YOUR_AEROSPIKE_SERVER_NAME      -n     test     -o     set      -k      MyKey     -b       company      -v      "IBM"
+      cli     -h    YOUR_AEROSPIKE_SERVER_NAME      -n     test     -o     set      -k      MyKey     -b       hq           -v      "Armonk, NY"
+      cli     -h    YOUR_AEROSPIKE_SERVER_NAME      -n     test     -o     set      -k      MyKey     -b       industry     -v      "Information Technology"
+
+      (Read command)
+      cli     -h     YOUR_AEROSPIKE_SERVER_NAME      -n       test       -o        get           -k           MyKey
+
+      (Delete command)
+      cli      -h        YOUR_AEROSPIKE_SERVER_NAME        -n          test              -o          delete              -k          MyKey
+      
+   i) If everything worked fine, you may want to delete the installation file downloaded in step (b) and 
+      the installation package directory created in step (c).
+      
+   j) You can use a tool named asinfo to perform many Aerospike administrative tasks.
+      List all the namespaces currently available:   asinfo    -v    'namespaces'
+      List the unique id of the current machine:     asinfo    -v    'node'
+      List the log file locations in use by this Aerospike server:   asinfo     -v     'logs'
+      List the IP address and port number for this Aerospike server:   asinfo     -v     'service'
+
+      You can find more asinfo commands in this URL:   http://www.aerospike.com/docs/reference/info/ 
+  
+   k) If you want to stop Aerospike, give the following command:
+      sudo          service          aerospike         stop
+      
+   l) VERY IMPORTANT TO-DO ITEM
+      -------------------------
+      To use your Aerospike server with the Streasms DPS toolkit, you must manually create a namepsace called ibm_dps in your Aerospike infrastructure.
+
+      i)    As a root user, change to /etc/aerospike directory.
+      ii)   Take a backup of the original versions of the two configuration files there (aerospike.conf and aerospike_ssd.conf)
+      iii)  Open the aerospike.conf file in a text editor and search for this: namespace bar
+      iv)   Copy the entire block for 'namespace bar' and paste it at the end of that same file.
+      v)    In the paste block of text, change the namespace from bar to ibm_dps
+      vi)   Inside the configuration block for ibm_dps, change these configuration parameters as needed for your project:
+            replication-factor, memory-size, default-ttl (0 is a suggested value for use with DPS),  storage-engine (memory, disk or both).
+            If you select to use disk as the storage engine, please ensure that ibm_dps.dat is the storage filename. 
+      vii)  In that same configuration file, search for logging and see if you want to change the logging severity level from info to
+            any of the other two less verbose log levels (warning or critical).
+      viii) If you have SSD drives in your Aerospike cluster, then you can copy/paste the example SSD configuration block from the
+            aerospike_ssd.conf file and modify it to suit your needs.   
+
+   m) At this time, you can stop the Aerospike server and start it again (as root or as a sudo user) for the ibm_dps namespace to get created.
+   
+   n) You can ensure that the ibm_dps namespace is available now by running this command:       asinfo    -v    'namespaces'
+   
+   o) Aerospike also provides a utility called aql which will provide a shell in which you can type commands such as the following:
+      show namespaces
+      show sets
+      show bins
+      select * from ibm_dps.dps_store_id_tracker
+      
+   p) To uninstall Aerospike from your machines, run the following commands either as root or with sudo permissions.
+      (Change the RPM names below with the correct version numbers as needed.)
+      
+      sudo     service      aerospike     stop
+      sudo     rpm     -e        aerospike-server-community-3.4.1-1.el6.x86_64
+      sudo     rpm     -e        aerospike-tools-3.4.1-1.el6.x86_64
+      sudo     rm      -rf        /etc/aerospike
+      sudo     rm      -rf        /opt/aerospike
+      
+   q) Additional general tips about Aerospike you should be aware of before using Aerospike with the Streams DPS toolkit:
+      --> Any given Aerospike namespace can have only a maximum of 1023 Set collections in it. That means, in our
+          ibm_dps namespace, there can only be a maximum of 1023 stores possible. DPS will use sets 1001 to 1023 for its
+          internal needs. So, there is a maximum limit of how many user created stores can be active at a time.
+          That limit is set to 1000 user created stores. If your use case needs more than 1000 user created stores to be
+          active at any given time, then Aerospike will have a problem in satisfying that need.
+
+      --> Unlike the other NoSQL K/V supported by the DPS, Aerospike doesn't have a single API to clear the store contents or
+          to delete an entire store. These two actions are done by Aerospike scan APIs which work via a callback method
+          for every single record in the given Set (i.e. store). So, please be aware that clearing or deleting a store with
+          hundreds of thousands of K/V pairs will take considerable amount of time.
+          
+      --> Aerospike doesn't provide an API to completely get rid of a Set (i.e. store). Hence, DPS has to do some tricks
+          internally to keep reusing the store ids among the 1023 available total slots. If you ever get into a situation
+          where a store (Set) must be completely removed, there is no API to do that. However, there is a roundabout way of 
+          doing it manually via an Aerospike command-line utility. A user has to do this very rarely.
+          If that is ever needed, please refer to the next section where we discuss about this.
+          
+      --> Aerospike client libraries are not supported on IBM Power machines. Hence, you can use the Streams DPS tookit configured with
+          the Aerospike NoSQL server(s) only on Intel x86 servers and not on IBM Power machines.
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+9) Install the redis-cluster:
+
+Redis 3.0.0 and higher versions provide a new feature to install and run a Redis cluster.
+In this version, you can install multiple instances of Redis and configure them with a replication factor.
+For every master Redis instance you can have one or more slaves instances. When the DPS toolkit writes 
+data into the Redis 3.x cluster, they will be automatically sharded and distributed among all the master
+Redis instances running on your Redis cluster. Just to remind you, in the case of Redis 2.x multi-server
+setup, our DPS toolkit provides a way to accomplish sharding of your data among those Redis 2.x servers.
+In Redis 3.x, automatic sharding is a built-in feature. Another important feature in Redis 3.x
+is that when a master Redis instance fails, its slave copy will automatically take-over the operation with no
+disruption to the Redis client applications.
+
+According to the Redis 3.x official documentation, this is what you get with Redis Cluster:
+
+* The ability to automatically split your dataset among multiple nodes.
+
+* The ability to continue operations when a subset of the nodes are experiencing
+  failures or are unable to communicate with the rest of the cluster.
+        
+To install, configure, start and stop a multi-server Redis 3.x cluster is somewhat involved.
+You can follow the instructions published here by the Redis release team: 
+
+http://redis.io/topics/cluster-tutorial
+
+In our Streams lab, we tested the DPS toolkit on a 10 server Redis 3.x cluster and everything worked fine.
+If you want to know how we installed and configured our Redis 3.x cluster to test the DPS toolkit, you may
+contact the author of the DPS toolkit and obtain an informal set of instructions scribbled in a notebook.
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+How about the client installation for memcached or redis or cassandra or cloudant or hbase or mongodb or couchbase or aerospike or redis-cluster?
+-------------------------------------------------------------------------------------------------------------------------------------------------
+In order to run and use the DPS toolkit, it is important to have the no-sql store client software available
+on all the machines where the Streams applications will be running. Does that mean, we have to now go and install
+our chosen backend data store client software on several dozens of machines? The answer is an
+emphatic "No". Because, we made that job so easy for you. There is no need to install any of the memcached or
+redis or cassandra or cloudant or hbase or mongodb or couchbase or aerospike or redis-cluster client software on one or more of
+your Streams application machines. As part of this toolkit, we already packaged the client libraries (.so files)
+for memcached, redis, cassandra, cloudant, hbase, mongodb, couchbase, aerospike and redis-cluster. Our DPS implementation uses the
+popular libmemcached C client for accessing the memcached no-sql store. It uses the fantastic hiredis C client for
+accessing the redis no-sql store. It uses the Cassandra C++ client driver from DataStax for working with the Cassndra
+servers. For Cloudant, we use the libcurl and libjson-c client libraries. For HBase, we use the same libcurl and
+libjson-c client libraries. For MongoDB, we use the libbson and libmongoc client libraries. For Couchbase, we use the
+libcouchbase client library. For Aerospike, we use the libaerospike client library. Library files for all of them are
+included in the impl/lib sub-directory inside the DPS toolkit. For redis-cluster, we used the same hiredis C client
+coupled with the hiredis-cluster wrapper include files published by the Redis release team in April/2015.
+
+At this time, we support the DPS toolkit on both x86 and IBM Power servers installed with one of
+these Linux flavors: RHEL6, CentOS6 or on IBM Power servers using PPC64-RHEL6.
+
+While running the DPS APIs with Cassandra, all the Streams application data will be stored inside the
+com_ibm_streamsx_dps keyspace. If you encounter any severe errors while executing the DPS APIs, then you
+may have to stop your Streams applications and drop the entire Cassandra keyspace com_ibm_streamsx_dps by using the cqlsh shell.
+Please be aware that this action will delete everything your application stored in Cassandra via the DPS toolkit functions.
+If you don't prefer this approach, then you have to programmatically clean the database or login to the
+Cassandra cqlsh application and manually do the DB cleanup.
+
+While running the DPS APIs with Cloudant, all the Streams application data will be stored in their own Cloudant
+databases. Meta data about your K/V data will be stored in a Cloudant database called dps_dl_meta_data. If you encounter
+any severe errors while testing the DPS APIs, then you may have to stop your Streams applications and delete your
+application specific state databases that have their names starting with dps_1_XXXXXXX and the meta data DB mentioned above.
+Please be aware that this action will delete everything your application stored in Cloudant via the DPS toolkit functions.
+If you don't prefer this approach, then you have to programmatically clean the database or login to the Cloudant browser GUI and
+manually do the DB cleanup.
+
+While using Aerospike with the DPS toolkit, if for some reason there is an error in a store you created and the DPS toolkit
+struggles to delete that toolkit, you may want to manually delete that store which behind the scenes uses an Aerospike Set data structure.
+A quick way to delete an Aerospike Set manually:   [DPS toolkit uses a dedicated Aerospike namespace called ibm_dps]
+i)   asinfo -v "set-config:context=namespace;id=<name space>;set=<set name>;set-delete=true;"
+ii)  Stop and start the Aerospike server.
+iii) Ensure that the set is deleted via the aql shell.
+
+Steps to build and run the packaged example application to showcase all the DPS features
+-----------------------------------------------------------------------------------------  
+One good way to learn about using the Streams toolkits is to work through the built-in examples packaged inside
+of those toolkits. Our DPS toolkit takes no exception when it comes to assisting the developers with high quality examples.
+DPS toolkit is driven 100% via its rich set of APIs. That makes it even more important for developers to build
+expertise on the calling syntax of the DPS APIs in the context of the SPL/C++/Java operators. One can browse
+the examples mentioned below or the APPENDIX A below and search for any of the DPS APIs. 
+
+Following are the steps required to build and run the packaged SPL example application to showcase all the DPS features.
+If you really want, the DPS core C++ code artifact can be built into a .so file before attempting to verify
+this toolkit. But, there is no need for that since we have already pre-built and packaged it for you inside
+this toolkit's impl/lib directory. Unless you really want to build the DPS .so library on your own just to learn that aspect,
+you can skip steps 1 and 2 below.
+
+1) Switch to <your_base_dir>/com.ibm.streamsx.dps/impl directory and run ./mk
+2) If ./mk worked correctly, it should have built and copied the .so file to the following location.
+   <your_base_dir>/com.ibm.streamsx.dps/impl/lib/x86_64.RHEL6 (If you are builing it on a RHEL6 server.)
+3) Switch to <your_base_dir>/com.ibm.streamsx.dps/impl/java/src/com/ibm/streamsx/dps/impl and run ./build_dps_helper.sh
+   This will create a new dps-helper.jar file in the impl/java/bin directory. This is needed to access the DPS
+   functions from a Java primitive operator.
+
+4) You have to edit the <your_base_dir>/com.ibm.streamsx.dps/samples/dps_test1/etc/no-sql-kv-store-servers.cfg file and add the names or the
+   IP addresses of your memcached or redis or Cassandra or Cloudant or HBase or Mongo or Couchbase or Aerospike or Redis-Cluster servers.
+   Then, save the file.
+5) Switch to <your_base_dir>/com.ibm.streamsx.dps/samples/dps_test1/bin directory and run this script: ./build-distributed.sh.
+   [Note: Whenever you change the DPS configuration file as shown in step 4, you must build the application and ensure that
+    the application bundle (sab) file in the output directory has a new file modification time. If that file's modification time
+    indicates that the sab file never got updated, then you must completely remove 
+    <your_base_dir>/com.ibm.streamsx.dps/samples/dps_test1/output directory and build again. If you don't do this, your DPS configuration
+    changes will not take effect. As of Apr/2015, this is a new requirement/restriction in Streams 4.x to update the
+    application bundle with your modified DPS configuration file. This requirement/restriction will be eliminated in a future release.]
+6) To test the application, you can run this script from <your_base_dir>/com.ibm.streamsx.dps/samples/dps_test1/bin: ./run-distributed.sh -i <YOUR_STREAMS_INSTANCE_NAME>
+7) You can verify the application results in the Streams PE log files.
+   --> You have to first read the SPLMM file and understand which operator writes what in the PE log files.
+8) After verifying the results produced by this test application, you can now run this script from the bin directory: ./stop-streams-instance.sh -i <YOUR_STREAMS_INSTANCE_NAME>
+9) You can use the code shown in the SPLMM file as a reference and take advantage of the DPS APIs in your  
+   own applications to share data across multiple PEs running on multiple applications/machines. All you have to do is
+   simply compile your application with -t <path_containing_the_dps_toolkit_directory> and then add the following
+   two statements at the top of your SPL or splmm file(s).
+   
+   use com.ibm.streamsx.store.distributed::*;
+   use com.ibm.streamsx.lock.distributed::*;
+
+10) If you want to use the DPS functions within a C++ or a Java primitive operator or within your C++ native functions, 
+    please download the SPL-Examples-For-Beginners package (simply google search for it) and refer to a very comprehensive
+    set of examples in that package as listed below. 
+
+    058_data_sharing_between_non_fused_spl_custom_and_cpp_primitive_operators
+    061_data_sharing_between_non_fused_spl_custom_operators_and_a_native_function    
+    062_data_sharing_between_non_fused_spl_custom_and_java_primitive_operators
+==================================================================================
+
+
+
+Good luck with sharing your data using the Streams Distributed Process Store (DPS)                      
+
+
+
+==================================================================================
+APPENDIX A
+
+Description about the available DPS APIs
+----------------------------------------
+As already mentioned, a good way to learn about using the DPS APIs is to read the code inside the 
+comprehensive DPS examples cited above and observe how those examples handle the DPS APIs that
+you are interested in using. DPS APIs are callable functions that can be arbitrarily invoked from
+anywhere within your SPL, C++, and Java operator code. DPS APIs are divided into three major groups. 
+
+--> APIs to work with the User created stores
+--> APIs to work with the TTL global store in which K/V pairs can be configured to expire after a certain time period
+--> APIs to work with the distributed locks
+
+You will find descriptions below that explain about the usage of the DPS APIs inside the 
+SPL/C++/Java operator code. For using the DPS APIs in your Java operators, you have to use a
+slightly different syntax that adopts an Object Oriented style as shown below. 
+
+In your SPL source files, you must add the following two statements in order to resolve the DPS APIs:
+
+   use com.ibm.streamsx.store.distributed::*;
+   use com.ibm.streamsx.lock.distributed::*;
+
+In your Java source files, you must add the following two statements in order to resolve the DPS APIs:
+
+   import com.ibm.streamsx.dps.*;
+   import com.ibm.streamsx.dl.*;
+
+--> APIs to work with the user created stores
+    -----------------------------------------
+[A DPS store is a container in which K/V pairs can be created, retrieved from, updated and deleted.
+ DPS users can create their own stores to share their application-specific data across multiple
+ Streams processing elements (PEs) across multiple Streams applications running on one or more
+ machines. DPS users are responsible for managing the lifecycle of a store they create using the
+ many APIs described below.]    
+    
+******************************************************************************************
+* dpsCreateStore, dpsCreateOrGetStore, dpsFindStore, dpsRemoveStore, dpsPut, dpsPutSafe, *
+* dpsGet, dpsGetSafe, dpsRemove, dpsHas, dpsClear, dpsSize,                              *
+* dpsBeginIteration, dpsGetNext, dpsEndIteration, dpsSerialize, dpsDeserialize,          *
+* dpsGetStoreName, dpsGetSplTypeNameForKey, dpsGetSplTypeNameForValue,                   *
+* dpsGetNoSqlDbProductName, dpsGetDetailsAboutThisMachine, dpsRunDataStoreCommand,       *
+* dpsBase64Encode, dpsBase64Decode, dpsGetLastStoreErrorCode, dpsGetLastStoreErrorString *
+******************************************************************************************   
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>  
+  
+1) dpsCreateStore  (Create a new store)
+
+uint64 dpsCreateStore(rstring storeName, T1 dummyKey, T2 dummyValue, mutable uint64 err)
+
+This function creates a new store with a given store name. You must specify a dummy variable
+to indicate the type of your key and another dummy variable to indicate the type of your value.
+These dummy variables are used for certain book-keeping inside of the DPS library code. You must
+also provide a mutable variable to receive the DPS error code in case of a problem in creating
+a new store.
+
+On a successful store creation it assigns a value of 0 to the err variable passed as an argument.
+In the case of a successful operation, it returns the store id and it is advisable to cache the
+store id in your application-specific SPL or C++ or Java variable. In case of an error, it assigns a
+non-zero value to the err variable. To get the detailed information about the most recent
+DPS API error, you can call the dpsGetLastStoreErrorCode and the dpsGetLastStoreErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 err = 0ul;
+mutable uint64 s = 0ul;
+rstring dummyRstring = "";
+uint32 dummyUint32 = 0u;
+s = dpsCreateStore("myDBStore1", dummyRstring, dummyUint32, err);
+
+if (err != 0ul) {
+   printStringLn("Unexpected error in creating a store named myDBStore1: rc = " + 
+      (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
+}
+
+Example Java code snippet:
+
+StoreFactory sf = DistributedStores.getStoreFactory();
+Store store = null;
+
+try {
+   store = sf.createStore("Java Test Store1", "boolean", "boolean");
+   System.out.println("Created the Java Test Store1 with a storeId of " + store.getId()); 
+} catch (StoreFactoryException sfe) {
+   System.out.println("Unable to create the Java Test Store1. Error code = " + 
+      sfe.getErrorCode() + ", Error Msg = " + sfe.getErrorMessage());
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+2) dpsCreateOrGetStore  (Create a new store if not exists or return a store if it exists)
+
+uint64 dpsCreateOrGetStore(rstring name, T1 key, T2 value, mutable uint64 err)
+
+This function creates a new store with a given store name if that store doesn't exist already.
+If the store is already present, then it simply returns the id of that store.  You must specify a
+dummy variable to indicate the type of your key and another dummy variable to indicate the type of
+your value. These dummy variables are used for certain book-keeping inside of the DPS library code.
+You must also provide a mutable variable to receive the DPS error code in case of a problem in
+creating a new store or getting an existing store.
+
+On a successful create or get store operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns the store id and it is advisable to
+cache the store id in your application-specific SPL or C++ or Java variable. In case of an error,
+it assigns a non-zero value to the err variable. To get the detailed information about the most recent
+DPS API error, you can call the dpsGetLastStoreErrorCode and the dpsGetLastStoreErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 err = 0ul;
+mutable uint64 k = 0ul;
+list<rstring> dummyRstringList = ["1", "2"];
+map<rstring, uint64> dummyRstringUint64Map = {"a":34ul, "b":45ul};
+k = dpsCreateOrGetStore("My Mega Store1", dummyRstringList, dummyRstringUint64Map, err);
+
+if (err != 0ul) {
+   printStringLn("Unexpected error in creating or getting a store named My Mega Store1: rc = " +
+      (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
+}	
+
+Example Java code snippet:
+
+StoreFactory  sf = DistributedStores.getStoreFactory();
+Store store = null;
+
+try {
+   store = sf.createOrGetStore("Java Test Store1", "boolean", "boolean");
+   System.out.println("Created or obtained the Java Test Store1 with a storeId of " + store.getId()); 
+} catch (StoreFactoryException sfe) {
+   System.out.println("Unable to create or get the Java Test Store1. Error code = " + 
+      sfe.getErrorCode() + ", Error Msg = " + sfe.getErrorMessage());
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+3) dpsFindStore  (Find a store)
+
+uint64 dpsFindStore(rstring name, mutable uint64 err)
+
+This function finds a store with a given store name. You must provide a mutable variable to receive
+the DPS error code in case of a problem in finding the store.
+
+On a successful find store operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns the store id and it is advisable to
+cache the store id in your application-specific SPL or C++ or Java variable. In case of an error,
+it assigns a non-zero value to the err variable. To get the detailed information about the most recent
+DPS API error, you can call the dpsGetLastStoreErrorCode and the dpsGetLastStoreErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 err = 0ul;
+mutable uint64 k = 0ul;
+k = dpsFindStore("My Mega Store1", err);
+
+if (err != 0ul) {
+   printStringLn("Unexpected error in finding a store named My Mega Store1: rc = " +
+      + (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
+}	
+
+Example Java code snippet:
+
+StoreFactory  sf = DistributedStores.getStoreFactory();
+Store store = null;
+
+try {
+   store = sf.findStore("Java Test Store1");
+   System.out.println("Found the Java Test Store1 with a storeId of " + store.getId());
+} catch (StoreFactoryException sfe) {
+   System.out.println("32) Unable to find the Java Test Store1. Error code = " +
+      sfe.getErrorCode() + ", Error Msg = " + sfe.getErrorMessage());
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+4) dpsRemoveStore  (Remove a store)
+
+boolean dpsRemoveStore(uint64 store, mutable uint64 err)
+
+This function removes a store with a given store id. You must provide a mutable variable to 
+receive the DPS error code in case of a problem in removing the store.
+
+On a successful remove store operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns true. In case of an error,
+it assigns a non-zero value to the err variable and also returns false. To get the detailed
+information about the most recent DPS API error, you can call the dpsGetLastStoreErrorCode and
+the dpsGetLastStoreErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 err = 0ul;
+mutable boolean result = true;
+result = dpsRemoveStore(k, err);
+
+if (err != 0ul) {
+   printStringLn("Unexpected error in removing a store: rc = " +
+      + (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
+}	
+
+Example Java code snippet:
+
+StoreFactory  sf = DistributedStores.getStoreFactory();
+Store store = null;
+
+try {
+   sf.removeStore(store);
+   System.out.println("Removed a store named " + store.getStoreName() + " with a storeId of " + store.getId());
+} catch(StoreFactoryException sfe) {
+   System.out.println("Unable to remove a store named " + store.getStoreName() + ". Error code = " + 
+      sfe.getErrorCode() + ", Error Msg = " + sfe.getErrorMessage());
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+5) dpsPut  (Put a K/V pair into a store)
+
+boolean dpsPut(uint64 store, T1 key, T2 value, mutable uint64 err)
+
+This function puts a K/V pair into a store with a given store id. For the second and
+the third function arguments, you can provide a valid SPL typed key and SPL typed value.
+As a good practice, the types of your key and value must be the same ones that were
+provided at the time of creating the store. If you don't follow that rule, then the
+results your store operations will produce undesired results. For the final method
+argument, you must provide a mutable variable to receive the DPS error code in case of
+a problem in the put operation.
+
+On a successful put operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns true. In case of an error,
+it assigns a non-zero value to the err variable and also returns false. To get the detailed
+information about the most recent DPS API error, you can call the dpsGetLastStoreErrorCode and
+the dpsGetLastStoreErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 err = 0ul;
+mutable boolean result = true;
+result = dpsPut(s, "abc", 10, err);
+
+if (err != 0ul) {
+   printStringLn("Unexpected error in dpsPut(s, abc, 10): rc = " + (rstring)dpsGetLastStoreErrorCode() + 
+      ", msg = " + dpsGetLastStoreErrorString());
+}  
+					 
+assert(res==true && err==0ul);                    
+
+Example Java code snippet:
+
+long tickerId = 46267353;
+String tickerSymbol = "IBM";
+
+try {
+   store.put(tickerSymbol, tickerId);
+} catch (StoreException se) {
+   String msg = "Unable to put the tickerId " + tickerId + 
+     " for the ticker symbol " + tickerSymbol + " in the Thing2_Store. Error code = " + 
+     se.getErrorCode() + ", Error Msg = " + se.getErrorMessage();
+   System.out.println(msg);
+   throw se;
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+6) dpsPutSafe  (Put a K/V pair into a store with additional safety checks)
+
+boolean dpsPutSafe(uint64 store, T1 key, T2 value, mutable uint64 err)
+
+This function does exactly the same as the regular put method described above.
+Only difference in this function is it does additional safety checkes to see whether
+a given store exists etc. Because of that, this function will be slower than the
+regular put method.
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+7) dpsGet  (Get the value for a given key from a store)
+
+boolean dpsGet(uint64 store, T1 key, mutable T2 value, mutable uint64 err)
+
+This function gets the value for a given key from a given store id. For the second
+function argument, you can provide a valid SPL typed key. For the third function argument,
+you must provide a mutable variable of a specific SPL type for the expected value
+that will be obtained from the store. For the final function argument, you must provide a
+mutable variable to receive the DPS error code in case of a problem in the get operation.
+
+On a successful get operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns true and the value
+will be returned in the mutable variable you passed to bring back the value.
+In case of an error, it assigns a non-zero value to the err variable and also returns
+false. To get the detailed information about the most recent DPS API error, you can call
+the dpsGetLastStoreErrorCode and the dpsGetLastStoreErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 err = 0ul;
+mutable boolean result = true;
+mutable int32 v = 0;
+result = dpsGet(s, "abc", v, err);
+
+if (err != 0ul) {
+   printStringLn("Unexpected error in dpsGet(s, abc, v): rc = " + (rstring)dpsGetLastStoreErrorCode() + 
+      ", msg = " + dpsGetLastStoreErrorString());
+}  
+					 
+assert(res==true && err==0ul);                    
+
+Example Java code snippet:
+
+RString yktString = new RString("Yorktown temperature reading");
+
+try {
+   float temperature = (Float)store.get(yktString);
+   System.out.println("dpsGet result for <rstring, float32>: temperature-->" + temperature);
+} catch (StoreException se) {
+   System.out.println("Unable to get <rstring, float32>. Error code = " + 
+      se.getErrorCode() + ", Error msg = " + se.getErrorMessage());
+} 
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+8) dpsGetSafe  (Get the value for a given key from a store with additional safety checks)
+
+boolean dpsGetSafe(uint64 store, T1 key, mutable T2 item, mutable uint64 err)
+
+This function does exactly the same as the regular get method described above.
+Only difference in this function is it does additional safety checkes to see whether
+a given store exists etc. Because of that, this function will be slower than the
+regular get method.
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+9) dpsRemove  (Remove a K/V pair from a store)
+
+boolean dpsRemove(uint64 store, T1 key, mutable uint64 err)
+
+This function removes a K/V pair for a given key from a given store id. For the second
+function argument, you can provide a valid SPL typed key. For the final function argument,
+you must provide a mutable variable to receive the DPS error code in case of a problem
+in the remove operation.
+
+On a successful remove operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns true.
+In case of an error, it assigns a non-zero value to the err variable and also returns
+false. To get the detailed information about the most recent DPS API error, you can call
+the dpsGetLastStoreErrorCode and the dpsGetLastStoreErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 err = 0ul;
+mutable boolean result = true;
+result = dpsRemove(s, "abc", err);
+
+if (err != 0ul) {
+   printStringLn("Unexpected error in dpsRemove(s, abc): rc = " + 
+      (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
+} 
+
+assert(res==true && err==0ul); // remove has succeeded 
+                 
+Example Java code snippet:
+
+boolean itemRemoved = false;
+String favoriteMovie = "The Lord of the Rings: The Fellowship of the Ring";
+
+try {
+   itemRemoved = store.remove(favoriteMovie);
+   System.out.println("dpsRemove result: itemRemoved-->" + itemRemoved);
+} catch (StoreException se) {
+   System.out.println("Unable to do dpsRemove. Error code = " + 
+      se.getErrorCode() + ", Error msg = " + se.getErrorMessage());
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+10) dpsHas  (Check for the existence of a K/V pair in a store)
+
+boolean dpsHas(uint64 store, T1 key, mutable uint64 err)
+
+This function checks whether a given key exists in a given store id. For the second
+function argument, you can provide a valid SPL typed key. For the final function argument,
+you must provide a mutable variable to receive the DPS error code in case of a problem
+in the existence check operation.
+
+On a successful existence check operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns true.
+In case of an error, it assigns a non-zero value to the err variable and also returns
+false. To get the detailed information about the most recent DPS API error, you can call
+the dpsGetLastStoreErrorCode and the dpsGetLastStoreErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 err = 0ul;
+mutable boolean exists = true;
+exists = dpsHas(s, "abc", err);
+
+if (err == 0ul && exists == true) {
+   printStringLn("K/V pair with a key 'abc' exists in the store.");
+} else if (err == 0ul && exists = false) {
+   printStringLn("K/V pair with a key 'abc' doesn't exist in the store.");
+} else if (err != 0ul) {
+   printStringLn("Unexpected error in dpsHas(s, abc): rc = " + 
+      (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
+}
+                 
+Example Java code snippet:
+
+boolean keyFound = false;
+String favoriteMovie = "Star Wars: A New Hope";
+
+try {
+   keyFound = store.has(favoriteMovies);
+   System.out.println("dpsHas result: keyFound-->" + keyFound);
+} catch (StoreException se) {
+   System.out.println("Unable to do dpsHas. Error code = " + 
+      se.getErrorCode() + ", Error msg = " + se.getErrorMessage());
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+11) dpsClear  (Clear all the K/V pairs in a store i.e. empty a store)
+
+void dpsClear(uint64 store, mutable uint64 err)
+
+This function empties a given store id by deleting all the K/V pairs in it. For the final
+function argument, you must provide a mutable variable to receive the DPS error code in case of
+a problem in the existence check operation.
+
+This method doesn't return anything. On a successful put operation, it assigns a
+value of 0 to the err variable passed as an argument.In case of an error, it assigns a 
+non-zero value to the err variable. To get the detailed information about the
+most recent DPS API error, you can call the dpsGetLastStoreErrorCode and
+the dpsGetLastStoreErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 err = 0ul;
+dpsClear(s, err);
+
+if (err != 0ul) {
+   printStringLn("Unexpected error in dpsClear(s): rc = " + 
+      (rstring)dpsGetLastStoreErrorCode() +  ", msg = " + dpsGetLastStoreErrorString());
+} 					
+
+assert(err==0ul);
+                 
+Example Java code snippet:
+
+try {
+   testStore1.clear();
+   System.out.println("testStore1 has been cleared i.e. emptied.");
+} catch (StoreException se) {
+   System.out.println("Unable to clear testStore1. Error code = " + 
+      se.getErrorCode() + ", Error msg = " + se.getErrorMessage());
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+12) dpsSize  (Get the size of a store)
+
+uint64 dpsSize(uint64 store, mutable uint64 err)
+
+This function gets the total number of K/V pairs stored in a given store id.
+For the final function argument, you must provide a mutable variable to receive the
+DPS error code in case of a problem in the size operation.
+
+On a successful size operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns the size of that store.
+In case of an error, it assigns a non-zero value to the err variable.
+To get the detailed information about the most recent DPS API error, you can call
+the dpsGetLastStoreErrorCode and the dpsGetLastStoreErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 err = 0ul;
+mutable uint64 size = 0ul;
+
+size = dpsSize(s, err);
+                    
+if (err != 0ul) {
+   printStringLn("Unexpected error in dpsSize(s): rc = " + (rstring)dpsGetLastStoreErrorCode() + 
+      ", msg = " + dpsGetLastStoreErrorString());
+}
+                 
+Example Java code snippet:
+
+boolean keyFound = false;
+long sizeOfTestStore1 = 0;
+
+try {
+   sizeOfTestStore1 = testStore1.size();
+} catch (StoreException se) {
+   System.out.println("Unable to do dpsSize. Error code = " + 
+      se.getErrorCode() + ", Error msg = " + se.getErrorMessage());
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+13) dpsBeginIteration  (Get a store iterator)
+
+uint64 dpsBeginIteration(uint64 store, mutable uint64 err)
+
+This function gets a store iterator that can be used to iterate over all the
+K/V pairs in a given store id. For the final function argument, you must provide a 
+mutable variable to receive the DPS error code in case of a problem in the
+begin-iteration operation.
+
+On a successful size operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns a store iteration id
+that must be used in the remaining two store iteration functions. In case of an error, it 
+assigns a non-zero value to the err variable. To get the detailed information about the
+most recent DPS API error, you can call the dpsGetLastStoreErrorCode and the 
+dpsGetLastStoreErrorString functions.
+
+Once a store iterator is obtained, it must be released by calling the dpsEndIteration after
+the store iteration activities are completed. Otherwise, it will leave the allocated
+resources without being freed properly.
+
+Example SPL code snippet:
+
+mutable uint64 err = 0ul;
+uint64 it = dpsBeginIteration(s, err);
+
+if (err != 0ul) {
+   printStringLn("Unexpected error in dpsBeginIteration(s): rc = " + (rstring)dpsGetLastStoreErrorCode() + 
+      ", msg = " + dpsGetLastStoreErrorString());
+}
+                 
+Example Java code snippet:
+
+In Java, we have a much better to iterate the stores. You can follow any of these two methods.
+
+a) Java store iteration technique 1:
+StoreIterator it = testStore1.iterator();
+
+if (it != null) {
+   // Stay in a loop, and iterate the store contents and display every data item as a key value pair.
+   while (it.hasNext() == true) {
+      KeyValuePair kv = it.next();
+         // If a data item is successfully fetched during store iteration, then the key=>value can be
+         // obtained by two other getter methods on the key value pair object.
+         System.out.println("'" + kv.getKey() + "' => '" + kv.getValue() + "'");
+   }
+   
+   // Optional task: Setting a store iterator object to null after the end of a store iteration is a 
+   // very good practice to do an immediate cleanup of the iteration resources.
+   it = null;
+} else {
+   System.out.println("Unable to obtain an iterator for testStore1.");
+}
+
+b) Java store iteration technique 2:
+
+// This is a much simpler way in Java to iterate a store in three lines of code.
+for (KeyValuePair kv: testStore1) {
+   System.out.println("'" + kv.getKey() + "' => '" + kv.getValue() + "'");
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+14) dpsGetNext  (Iterate the store and get the next K/V pair)
+
+boolean dpsGetNext(uint64 store, uint64 iterator, mutable T1 key, mutable T2 value, mutable uint64 err)
+
+This function can be called by staying in a loop to get all the K/V pairs one at a time from a
+given stored id. You must pass the store iterator id you obtained from the "dpsBeginIteration" API as
+the second function argument. For the third and fourth function arguments, you must pass mutable
+variables to receive the next Key and Value from the store. These variables must be of the
+same SPL type that was used when this store was originally created via the 'dpsCreateStore' API.
+For the final function argument, you must provide a mutable variable to receive the DPS error code
+in case of a problem in the getNext operation.
+
+On a successful getNext operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns the key and value in the two
+mutable variables you passed and it also returns true. In case of an error, it 
+assigns a non-zero value to the err variable and returns false. To get the detailed information
+about the most recent DPS API error, you can call the dpsGetLastStoreErrorCode and the 
+dpsGetLastStoreErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 err = 0ul;
+uint64 it = dpsBeginIteration(s, err); 
+mutable rstring key = "";
+mutable list<rstring> value = [];
+							
+while (dpsGetNext(s, it, key, value, err)) {
+   printStringLn("'" + (rstring)key + "' => " + (rstring)value);
+}
+                 
+Example Java code snippet:
+
+In Java, we have a much simpler way to do this and we covered that in the previous API description.
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+15) dpsEndIteration  (Close the store iterator)
+
+void dpsEndIteration(uint64 store, uint64 iterator, mutable uint64 err)
+
+This function must be called once you are done with your store iteration activities.
+You must pass the store iterator id you obtained from the "dpsBeginIteration" API as
+the second function argument. For the final function argument, you must provide a mutable
+variable to receive the DPS error code in case of a problem in the endIteration operation.
+
+On a successful endIteration operation, it assigns a value of 0 to the err variable passed as
+an argument. In case of an error, it assigns a non-zero value to the err variable.
+To get the detailed information about the most recent DPS API error, you can call the
+dpsGetLastStoreErrorCode and the dpsGetLastStoreErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 err = 0ul;
+uint64 it = dpsBeginIteration(s, err); 
+mutable rstring key = "";
+mutable list<rstring> value = [];
+							
+while (dpsGetNext(s, it, key, value, err)) {
+   printStringLn("'" + (rstring)key + "' => " + (rstring)value);
+}
+
+dpsEndIteration(s, it, err);
+                 
+Example Java code snippet:
+
+In Java, we have a much simpler way to do this and we covered that in the previous API description.
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+16) dpsSerialize  (Serialize all the K/V pairs in a store into a blob)
+
+void dpsSerialize(uint64 store, mutable blob data, T1 dummyKey, T2 dummyValue, mutable uint64 err)
+
+This function serializes all the K/V pairs in a given store id into a blob.
+Then this blob can be used to recreate all the K/V pairs into another store.
+This is a useful technique to take a copy of an entire store into a different store.
+You must pass a mutable blob variable as a second function argument. Third and fourth method
+arguments are dummy variables which you must pass and they should be of the SPL types used for
+the key and value in the given store (same as what was passed originally in the store creation API).
+For the final function argument, you must provide a mutable variable to receive the DPS error code
+in case of a problem in the serialize operation.
+
+On a successful serialize operation, it assigns a value of 0 to the err variable passed as
+an argument. In case of an error, it assigns a non-zero value to the err variable.
+To get the detailed information about the most recent DPS API error, you can call the
+dpsGetLastStoreErrorCode and the dpsGetLastStoreErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 err = 0ul;
+rstring dummyRstring = "";
+list<rstring> dummyRstringList = ["1", "2"];
+mutable blob sData = [];
+dpsSerialize(s, sData, dummyRstring, dummyRstringList, err);
+
+if (err != 0ul) {
+   printStringLn("Unexpected error in dpsSerialize(s, sData, dummyRstring, dummyRstringList): rc = " + 
+      (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
+}
+                 
+Example Java code snippet:
+
+Store topBrandsStore = sf.createOrGetStore("2013_Best_Global_Brands_ABC", "int32", "ustring");
+// Add few data items.
+topBrandsStore.put(1, "Apple");
+topBrandsStore.put(2, "Google");
+topBrandsStore.put(3, "Coca Cola");
+topBrandsStore.put(4, "IBM");
+// Serialize this entire store now.
+ByteBuffer serializedStore = null;
+
+try {
+   serializedStore = topBrandsStore.serialize();
+   System.out.println("Successfully serialized the store '2013_Best_Global_Brands_ABC' = " + serializedStore);
+} catch (StoreException se) {
+   System.out.println("Problem in serializing the store '2013_Best_Global_Brands_ABC'. Error code = " +
+      se.getErrorCode() + ", Error msg = " + se.getErrorMessage());
+      throw se;
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+17) dpsDeserialize  (Deserialize all the K/V pairs in a blob into an existing store)
+
+void dpsDeserialize(uint64 store, blob data, T1 dummyKey, T2 dummyValue, mutable uint64 err)
+
+This function deserializes a given blob containing one or more serialized K/V pairs into 
+a given store id thereby populating that store with those K/V pairs. This technique can be
+used to pass a serialized store contents contained in a blob to someone who then can recreate
+the contents of that store (that may or may not exist now) in a completely new store.
+You must pass the blob containing the serialized store contents as the second function argument.
+Third and fourth function arguments are dummy variables which you must pass and they should be of
+the SPL types used for the key and value in the given store (same as what was passed originally
+in the store creation API). For the final function argument, you must provide a mutable variable to
+receive the DPS error code in case of a problem in the deserialize operation.
+
+On a successful deserialize operation, it assigns a value of 0 to the err variable passed as
+an argument. In case of an error, it assigns a non-zero value to the err variable.
+To get the detailed information about the most recent DPS API error, you can call the
+dpsGetLastStoreErrorCode and the dpsGetLastStoreErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 err = 0ul;
+rstring dummyRstring = "";
+list<rstring> dummyRstringList = ["1", "2"];
+mutable blob sData = [];
+dpsSerialize(s1, sData, dummyRstring, dummyRstringList, err);
+
+if (err != 0ul) {
+   printStringLn("Unexpected error in dpsSerialize(s1, sData, dummyRstring, dummyRstringList): rc = " + 
+      (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
+}
+
+// Let us deserialize it now into another store.
+dpsDeserialize(s2, sData, dummyRstring, dummyRstringList, err);
+
+if (err != 0ul) {
+   printStringLn("Unexpected error in dpsDeserialize(s2, sData, key, value): rc = " + 
+      (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
+}
+                 
+Example Java code snippet:
+
+Store topBrandsStore = sf.createOrGetStore("2013_Best_Global_Brands_ABC", "int32", "ustring");
+// Add few data items.
+topBrandsStore.put(1, "Apple");
+topBrandsStore.put(2, "Google");
+topBrandsStore.put(3, "Coca Cola");
+topBrandsStore.put(4, "IBM");
+// Serialize this entire store now.
+ByteBuffer serializedStore = null;
+
+try {
+   serializedStore = topBrandsStore.serialize();
+   System.out.println("Successfully serialized the store '2013_Best_Global_Brands_ABC' = " + serializedStore);
+} catch (StoreException se) {
+   System.out.println("Problem in serializing the store '2013_Best_Global_Brands_ABC'. Error code = " +
+      se.getErrorCode() + ", Error msg = " + se.getErrorMessage());
+      throw se;
+}
+
+// Let us deserialize a byte buffer containing the serialized store contents. This action will populate a brand new store.
+// Remove the top brands store.
+sf.removeStore(topBrandsStore);
+// Set this store handle to null so that we can start from scratch.
+topBrandsStore = null;
+// Let us create a new store.
+topBrandsStore = sf.createOrGetStore("2013_Best_Global_Brands_XYZ", "int32", "ustring");
+System.out.println("Size of the '2013_Best_Global_Brands_XYZ' store before deserialize: " + topBrandsStore.size());
+// We are going to populate this empty store by deserializing the serialized content into this new store.
+try {
+   topBrandsStore.deserialize(serializedStore);
+   System.out.println("Successfully deserialized into the store '2013_Best_Global_Brands_XYZ'");
+} catch (StoreException se) {
+   System.out.println("Problem in deserializing the byte buffer into the store '2013_Best_Global_Brands_XYZ'. Error code = " +
+      se.getErrorCode() + ", Error msg = " + se.getErrorMessage());
+   throw se;        	
+}
+
+System.out.println("Size of the '2013_Best_Global_Brands_XYZ' store after deserialize: " + topBrandsStore.size());
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+18) dpsGetStoreName  (Get the name of a given store)
+
+rstring dpsGetStoreName(uint64 store)
+
+This function returns the name of a given store id.
+
+Example SPL code snippet:
+
+rstring myStoreName = dpsGetStoreName(k);
+                 
+Example Java code snippet:
+
+System.out.println("Store name for a store id " + store.getId() + "=" + store.getStoreName());
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+19) dpsGetSplTypeNameForKey  (Get the SPL type name for a key of a given store)
+
+rstring dpsGetSplTypeNameForKey(uint64 store)
+
+This function returns the SPL type name for a key of a given store id.
+
+Example SPL code snippet:
+
+rstring splTypeNameForKey = dpsGetSplTypeNameForKey(k);
+                 
+Example Java code snippet:
+
+System.out.println("SPL type for the key of the store " + store.getStoreName() + "=" + store.getKeySplTypeName());
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+20) dpsGetSplTypeNameForValue  (Get the SPL type name for a value of a given store)
+
+rstring dpsGetSplTypeNameForValue(uint64 store)
+
+This function returns the SPL type name for a value of a given store id.
+
+Example SPL code snippet:
+
+rstring splTypeNameForValue = dpsGetSplTypeNameForValue(k);
+                 
+Example Java code snippet:
+
+System.out.println("SPL type for the value of the store " + store.getStoreName() + "=" + store.getValueSplTypeName());
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+21) dpsGetNoSqlDbProductName  (Get the name of the NoSQL K/V data store product being used now)
+
+rstring dpsGetNoSqlDbProductName()
+
+This function returns the name of the NoSQL K/V data store product being used now.
+
+Example SPL code snippet:
+
+rstring noSqlDbProductName = dpsGetNoSqlDbProductName();
+                 
+Example Java code snippet:
+
+StoreFactory  sf = DistributedStores.getStoreFactory();
+System.out.println("Name of the NoSQL K/V data store = " + sf.dpsGetNoSqlDbProductName);
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+22) dpsGetDetailsAboutThisMachine  (Get the details about the Streams DPS client machine)
+
+void dpsGetDetailsAboutThisMachine(mutable rstring machineName, mutable rstring osVersion, mutable rstring cpuArchitecture)
+
+This function can be used to get the details about the DPS client machine.
+You must pass three mutable rstring variables as the three function arguments in which the machine name,
+Linux OS version and the CPU architecture (x86 versus PPC) will be assigned for your use.
+
+Example SPL code snippet:
+
+rstring dbProductName = dpsGetNoSqlDbProductName();
+// Get the details about the machine where this operator is running.
+mutable rstring machineName = "", osVersion = "", cpuArchitecture = "";
+dpsGetDetailsAboutThisMachine(machineName, osVersion, cpuArchitecture);
+// Display the NoSQL DB product name being used for this test run.
+printStringLn("=====================================================");
+printStringLn("Details about this DPS client machine:");
+printStringLn("NoSQL K/V store product name: " + dbProductName);
+printStringLn("Machine name: " + machineName);
+printStringLn("OS version: " + osVersion);
+printStringLn("CPU architecture: " + cpuArchitecture);
+printStringLn("=====================================================");
+                 
+Example Java code snippet:
+
+StoreFactory  sf = DistributedStores.getStoreFactory();
+String dbProductName = sf.getNoSqlDbProductName();
+// Get the details about the machine where this operator is running.
+// This method returns a String array with 3 elements.
+// Each element will carry the value for machine name, os version, cpu architecture in that order.
+String [] machineDetails = new String[3];
+machineDetails = sf.getDetailsAboutThisMachine();
+// Display the NoSQL DB product name being used for this test run.
+System.out.println("=====================================================");
+System.out.println("Details about this DPS client machine:");
+System.out.println("NoSQL K/V store product name: " + dbProductName);
+System.out.println("Machine name: " + machineDetails[0]);
+System.out.println("OS version: " + machineDetails[1]);
+System.out.println("CPU architecture: " + machineDetails[2]);
+System.out.println("=====================================================");  
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+23) dpsRunDataStoreCommand  (Run a one way native data store command)
+
+boolean dpsRunDataStoreCommand(rstring cmd, mutable uint64 err)
+
+If users want to execute simple arbitrary back-end data store (fire and forget)
+native commands, this API can be used. This covers any Redis or Cassandra(CQL)
+native commands that don't have to fetch and return K/V pairs or return size of the db etc.
+(Insert and Delete are the more suitable ones here. However, key and value can only
+have string types.) In the first function argument, you must give a valid native
+data store command as a literal Redis API command or as a literal Cassandra CQL command.
+You must pass a mutable err variable which will be assigned a DPS error code in case of
+any error. On success it will assign a zero for err variable and it returns true.
+If the one way command is not successful, then err variable will carry an error code and
+it returns false.
+
+Example SPL code snippet:
+
+// Insert a K/V pair by using the popular Redis set command.
+cmd = "set foo bar";
+err = 0ul;
+res = dpsRunDataStoreCommand(cmd, err);
+					  
+if (res == true) {
+   printStringLn("Running a Redis native command 'set foo bar' worked correctly.");
+} else {
+   printStringLn("Error in running a Redis native command 'set foo bar'. Error code=" + 
+      (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
+}
+                 
+Example Java code snippet:
+
+StoreFactory  sf = DistributedStores.getStoreFactory();
+// Create a keyspace by using a Cassandra CQL command.
+String cmd = "create keyspace test_native_command_exec with replication = {'class' : 'SimpleStrategy', 'replication_factor' : 1};";
+			
+try {
+   sf.runDataStoreCommand(cmd);
+   System.out.println("Running a Cassandra native command 'create keyspace test_native_command_exec;' worked correctly.");
+   // Drop a keyspace using another Cassandra CQL command.
+   cmd = "drop keyspace test_native_command_exec;";
+				
+   try {
+      sf.runDataStoreCommand(cmd);
+      System.out.println("Running a Cassandra native command 'drop keyspace test_native_command_exec;' worked correctly.");
+   } catch (StoreFactoryException sfe) {
+      System.out.println("Error in running a Cassandra native command 'drop keyspace test_native_command_exec;'. Error code=" + 
+      sfe.getErrorCode() + ", Error Msg = " + sfe.getErrorMessage());				
+   }	        	
+} catch (StoreFactoryException sfe) {
+   System.out.println("Error in running a Cassandra native command 'create keyspace test_native_command_exec;'. Error code=" + 
+      sfe.getErrorCode() + ", Error Msg = " + sfe.getErrorMessage());
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+24) dpsRunDataStoreCommand  (Run a two way native data store command)
+
+boolean dpsRunDataStoreCommand(uint32 cmdType, rstring httpVerb,
+   rstring baseUrl, rstring apiEndpoint, rstring queryParams,
+   rstring jsonRequest, mutable rstring jsonResponse, mutable uint64 err)
+
+If users want to execute arbitrary back-end data store two way
+native commands, this API can be used. This is a variation of the previous API with
+overloaded function arguments. As of Jan/2015, this API is supported in the dps toolkit only
+when Cloudant or HBase NoSQL DB is used as a back-end data store. It covers any Cloudant HTTP/JSON based
+native commands that can perform both database and document related Cloudant APIs that are very
+well documented for reference on the web or it covers the HBase related REST APIs.
+
+Example SPL code snippet:
+
+Code snippet is too big to fit here. Please refer to the SPLMM code shipped in the samples directory of
+the DPS toolkit. 
+                 
+Example Java code snippet:
+
+Code snippet is too big to fit here. Please refer to the Java code shipped in one of the examples inside
+the SPL-Examples-For-Beginners package. 
+(Example project directory: 062_data_sharing_between_non_fused_spl_custom_and_java_primitive_operators)
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+24) dpsRunDataStoreCommand  (Run a two way native data store command)
+
+boolean dpsRunDataStoreCommand(uint32 cmdType, rstring httpVerb,
+   rstring baseUrl, rstring apiEndpoint, rstring queryParams,
+   rstring jsonRequest, mutable rstring jsonResponse, mutable uint64 err)
+
+If users want to execute arbitrary back-end data store two way
+native commands, this API can be used. This is a variation of the previous API with
+overloaded function arguments. As of Jan/2015, this API is supported in the dps toolkit only
+when Cloudant or HBase NoSQL DB is used as a back-end data store. It covers any Cloudant HTTP/JSON based
+native commands that can perform both database and document related Cloudant APIs that are very
+well documented for reference on the web or it covers the HBase related REST APIs.
+
+Example SPL code snippet:
+
+Code snippet is too big to fit here. Please refer to the SPLMM code shipped in the samples directory of
+the DPS toolkit. 
+                 
+Example Java code snippet:
+
+Code snippet is too big to fit here. Please refer to the Java code shipped in one of the examples inside
+the SPL-Examples-For-Beginners package. 
+(Example project directory: 062_data_sharing_between_non_fused_spl_custom_and_java_primitive_operators)
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+25) dpsBase64Encode  (Base64 encode any arbitrary string)
+
+void dpsBase64Encode(rstring str, mutable rstring encodedResultStr)
+
+This function can be used to base64 encode any given string. Encoded result will be
+returned in a user provided mutable string passed as a second function argument.
+
+Example SPL code snippet:
+
+mutable list<rstring>[5] cn = [];
+// HBase column key (Format: ColumnFamily:ColumnQualifier)
+dpsBase64Encode("cf1:Company", cn[0]);
+// HBase column value
+dpsBase64Encode("IBM", cn[1]);
+dpsBase64Encode("Microsoft", cn[2]);
+dpsBase64Encode("Amazon", cn[3]);
+dpsBase64Encode("Google", cn[4]);
+                 
+Example Java code snippet:
+
+StoreFactory  sf = DistributedStores.getStoreFactory();
+String[] hq = new String[5];
+hq[0] = sf.base64Encode("cf1:HQ");
+hq[1] = sf.base64Encode("Armonk, NY");
+hq[2] = sf.base64Encode("Redmond, WA");
+hq[3] = sf.base64Encode("Seattle, WA");
+hq[4] = sf.base64Encode("Mountain View, CA");	
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+26) dpsBase64Decode  (Base64 decode a given base64 encoded string)
+
+void dpsBase64Decode(rstring str, mutable rstring decodedResultStr)
+
+This function can be used to base64 decode any given base64 encoded string. Decoded result will be
+returned in a user provided mutable string passed as a second function argument.
+
+Example SPL code snippet:
+
+rstring base64EncodedString = "bXlEQlN0b3JlMQ==";
+mutable rstring base64DecodedString = "";
+// Following DPS API will result in this clear text: "myDBStore1"
+dpsBase64Decode(rowKey, base64DecodedString);
+                 
+Example Java code snippet:
+
+StoreFactory  sf = DistributedStores.getStoreFactory();
+String base64EncodedString = "bXlEQlN0b3JlMQ==";
+String base64DecodedString = "";
+// Following DPS API will result in this clear text: "myDBStore1"
+try {
+   base64DecodedString = sf.base64Decode(base64EncodedString);
+} catch (StoreFactoryException sfe) {
+   ;
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+27) dpsGetLastStoreErrorCode  (Get the error code for the most recently made DPS API call)
+
+uint64 dpsGetLastStoreErrorCode()
+
+This function can be used to get the error code for the most recently executed DPS API.
+
+Example SPL code snippet:
+
+printStringLn("Unsuccessful DPS API execution. rc = " + (rstring)dpsGetLastStoreErrorCode() + 
+   ", msg = " + dpsGetLastStoreErrorString());
+
+Example Java code snippet:
+
+System.out.println("Unsuccessful DPS API execution. Error code = " +
+   se.getErrorCode() + ", Error msg = " + se.getErrorMessage());
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+28) dpsGetLastStoreErrorString  (Get the detailed error message for the most recently made DPS API call)
+
+rstring dpsGetLastStoreErrorString()
+
+This function can be used to get the detailed error message for the most recently executed DPS API.
+
+Example SPL code snippet:
+
+printStringLn("Unsuccessful DPS API execution. rc = " + (rstring)dpsGetLastStoreErrorCode() + 
+   ", msg = " + dpsGetLastStoreErrorString());
+
+Example Java code snippet:
+
+System.out.println("Unsuccessful DPS API execution. Error code = " +
+   se.getErrorCode() + ", Error msg = " + se.getErrorMessage());
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+--> APIs to work with the TTL global store
+    --------------------------------------
+[A single global store with TTL (Time To Live) is automatically created by the DPS
+ internal code. This TTL store is always available for the Streams developers to  store
+ K/V pairs that are configured to expire after a certain time period.]  
+    
+******************************************************************************************
+* dpsPutTTL, dpsGetTTL, dpsHasTTL, dpsRemoveTTL,                                         *
+* dpsGetLastErrorCodeTTL, dpsGetLastErrorStringTTL                                       *
+******************************************************************************************   
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>  
+
+29) dpsPutTTL  (Put a K/V pair into the TTL store)
+
+boolean dpsPutTTL(T1 key, T2 item, uint32 ttl, mutable uint64 err)
+
+This function puts a K/V pair into the TTL store. For the first and
+the second function arguments, you can provide a valid SPL typed key and SPL typed value.
+As a third argument, you must provide a TTL value in seconds after which this K/V pair
+will be automatically removed from the TTL store. If you give a TTL value of 0, then
+this K/V pair will be there forever and it can be removed manually using the dpsRemoveTTL API.
+For the final method argument, you must provide a mutable variable to receive the 
+DPS error code in case of a problem in the putTTL operation.
+
+On a successful putTTL operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns true. In case of an error,
+it assigns a non-zero value to the err variable and also returns false. To get the detailed
+information about the most recent DPS API error, you can call the dpsGetLastStoreErrorCodeTTL and
+the dpsGetLastStoreErrorStringTTL functions.
+
+Example SPL code snippet:
+
+mutable rstring myKey = "", myValue = "";
+myKey = "New York";
+myValue = "Albany";
+mutable uint64 err = 0ul;
+// Put a K/V pair with 5 seconds of TTL.
+boolean res = dpsPutTTL(myKey, myValue, 5u, err);
+	                    
+if (res == false) {
+   printStringLn("Unexpected error in dpsPutTTL. Error code=" + 
+      (rstring)dpsGetLastErrorCodeTTL() + ", Error msg=" + dpsGetLastErrorStringTTL());
+}
+
+Example Java code snippet:
+
+StoreFactory  sf = DistributedStores.getStoreFactory();
+RString myKey = new RString(""), myValue = new RString("");
+myKey = new RString("New Jersey");
+myValue = new RString("Trenton");
+	        
+try {
+   // Put a K/V pair with 5 seconds of TTL.  
+   // We must provide the SPL type names for our key and value as literal strings as shown below.
+   sf.putTTL(myKey, myValue, 5, "rstring", "rstring");
+} catch (StoreFactoryException sfe) {
+   System.out.println("Unexpected error in putTTL. Error code=" + 
+      sfe.getErrorCode() + ", Error msg=" + sfe.getErrorMessage());
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+30) dpsGetTTL  (Get a K/V pair from the TTL store)
+
+boolean dpsGetTTL(T1 key, mutable T2 value, mutable uint64 err)
+
+This function gets the value for a given key from the TTL store. For the first
+function argument, you can provide a valid SPL typed key. For the second function argument,
+you must provide a mutable variable of a specific SPL type for the expected value
+that will be obtained from the TTL store. For the final function argument, you must provide a
+mutable variable to receive the DPS error code in case of a problem in the getTTL operation.
+
+On a successful getTTL operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns true and the value
+will be returned in the mutable variable you passed to bring back the value.
+In case of an error, it assigns a non-zero value to the err variable and also returns
+false. To get the detailed information about the most recent DPS API error, you can call
+the dpsGetLastStoreErrorCodeTTL and the dpsGetLastStoreErrorStringTTL functions.
+
+Example SPL code snippet:
+
+mutable rstring myKey = "", myValue = "";
+myKey = "New York";
+myValue = "";
+mutable uint64 err = 0ul;
+boolean res = dpsGetTTL(myKey, myValue, err);
+	                    
+if (res == true) {
+   printStringLn("TTL based K/V pair is read successfully from the global store. Key=" + 
+      myKey + ", Value=" + myValue);
+} else {
+   printStringLn("Unexpected error in reading the K/V pair 'New York':'Albany'. Error code=" + 
+      (rstring)dpsGetLastErrorCodeTTL() + ", Error msg=" + dpsGetLastErrorStringTTL());
+}
+
+Example Java code snippet:
+
+StoreFactory  sf = DistributedStores.getStoreFactory();
+RString myKey = new RString(""), myValue = new RString("");
+myKey = new RString("New Jersey");
+	        
+try {
+   // You must provide the SPL type names for your key and value as literal strings. (2nd and 3rd arguments).
+   myValue = (RString)sf.getTTL(myKey, "rstring", "rstring");
+   System.out.println("TTL based K/V pair is read successfully from the global store. Key=" + 
+      myKey + ", Value=" + myValue);
+} catch (StoreFactoryException sfe) {
+   System.out.println("Unexpected error in reading the K/V pair 'New Jersey':'Trenton'. Error code=" + 
+      sfe.getErrorCode() + ", Error msg=" + sfe.getErrorMessage());
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+31) dpsHasTTL  (Check for the existence of a K/V pair in the TTL store)
+
+boolean dpsHasTTL(T1 key, mutable uint64 err)
+
+This function checks whether a given key exists in the TTL store. For the first
+function argument, you can provide a valid SPL typed key. For the final function argument,
+you must provide a mutable variable to receive the DPS error code in case of a problem
+in the existence check operation.
+
+On a successful existence check operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns true.
+In case of an error, it assigns a non-zero value to the err variable and also returns
+false. To get the detailed information about the most recent DPS API error, you can call
+the dpsGetLastStoreErrorCodeTTL and the dpsGetLastStoreErrorStringTTL functions.
+
+Example SPL code snippet:
+
+mutable rstring myKey = "";
+myKey = "New York";
+mutable uint64 err = 0ul;
+boolean res = dpsHasTTL(myKey, err);
+	                    
+if (res == true) {
+   printStringLn("Unexpected error: TTL based K/V pair 'New York':'Albany' is still present after the TTL expiration.");
+} else {
+   printStringLn("K/V pair 'New York':'Albany' was already removed after its TTL expiration.");
+}            
+
+Example Java code snippet:
+
+StoreFactory  sf = DistributedStores.getStoreFactory();
+RString myKey = new RString("");
+myKey = new RString("New Jersey");
+	        
+try {
+   boolean kvPairExists = sf.hasTTL(myKey, "rstring");
+	        	
+   if (kvPairExists == true) {
+      System.out.println("TTL based K/V pair 'New Jersey':'Trenton' exists in the global store.");
+   } else {
+      System.out.println("TTL based K/V pair 'New Jersey':'Trenton' doesn't esist in the global store.");
+   }
+} catch (StoreFactoryException sfe) {
+   System.out.println("Unexpected error in checking for the existence of the K/V pair 'New Jersey':'Trenton'. Error code=" + 
+      sfe.getErrorCode() + ", Error msg=" + sfe.getErrorMessage());
+} 
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+32) dpsRemoveTTL  (Remove a K/V pair from the TTL store)
+
+boolean dpsRemoveTTL(T1 key, mutable uint64 err)
+
+This function removes a K/V pair for the TTL store. For the first
+function argument, you can provide a valid SPL typed key. For the final function argument,
+you must provide a mutable variable to receive the DPS error code in case of a problem
+in the removeTTL operation.
+
+On a successful removeTTL operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns true.
+In case of an error, it assigns a non-zero value to the err variable and also returns
+false. To get the detailed information about the most recent DPS API error, you can call
+the dpsGetLastStoreErrorCodeTTL and the dpsGetLastStoreErrorStringTTL functions.
+
+Example SPL code snippet:
+
+mutable rstring myKey = "";
+myKey = "New York";
+mutable uint64 err = 0ul;
+boolean res = dpsRemoveTTL(myKey, err);
+	                    
+if (res == true) {
+   printStringLn("Successfully removed the TTL based data item with a key " + (rstring)myKey + ".");
+} else {
+   printStringLn("Unexpected error in removing the TTL based data item with a key " +  myKey + 
+      ". Error code=" + (rstring)dpsGetLastErrorCodeTTL() + ", Error msg=" + dpsGetLastErrorStringTTL());
+}       
+
+Example Java code snippet:
+
+StoreFactory  sf = DistributedStores.getStoreFactory();
+RString myKey = new RString("");
+myKey = new RString("New Jersey");
+	        
+try {
+   sf.removeTTL(myKey, "rstring");
+   System.out.println("Successfully removed the TTL based data item with a key " + myKey + ".");
+} catch (StoreFactoryException sfe) {
+   System.out.println("Unexpected error in removing the TTL based data item with a key " + myKey +
+      ". Error code=" +  sfe.getErrorCode() + ", Error msg=" + sfe.getErrorMessage());
+} 
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+33) dpsGetLastErrorCodeTTL  (Get the error code for the most recently made TTL based DPS API call)
+
+uint64 dpsGetLastErrorCodeTTL()
+
+This function can be used to get the error code for the most recently executed TTL based DPS API.
+
+Example SPL code snippet:
+
+printStringLn("Unexpected error in the TTL based DPS API call. Error code=" + 
+   (rstring)dpsGetLastErrorCodeTTL() + ", Error msg=" + dpsGetLastErrorStringTTL());
+
+Example Java code snippet:
+
+System.out.println("Unexpected error in the TTL based DPS API call. Error code=" +  
+   sfe.getErrorCode() + ", Error msg=" + sfe.getErrorMessage()); 
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+34) dpsGetLastErrorStringTTL  (Get the detailed error message for the most recently made TTL based DPS API call)
+
+rstring dpsGetLastErrorStringTTL()
+
+This function can be used to get the detailed error message for the most recently executed TTL based DPS API.
+
+Example SPL code snippet:
+
+printStringLn("Unexpected error in the TTL based DPS API call. Error code=" + 
+   (rstring)dpsGetLastErrorCodeTTL() + ", Error msg=" + dpsGetLastErrorStringTTL());
+
+Example Java code snippet:
+
+System.out.println("Unexpected error in the TTL based DPS API call. Error code=" +  
+   sfe.getErrorCode() + ", Error msg=" + sfe.getErrorMessage()); 
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+--> APIs to work with the distributed locks
+    ---------------------------------------
+[Distributed locks in DPS can be used to perform any coordinated tasks between two or more 
+ processes/applications. For example, if two different processing elements (PEs) have code
+ segments that will try to write or delete K/V pairs in a given store, then it is very hard
+ to predict when each of them can safely perform that operation without causing collisions
+ between each other's write/delete API calls. This is where the DPS distributed locks will
+ come handy to do such tasks safely by two or more unrelated application code artifacts.]  
+    
+****************************************************************************
+* dlCreateOrGetLock, dlRemoveLock, dlAcquireLock, dlReleaseLock,           *
+* dlGetLastDistributedLockErrorString, dlGetLastDistributedLockErrorCode,  * 
+* dlGetPidForLock                                                          *
+****************************************************************************  
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+35) dlCreateOrGetLock  (Create a new distributed lock or get a distributed lock if it exists already)
+
+uint64 dlCreateOrGetLock(rstring name, mutable uint64 err)
+
+This function can be used to create a new distributed lock with a given lock name or obtain an 
+existing distributed lock with a given lock name. First function argument is any arbitrary
+string representing the intended lock name.  For the final function argument,
+you must provide a mutable variable to receive the DPS error code in case of a problem
+in the create/get lock operation.
+
+On a successful create/get lock operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns the lock id.
+In case of an error, it assigns a non-zero value to the err variable and also returns
+zero. To get the detailed information about the most recent DL API error, you can call
+the dlGetLastDistributedLockErrorCode and the dlGetLastDistributedLockErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 l = 0ul;
+mutable uint64 err = 0ul;
+l = dlCreateOrGetLock("My Sentinel Lock1", err);
+
+if (err != 0ul) {
+   printStringLn("Error in creating My Sentinel Lock1. rc = " + 
+      (rstring)dlGetLastDistributedLockErrorCode() + ", msg = " + dlGetLastDistributedLockErrorString());
+} else {
+   printStringLn("My Sentinel Lock1 was created with an id of " + (rstring)l);
+}
+
+Example Java code snippet:
+
+LockFactory lf = DistributedLocks.getLockFactory(); 
+Lock myLock = lf.createOrGetLock("Lock_For_Test_Store1");
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+36) dlRemoveLock  (Remove a distributed lock)
+
+boolean dlRemoveLock(uint64 lock, mutable uint64 err)
+
+This function can be used to remove a given distributed lock id. For the final function argument,
+you must provide a mutable variable to receive the DPS error code in case of a problem
+in the remove lock operation. (Since the whole purpose of distributed locks is to ensure
+operations are performed safely on shared resources by multiple unrelated application components,
+don't remove the distributed locks abruptly unless you are very clear about what you are doing.
+Do it only when you are sure that no one is using the lock at the time of removing it.)
+
+On a successful remove lock operation, it assigns a value of 0 to the err variable passed as
+an argument. In the case of a successful operation, it returns true.
+In case of an error, it assigns a non-zero value to the err variable and also returns
+false. To get the detailed information about the most recent DL API error, you can call
+the dlGetLastDistributedLockErrorCode and the dlGetLastDistributedLockErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 l = 0ul;
+mutable uint64 err = 0ul;
+l = dlCreateOrGetLock("My Sentinel Lock1", err);
+
+if (err != 0ul) {
+   printStringLn("Error in creating My Sentinel Lock1. rc = " + 
+      (rstring)dlGetLastDistributedLockErrorCode() + ", msg = " + dlGetLastDistributedLockErrorString());
+} else {
+   printStringLn("My Sentinel Lock1 was created with an id of " + (rstring)l);
+}
+
+boolean myResult = dlRemoveLock(l, err);
+if (err == 0ul && myResult == true) {
+   printStringLn("We removed the lock My Sentinel Lock1 l=" + (rstring)l);
+} else {
+   printStringLn("Failed to remove the lock My Sentinel Lock1 l=" + 
+      (rstring)l + ", err=" + (rstring)err + ", msg=" + 
+      dlGetLastDistributedLockErrorString());
+}
+
+Example Java code snippet:
+
+LockFactory lf = DistributedLocks.getLockFactory(); 
+Lock myLock = lf.createOrGetLock("Lock_For_Test_Store1");
+lf.removeLock(myLock);
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+37) dlAcquireLock  (Acquire a distributed lock before accessing a critical shared resource)
+
+void dlAcquireLock(uint64 lock, mutable uint64 err)
+
+This function can be used to acquire a given distributed lock id. This is an important function
+in the use of the DL APIs. Before performing a write/delete operation into a data store that is
+shared by multiple applications, it is a good way protect that code block for the safe access
+of the shared resource. In front of that code block, this API can be called to reserve a distributed
+lock to gain an exclusive access for that shared resource. For the final function argument,
+you must provide a mutable variable to receive the DPS error code in case of a problem
+in the acquire lock operation.
+
+On a successful acquire lock operation, it assigns a value of 0 to the err variable passed as
+an argument. In case of an error, it assigns a non-zero value to the err variable.
+To get the detailed information about the most recent DL API error, you can call
+the dlGetLastDistributedLockErrorCode and the dlGetLastDistributedLockErrorString functions.
+
+IMPORTANT
+---------
+Please note that once called, this API could spin loop for a very long time (three or four minutes)
+until it acquires the distributed lock or it times out in case of the distributed lock being not yet available.
+Another important factor is that once the lock is granted, it is given to you for an infinite period of time.
+Hence, it is your responsibility to properly release the lock at the end of your task. There is no external
+mechanism to take the lock back from you in case your code crashes after acquiring the lock.
+[If you don't like this lock behavior of waiting for four minutes to acquire the lock or the indefinite allocation
+of lock to yourself, then don't use this API. Instead go for an alternative overloaded function described next.]
+
+Example SPL code snippet:
+
+mutable uint64 l = 0ul;
+mutable uint64 err = 0ul;
+l = dlCreateOrGetLock("My Sentinel Lock1", err);
+
+if (err != 0ul) {
+   printStringLn("Error in creating My Sentinel Lock1. rc = " + 
+      (rstring)dlGetLastDistributedLockErrorCode() + ", msg = " + dlGetLastDistributedLockErrorString());
+} else {
+   printStringLn("My Sentinel Lock1 was created with an id of " + (rstring)l);
+}
+
+dlAcquireLock(l, err);
+if (err == 0ul) {
+   printStringLn("We acquired the lock My Sentinel Lock1 l=" + (rstring)l);
+} else {
+   printStringLn("Failed to acquire the lock My Sentinel Lock1 l=" + (rstring)l + 
+      " rc = " + (rstring)dlGetLastDistributedLockErrorCode() + 
+      ", msg = " + dlGetLastDistributedLockErrorString());
+   // It is advisable to return from here since the lock is not granted.
+   return;
+}
+
+// Exclusive access to the distributed lock obtained.
+// Perform your operations on a shared data store safely now.
+// ....
+// ....
+
+Example Java code snippet:
+
+LockFactory lf = DistributedLocks.getLockFactory(); 
+Lock myLock = lf.createOrGetLock("Lock_For_Test_Store1");
+
+// Acquire that lock
+try {
+   myLock.acquireLock();
+   System.out.println("Successfully acquired the lock named 'Lock_For_Test_Store1'.");
+   // There is also a lock factory API to get the Linux PID of the current owner who is holding this lock.
+   int pid = lf.getPidForLock("Lock_For_Test_Store1");
+   System.out.println("Linux PID for the current owner of the 'Lock_For_Test_Store1' = " + pid);
+} catch (LockException le) {
+   System.out.println("Unable to acquire the lock named 'Lock_For_Test_Store1'. Error = " +
+      le.getErrorCode() + ", Error msg = " + le.getErrorMessage());
+      throw le;
+}
+
+// Exclusive access to the distributed lock obtained.
+// Perform your operations on a shared data store safely now.
+// ....
+// ....
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+38) dlAcquireLock  (Acquire a distributed lock with lease time and max wait time before accessing a critical shared resource)
+
+void dlAcquireLock(uint64 lock, float64 leaseTime, float64 maxWaitTimeToAcquireLock, mutable uint64 err)
+
+This overloaded function can be used to acquire a given distributed lock id. This is a much better
+function than the aquire function described in the previous section. This API is very similar to
+the other acquire lock API in its overall scope. However, this function provides two other feaures where
+callers can pass a fixed lease time for the lock as a a second function argument. By passing this
+second function argument, caller is indicating that he or she will need the lock at the most for a specified
+period before which the caller will relinquish this lock. In addition, caller can also pass a 
+third argument to specify how long the caller is willing to wait to acquire the lock. If the lock
+acquisition is not done within the specified max wait time, this API will exit with an error instead of
+spin looping forever. If the caller doesn't release the lock after the requested lease time due to
+a proram crash or a programmatic error, DPS internal code will automatically release the stale lock
+for others to acquire. For the final function argument, you must provide a mutable variable to receive
+the DPS error code in case of a problem in the acquire lock operation.
+
+On a successful acquire lock operation, it assigns a value of 0 to the err variable passed as
+an argument. In case of an error, it assigns a non-zero value to the err variable.
+To get the detailed information about the most recent DL API error, you can call
+the dlGetLastDistributedLockErrorCode and the dlGetLastDistributedLockErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 l = 0ul;
+mutable uint64 err = 0ul;
+l = dlCreateOrGetLock("My Sentinel Lock1", err);
+
+if (err != 0ul) {
+   printStringLn("Error in creating My Sentinel Lock1. rc = " + 
+      (rstring)dlGetLastDistributedLockErrorCode() + ", msg = " + dlGetLastDistributedLockErrorString());
+} else {
+   printStringLn("My Sentinel Lock1 was created with an id of " + (rstring)l);
+}
+
+// Acquire that lock with a lease time for 18 seconds and wait no more than 10 seconds to acquire the lock.
+dlAcquireLock(l, 18.0, 10.0, err);
+if (err == 0ul) {
+   printStringLn("We acquired the lock My Sentinel Lock1 l=" + (rstring)l);
+} else {
+   printStringLn("Failed to acquire the lock My Sentinel Lock1 l=" + (rstring)l + 
+      " rc = " + (rstring)dlGetLastDistributedLockErrorCode() + 
+      ", msg = " + dlGetLastDistributedLockErrorString());
+   // It is advisable to return from here since the lock is not granted.
+   return;
+}
+
+// Exclusive access to the distributed lock obtained.
+// Perform your operations on a shared data store safely now.
+// ....
+// ....
+
+Example Java code snippet:
+
+LockFactory lf = DistributedLocks.getLockFactory(); 
+Lock myLock = lf.createOrGetLock("Lock_For_Test_Store1");
+
+// Acquire that lock for a lease period of 30 seconds.
+try {
+   // First argument is the lease period for the lock.
+   // Second argument is the time in seconds we are willing to wait in order to acquire the lock.
+   // If a lock can't be acquired within that max wait time, then we will get a timeout exception.
+   myLock.((double)30.0, (double)120.0);
+   System.out.println("Successfully acquired the lock named 'Lock_For_Test_Store1'.");
+   // There is also a lock factory API to get the Linux PID of the current owner who is holding this lock.
+   int pid = lf.getPidForLock("Lock_For_Test_Store1");
+   System.out.println("Linux PID for the current owner of the 'Lock_For_Test_Store1' = " + pid);
+} catch (LockException le) {
+   System.out.println("Unable to acquire the lock named 'Lock_For_Test_Store1'. Error = " +
+      le.getErrorCode() + ", Error msg = " + le.getErrorMessage());
+      throw le;
+}
+
+// Exclusive access to the distributed lock obtained.
+// Perform your operations on a shared data store safely now.
+// ....
+// ....
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+39) dlReleaseLock  (Release a distributed lock)
+
+void dlReleaseLock(uint64 lock, mutable uint64 err)
+
+This API can be used to release a given distributed lock id.For the final function argument,
+you must provide a mutable variable to receive the DPS error code in case of a problem in
+the release lock operation.
+
+On a successful release lock operation, it assigns a value of 0 to the err variable passed as
+an argument. In case of an error, it assigns a non-zero value to the err variable.
+To get the detailed information about the most recent DL API error, you can call
+the dlGetLastDistributedLockErrorCode and the dlGetLastDistributedLockErrorString functions.
+
+Example SPL code snippet:
+
+mutable uint64 l = 0ul;
+mutable uint64 err = 0ul;
+l = dlCreateOrGetLock("My Sentinel Lock1", err);
+
+if (err != 0ul) {
+   printStringLn("Error in creating My Sentinel Lock1. rc = " + 
+      (rstring)dlGetLastDistributedLockErrorCode() + ", msg = " + dlGetLastDistributedLockErrorString());
+} else {
+   printStringLn("My Sentinel Lock1 was created with an id of " + (rstring)l);
+}
+
+// Acquire that lock with a lease time for 18 seconds and wait no more than 10 seconds to acquire the lock.
+dlAcquireLock(l, 18.0, 10.0, err);
+if (err == 0ul) {
+   printStringLn("We acquired the lock My Sentinel Lock1 l=" + (rstring)l);
+} else {
+   printStringLn("Failed to acquire the lock My Sentinel Lock1 l=" + (rstring)l + 
+      " rc = " + (rstring)dlGetLastDistributedLockErrorCode() + 
+      ", msg = " + dlGetLastDistributedLockErrorString());
+   // It is advisable to return from here since the lock is not granted.
+   return;
+}
+
+// Exclusive access to the distributed lock obtained.
+// Perform your operations on a shared data store safely now.
+// ....
+// ....
+
+// Release the lock.
+dlReleaseLock(l, err);
+
+if (err == 0ul) {
+   printStringLn("We released the lock My Sentinel Lock1 l=" + (rstring)l);
+} else {
+   printStringLn("Failed to release the lock My Sentinel Lock1 l=" + (rstring)l + 
+      " rc = " + (rstring)dlGetLastDistributedLockErrorCode() + 
+      ", msg = " + dlGetLastDistributedLockErrorString());
+}
+
+// Remove that lock.	
+boolean myResult = dlRemoveLock(l, err);
+if (err == 0ul && myResult == true) {
+   printStringLn("We removed the lock My Sentinel Lock1 l=" + (rstring)l);
+} else {
+   printStringLn("Failed to remove the lock My Sentinel Lock1 l=" + 
+      (rstring)l + ", err=" + (rstring)err + ", msg=" + 
+      dlGetLastDistributedLockErrorString());
+}
+
+Example Java code snippet:
+
+LockFactory lf = DistributedLocks.getLockFactory(); 
+Lock myLock = lf.createOrGetLock("Lock_For_Test_Store1");
+
+// Acquire that lock for a lease period of 30 seconds.
+try {
+   // First argument is the lease period for the lock.
+   // Second argument is the time in seconds we are willing to wait in order to acquire the lock.
+   // If a lock can't be acquired within that max wait time, then we will get a timeout exception.
+   myLock.((double)30.0, (double)120.0);
+   System.out.println("Successfully acquired the lock named 'Lock_For_Test_Store1'.");
+   // There is also a lock factory API to get the Linux PID of the current owner who is holding this lock.
+   int pid = lf.getPidForLock("Lock_For_Test_Store1");
+   System.out.println("Linux PID for the current owner of the 'Lock_For_Test_Store1' = " + pid);
+} catch (LockException le) {
+   System.out.println("Unable to acquire the lock named 'Lock_For_Test_Store1'. Error = " +
+      le.getErrorCode() + ", Error msg = " + le.getErrorMessage());
+      throw le;
+}
+
+// Exclusive access to the distributed lock obtained.
+// Perform your operations on a shared data store safely now.
+// ....
+// ....
+
+// Release the lock.
+myLock.releaseLock();
+// Remove the lock.
+lf.removeLock(myLock);
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+40) dlGetPidForLock  (Get the process id of the PE that has acquired and holding the lock at this time)
+
+uint32 dlGetPidForLock(rstring name, mutable uint64 err)
+
+This API can be used to obtain the process id currently owning the given lock name.
+For the final function argument, you must provide a mutable variable to receive the 
+DPS error code in case of a problem in the getPID operation.
+
+On a successful getPID operation, it assigns a value of 0 to the err variable passed as
+an argument. In case of an error, it assigns a non-zero value to the err variable.
+To get the detailed information about the most recent DL API error, you can call
+the dlGetLastDistributedLockErrorCode and the dlGetLastDistributedLockErrorString functions.
+
+TIP: You can use this API from a test or diagnostic or informational purposes.
+
+Example SPL code snippet:
+
+// We have an utility function that will return us the process id currently owning this lock.
+// Let us exercise that API.
+mutable uint32 pid = dlGetPidForLock("Super_Duper_Lock", err);
+					
+if (err != 0ul) {
+   printStringLn("Error in dlGetPidForLock(Super_Duper_Lock)  rc = " + 
+      (rstring)dlGetLastDistributedLockErrorCode() + ", msg=" + dlGetLastDistributedLockErrorString());
+} else {
+   printStringLn("Before lock acquisition: pid owning the Super_Duper_Lock = " + (rstring)pid);
+}
+
+Example Java code snippet:
+
+LockFactory lf = DistributedLocks.getLockFactory(); 
+int pid = lf.getPidForLock("Lock_For_Test_Store1");
+System.out.println("Linux PID for the current owner of the 'Lock_For_Test_Store1' = " + pid);
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+41) dlGetLastDistributedLockErrorCode  (Get the error code for the most recently exectuted DL API)
+
+uint64 dlGetLastDistributedLockErrorCode()
+
+This function can be used to obtain the error code for the most recently executed
+distributed lock API.
+
+Example SPL code snippet:
+
+printStringLn("Error in dlGetPidForLock(Super_Duper_Lock)  rc = " + 
+   (rstring)dlGetLastDistributedLockErrorCode() + ", msg=" + dlGetLastDistributedLockErrorString());
+}
+
+Example Java code snippet:
+
+try {
+   // Perform a Distributed Lock operation here.
+   // ...
+   // ...
+   // ...
+} catch (LockException le) {
+   System.out.println("Distributed lock operation failed. Error = " +
+      le.getErrorCode() + ", Error msg = " + le.getErrorMessage());
+      throw le;
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+
+42) dlGetLastDistributedLockErrorString  (Get the error message for the most recently exectuted DL API)
+
+rstring dlGetLastDistributedLockErrorString()
+
+This function can be used to obtain the detailed error message for the most recently executed
+distributed lock API.
+
+Example SPL code snippet:
+
+printStringLn("Error in dlGetPidForLock(Super_Duper_Lock)  rc = " + 
+   (rstring)dlGetLastDistributedLockErrorCode() + ", msg=" + dlGetLastDistributedLockErrorString());
+}
+
+Example Java code snippet:
+
+try {
+   // Perform a Distributed Lock operation here.
+   // ...
+   // ...
+   // ...
+} catch (LockException le) {
+   System.out.println("Distributed lock operation failed. Error = " +
+      le.getErrorCode() + ", Error msg = " + le.getErrorMessage());
+      throw le;
+}
+
+<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>
+==================================================================================
