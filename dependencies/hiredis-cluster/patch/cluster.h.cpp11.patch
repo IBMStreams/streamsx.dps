@@ -1,0 +1,21 @@
+--- cpp-hiredis-cluster-master.orig/include/cluster.h	2015-10-01 12:40:19.731418339 -0400
++++ cpp-hiredis-cluster-master/include/cluster.h	2015-10-02 11:21:53.128462302 -0400
+@@ -30,6 +30,7 @@
+ #define __libredisCluster__cluster__
+ 
+ #include <map>
++#include <stdlib.h>
+ 
+ extern "C"
+ {
+@@ -193,8 +194,8 @@
+                        reply->element[i]->element[2]->element[0]->type == REDIS_REPLY_STRING &&
+                        reply->element[i]->element[2]->element[1]->type == REDIS_REPLY_INTEGER)
+                     {
+-                        SlotRange slots = { reply->element[i]->element[0]->integer,
+-                            reply->element[i]->element[1]->integer };
++                      SlotRange slots(reply->element[i]->element[0]->integer,
++                                      reply->element[i]->element[1]->integer);
+                         
+                         connections_->insert(slots,
+                                             reply->element[i]->element[2]->element[0]->str,

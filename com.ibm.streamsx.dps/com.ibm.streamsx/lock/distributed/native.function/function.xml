@@ -136,19 +136,19 @@ In addition, the caller can also specify how long the caller is willing to wait 
         <cmn:managedLibrary>
           <cmn:lib>DistributedProcessStoreLib</cmn:lib>
           <cmn:lib>memcached</cmn:lib>
-          <cmn:lib>sds</cmn:lib>
+          <!-- <cmn:lib>sds</cmn:lib> -->
           <cmn:lib>hiredis</cmn:lib>
           <cmn:lib>uv</cmn:lib>
           <cmn:lib>crypto</cmn:lib>
           <cmn:lib>ssl</cmn:lib>
+          <cmn:lib>ldap_r</cmn:lib>
           <cmn:lib>cassandra</cmn:lib>
           <cmn:lib>curl</cmn:lib>
           <cmn:lib>json-c</cmn:lib>
           <cmn:lib>bson</cmn:lib>
           <cmn:lib>mongoc</cmn:lib>
-          <cmn:lib>couchbase</cmn:lib>
-          <cmn:lib>lua</cmn:lib>
-          <cmn:lib>aerospike</cmn:lib>
+          <!-- <cmn:lib>couchbase</cmn:lib> -->
+          <!-- <cmn:lib>aerospike</cmn:lib> -->
           <cmn:command>../../../../impl/bin/archLevel</cmn:command>
         </cmn:managedLibrary>
       </library>        

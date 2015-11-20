@@ -1,0 +1,12 @@
+--- curl-7.29.0.orig/configure	2013-02-06 04:47:26.000000000 -0500
++++ curl-7.29.0/configure	2015-10-27 14:01:54.396516514 -0400
+@@ -10271,6 +10271,9 @@
+ 	  x86_64-*linux*)
+ 	    LD="${LD-ld} -m elf_x86_64"
+ 	    ;;
++          ppc64le*-*linux*|powerpc64le*-*linux*)
++            LD="${LD-ld} -m elf64lppc"
++            ;;
+ 	  ppc*-*linux*|powerpc*-*linux*)
+ 	    LD="${LD-ld} -m elf64ppc"
+ 	    ;;

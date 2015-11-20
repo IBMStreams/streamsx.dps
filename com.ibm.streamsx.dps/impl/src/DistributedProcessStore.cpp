@@ -12,8 +12,10 @@
 #include "CloudantDBLayer.h"
 #include "HBaseDBLayer.h"
 #include "MongoDBLayer.h"
-#include "CouchbaseDBLayer.h"
-#include "AerospikeDBLayer.h"
+//#include "CouchbaseDBLayer.h"
+//#if !( defined (__PPC64__) )
+//#include "AerospikeDBLayer.h"
+//#endif
 #include "RedisClusterDBLayer.h"
 
 #include <SPL/Runtime/ProcessingElement/ProcessingElement.h>
@@ -165,10 +167,12 @@ namespace distributed
 		db_.reset(new HBaseDBLayer());
 	} else if (noSqlKvStoreProductName.compare("mongo") == 0) {
 		db_.reset(new MongoDBLayer());
-	} else if (noSqlKvStoreProductName.compare("couchbase") == 0) {
-		db_.reset(new CouchbaseDBLayer());
-	} else if (noSqlKvStoreProductName.compare("aerospike") == 0) {
-		db_.reset(new AerospikeDBLayer());
+// 	} else if (noSqlKvStoreProductName.compare("couchbase") == 0) {
+// 		db_.reset(new CouchbaseDBLayer());
+// #if !( defined (__PPC64__) )
+// 	} else if (noSqlKvStoreProductName.compare("aerospike") == 0) {
+// 		db_.reset(new AerospikeDBLayer());
+// #endif
 	} else if (noSqlKvStoreProductName.compare("redis-cluster") == 0) {
 		db_.reset(new RedisClusterDBLayer());
 	} else {

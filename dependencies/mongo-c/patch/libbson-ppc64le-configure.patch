@@ -1,0 +1,21 @@
+--- mongo-c-driver-1.0.2.orig/src/libbson/configure	2014-10-09 09:49:55.000000000 -0400
++++ mongo-c-driver-1.0.2/src/libbson/configure	2015-10-23 14:07:49.197479194 -0400
+@@ -5586,7 +5586,7 @@
+ 	for ac_word in $CC $CFLAGS $CPPFLAGS $LDFLAGS; do
+ 	 if test -n "$ac_prev"; then
+ 	   case $ac_word in
+-	     i?86 | x86_64 | ppc | ppc64)
++	     i?86 | x86_64 | ppc | ppc64 | ppc64le )
+ 	       if test -z "$ac_arch" || test "$ac_arch" = "$ac_word"; then
+ 		 ac_arch=$ac_word
+ 	       else
+@@ -8412,6 +8412,9 @@
+ 	  x86_64-*linux*)
+ 	    LD="${LD-ld} -m elf_x86_64"
+ 	    ;;
++          ppc64le*-*linux*|powerpc64le*-*linux*)
++            LD="${LD-ld} -m elf64lppc"
++            ;;
+ 	  ppc*-*linux*|powerpc*-*linux*)
+ 	    LD="${LD-ld} -m elf64ppc"
+ 	    ;;

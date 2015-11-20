@@ -246,7 +246,6 @@ Redis version 3.0.0 and higher provides a new feature to install and run a Redis
 In order to run and use the DPS toolkit, it is important to have the no-sql store client software available on all the machines where the Streams applications will be running. 
 The DPS toolkit manages the client installation for you by including the Redis client libraries (.so files) in the toolkit installation. 
 The DPS toolkit uses the hiredis C client and the hiredis-cluster wrapper include files for accessing the Redis no-sql store. The required header and library files are in the `impl/ext/` sub-directory of the DPS toolkit. 
-
 # Configuring the DPS toolkit
 Copy the DPS toolkit sample configuration file from `STREAMS_INSTALL/samples/com.ibm.streamsx.dps/dp_test_1/etc/no-sql-kv-store-servers.cfg` to `your-project-directory/etc/no-sql-kv-store-servers.cfg`.
 If using the Redis v2.8.x store, specify `redis` in the configuration file; if using the Redis v3.x store, specify `redis-cluster` in the configuration file.
@@ -258,8 +257,11 @@ Make any configuration changes needed to the file, based on your application's n
 # Reference information
 [../../javadoc/dps/index.html| DPS Java API Reference]
   </info:description>
-    <info:version>2.0.9</info:version>
+    <info:version>2.1.0</info:version>
     <info:requiredProductVersion>4.0.0.0</info:requiredProductVersion>
   </info:identity>
   <info:dependencies/>
+  <info:sabFiles>
+    <info:include path="impl/ext/**/*"/>
+  </info:sabFiles>
 </info:toolkitInfoModel>
