@@ -56,7 +56,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "DBLayer.h"
 
-#include "hiredis.h"
+#include "hiredis/hiredis.h"
 #include "hiredis-cluster/cluster.h"
 #include "hiredis-cluster/hirediscommand.h"
 #include <tr1/memory>

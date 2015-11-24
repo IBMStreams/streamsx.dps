@@ -1,0 +1,21 @@
+# -*- makefile -*-
+
+OBJ = sds.o
+LIB = libsds.so
+
+CFLAGS = -fPIC -Wall -std=c99 -pedantic -O2
+CPPFLAGS = -O3 -Wall -c -fmessage-length=0 -fPIC -D_REENTRANT -I.
+
+CXX = gcc
+
+all: $(LIB)
+
+$(OBJ): sds.c
+	$(CXX) $(CPPFLAGS) $<
+
+$(LIB): $(OBJ)
+	$(CXX) $(ARCH_CFLAG) -shared -Wl,-z,defs -o $@ $(OBJ)
+
+clean:
+	rm -f $(OBJ)
+	rm -f $(LIB)
