@@ -23,3 +23,9 @@ DPS toolkit for the purpose of sharing application state in a distributed manner
 There are plenty of details available about the installation, configuration, API description,
 built-in example etc. Please refer to the com.ibm.streamsx.dps/doc/dps-usage-tips.txt file
 for getting a good start in using this toolkit.  
+
+To learn more about Streams:
+* [IBM Streams on Github](http://ibmstreams.github.io)
+* [Introduction to Streams Quick Start Edition](http://ibmstreams.github.io/streamsx.documentation/docs/4.1/qse-intro/)
+* [Streams Getting Started Guide](http://ibmstreams.github.io/streamsx.documentation/docs/4.1/qse-getting-started/)
+* [StreamsDev](https://developer.ibm.com/streamsdev/)
