@@ -11,6 +11,11 @@ package com.ibm.streamsx.dps;
 import java.util.Iterator;
 import com.ibm.streamsx.dps.KeyValuePair;
 
+/***
+ * This class represents an iterator over the contents of a {@link Store}.
+ * It doesn't have any methods of its own other than the ones from the {@link Iterator} interface
+ * Each key and value in the iteration are represented by a {@link KeyValuePair}
+ */
 public interface StoreIterator extends Iterator<KeyValuePair> {
-	// This interface doesn't have any methods of its own other than the ones from the Iterator interface.
+
 }

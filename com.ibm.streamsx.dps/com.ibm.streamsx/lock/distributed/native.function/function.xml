@@ -7,36 +7,126 @@
     <headerFileName>DistributedLockWrappers.h</headerFileName>
     <functions>
       <function>
-        <description>Create a new lock with a given name or get it if
-        it already exists. Return the lock handle.</description>
+        <description>Create a new distributed lock with a given name or get it if it already exists.
+@param name the name of the lock to create or retrieve
+@param err a mutable variable that will retain the error code in event of a problem. On failure, **err** is assigned a non-zero value.  
+@return 0 on error, or the id of the lock otherwise. This id can then be used as a parameter to other lock related functions.  
+
+
+			mutable uint64 lock_id = 0ul;
+			mutable uint64 err = 0ul;
+			lock_id = dlCreateOrGetLock("My Sentinel Lock1", err);
+        	if (err != 0ul) {
+			   printStringLn("Error in creating My Sentinel Lock1. rc = " + 
+			   (rstring)dlGetLastDistributedLockErrorCode() + ", msg = " + dlGetLastDistributedLockErrorString());
+			} else {
+			   printStringLn("My Sentinel Lock1 was created with an id of " + (rstring)lock_id);
+			}
+        
+         </description>
         <prototype><![CDATA[ public stateful uint64 dlCreateOrGetLock(rstring name, mutable uint64 err) ]]></prototype>
       </function>
       <function>
-        <description>Remove lock. Return the true if the lock was there.</description>
+        <description>Remove the distributed lock with the given id. 
+**NOTE**:  Since the whole purpose of distributed locks is to ensure operations are performed safely on shared resources by multiple unrelated application components, do not remove distributed locks abruptly unless you are very clear about what you are doing. 
+Do it only when you are sure that no one is using the lock at the time of removing it.
+@param lock the id of the lock to remove.
+@param err a mutable variable to receive the error code.
+@return 'true' on success, 'false' otherwise. In the case of an error, a non-zero value is assigned to the **err**  variable.
+
+
+
+  	mutable uint64 lock_id = 0ul;
+	mutable uint64 err = 0ul;
+	lock_id = dlCreateOrGetLock("My Sentinel Lock1", err);
+	...
+	err = 0ul;
+	boolean myResult = dlRemoveLock(lock_id, err);
+	if (!myResult) { 
+               printStringLn("Failed to remove the lock My Sentinel Lock1 lock_id=" +(rstring)lock_id + ", err=" + (rstring)err + ", msg=" + dlGetLastDistributedLockErrorString());
+	} else {
+               printStringLn("We removed the lock My Sentinel Lock1 lock_id =" + (rstring)lock_id);
+	}
+ </description>       		
         <prototype><![CDATA[ public stateful boolean dlRemoveLock(uint64 lock, mutable uint64 err) ]]></prototype>
       </function>
       <function>
-        <description>Acquire lock.</description>
-        <prototype><![CDATA[ public stateful void dlAcquireLock(uint64 lock, mutable uint64 err) ]]></prototype>
+        <description> This function can be called to acquire a distributed lock. Acquiring a lock before performing a write/delete operation into a data store that is shared by multiple applications is a good way to ensure safe access of the shared resource.  This function can be used to acquire such a lock before in order to gain exclusive access for a shared resource. Locks acquired through this function will be owned until the lock is released via [dlReleaseLock(uint64,uint64)].   
+
+**IMPORTANT NOTE:**
+Once called, this function could spin loop for a very long time (three or four minutes) until it acquires the distributed lock or it times out due to the distributed lock being not yet available.  Another important factor is that once the lock is granted, it is given to you for an infinite period of time. Hence, it is your responsibility to properly release the lock at the end of your task. There is no external mechanism to take the lock back from you in case your code crashes after acquiring the lock.
+An alternative overloaded function is available that allows you to specify a maximum time to wait, and also allows lock ownership to expire after a given amount of time.  This alternative function is also called [dlAcquireLock(uint64, float64, float64,  uint64 ) |dlAcquireLock].
+@param lock the id of the lock to acquire.
+@param err a mutable variable to receive a non-zero error code in the event of a problem acquiring the lock.  Will be set to '0' on success. 
+
+
+		mutable uint64 lk = 0ul;
+		mutable uint64 err = 0ul;
+		lk = dlCreateOrGetLock("My Sentinel Lock1", err);
+		//do error checking
+
+		dlAcquireLock(lk, err);
+		if (err == 0ul) {
+		   printStringLn("We acquired the lock My Sentinel Lock1 lk=" + (rstring)lk);
+		   //perform operation
+		  
+			//call  dlReleaseLock once done
+		} else {
+		   printStringLn("Failed to acquire the lock My Sentinel Lock1 lk=" + (rstring)lk + 
+		      " rc = " + (rstring)dlGetLastDistributedLockErrorCode() + 
+		      ", msg = " + dlGetLastDistributedLockErrorString());
+		   // It is advisable to return from here since the lock is not granted.
+		   return;
+		}
+		
+</description>
+       <prototype><![CDATA[ public stateful void dlAcquireLock(uint64 lock, mutable uint64 err) ]]></prototype>
       </function>
       <function>
-        <description>Acquire lock, with an explicit lease time in seconds.</description>
+        <description>Acquire lock, with an explicit lease time in seconds and a maximum time to wait to acquire the lock. 
+This overloaded function can be used to acquire a given distributed lock id.  This function has two advantages over the other [dlAcquireLock(uint64, uint64)|dlAcquireLock] function.  
+First of all, callers can pass a fixed lease time for the lock, indicating that the lock will be needed at most for a specified period before which the caller will relinquish this lock.  
+In addition, the caller can also specify how long the caller is willing to wait to acquire the lock.
+@param lock the id of the lock to acquire, must have been previously created.
+@param leaseTime the length of time, in seconds, for which the lock is needed. Must be greater than 0. If the lock is not released after the requested lease time due to a program crash or a programmatic error, the lock will be automatically released and made available for others to acquire.
+@param maxWaitTimeToAcquireLock Maximum time to wait to acquire the lock, in seconds. If the lock acquisition is not done within the specified max wait time, this function will exit with an error instead of spin looping forever.
+@param err a mutable variable to receive a non-zero error code in the event of a problem acquiring the lock.  Will be set to '0' on success.
+      </description>
         <prototype><![CDATA[ public stateful void dlAcquireLock(uint64 lock, float64 leaseTime, float64 maxWaitTimeToAcquireLock, mutable uint64 err) ]]></prototype>
       </function>
       <function>
-        <description>Release lock.</description>
+        <description>Release the given distributed lock id.
+@param lock the id of the lock to release.  The specified lock will be made available for other callers to acquire.
+@param err a mutable variable to receive a non-zero error code in the event of a problem releasing the lock.  Will be set to '0' on success.  
+
+</description>
         <prototype><![CDATA[ public stateful void dlReleaseLock(uint64 lock, mutable uint64 err) ]]></prototype>
       </function>
       <function>
-        <description>Get the process id that is currently holding a given lock.</description>
+        <description>Get the process id that is currently holding a given lock.  This function can be used for test, diagnostic or informational purposes.
+@param name the name of the distributed lock in question.
+@param err stores the error code if an error occurs, or '0' otherwise.
+@return the id of the Linux process id of the processing element (PE) that currently owns the lock, or '0' if no one owns the lock.  
+		
+		mutable uint32 pid = dlGetPidForLock("file_lock", err);
+		if (err != 0ul) {
+			rstring msg = dlGetLastDistributedLockErrorString();
+			uint64 rc = dlGetLastDistributedLockErrorCode();
+			printStringLn("Error in dlGetPidForLock(file_lock)  rc = " + (rstring)(rc) + ", msg =" + msg );
+		} else {
+			printStringLn("Before lock acquisition: pid owning the file_lock = " + (rstring)pid);
+		}
+</description>
         <prototype><![CDATA[ public stateful uint32 dlGetPidForLock(rstring name, mutable uint64 err) ]]></prototype>
       </function>
       <function>
-        <description>Get the description of the last DB error.</description>
+        <description>Get the description of the error that occurred on the most recently executed operation in the DL API, if any.
+@return a message describing the error that occurred, or the empty string if the last DL operation was successful.</description>
         <prototype><![CDATA[ public stateful rstring dlGetLastDistributedLockErrorString() ]]></prototype>
       </function>
       <function>
-        <description>Get the error code of the last DB error.</description>
+        <description>Get the error code of the last DL error
+@return the error code for the most recently executed operation, or '0' if no error occurred.       .</description>
         <prototype><![CDATA[ public stateful uint64 dlGetLastDistributedLockErrorCode() ]]></prototype>
       </function> 
     </functions>
@@ -46,19 +136,19 @@
         <cmn:managedLibrary>
           <cmn:lib>DistributedProcessStoreLib</cmn:lib>
           <cmn:lib>memcached</cmn:lib>
-          <cmn:lib>sds</cmn:lib>
+          <!-- <cmn:lib>sds</cmn:lib> -->
           <cmn:lib>hiredis</cmn:lib>
           <cmn:lib>uv</cmn:lib>
           <cmn:lib>crypto</cmn:lib>
           <cmn:lib>ssl</cmn:lib>
+          <cmn:lib>ldap_r</cmn:lib>
           <cmn:lib>cassandra</cmn:lib>
           <cmn:lib>curl</cmn:lib>
           <cmn:lib>json-c</cmn:lib>
           <cmn:lib>bson</cmn:lib>
           <cmn:lib>mongoc</cmn:lib>
-          <cmn:lib>couchbase</cmn:lib>
-          <cmn:lib>lua</cmn:lib>
-          <cmn:lib>aerospike</cmn:lib>
+          <!-- <cmn:lib>couchbase</cmn:lib> -->
+          <!-- <cmn:lib>aerospike</cmn:lib> -->
           <cmn:command>../../../../impl/bin/archLevel</cmn:command>
         </cmn:managedLibrary>
       </library>        

@@ -5,10 +5,13 @@
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 */
-// Any errors during lock creation will result in this exception getting thrown.
-// Users of the dps facility can then catch the exception and obtain the error code and error message.
 package com.ibm.streamsx.dl;
 
+
+/**
+ * Any errors during lock creation will result in this exception getting thrown.
+	Users of the DPS facility can then catch the exception and obtain the error code and error message.
+*/
 public class LockFactoryException extends Exception {
 	private long errorCode;
 	private String errorMessage;

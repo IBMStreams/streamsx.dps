@@ -113,9 +113,9 @@ public class DpsHelper {
 	public DpsHelper() throws Exception {
 		boolean dpsJavaLibLoaderLibraryLoaded = false;
 		// Let us get the directory from where this class (DpsHelper) was loaded.
-		// [It should be "com.ibm.streamsx.dps/impl/java/bin"]
-		// Using that directory, we can navigate to the dps impl/lib/<OS_VERSION> directory and load the .so library from there.
-		// However, classDir obtained below in the next statement will have "<Full pathname to the impl/java/bin>/dps-helper.jar".
+		// [It should be "com.ibm.streamsx.dps/impl/java/lib"]
+		// Using that directory, we can navigate to the dps impl/lib irectory and load the .so library from there.
+		// However, classDir obtained below in the next statement will have "<toolkit_root>/impl/java/lib/dps-helper.jar".
 		// We have to get rid of the 'dps-helper.jar' substring that appears at the very end of it.
 		String classDir = DpsHelper.class.getProtectionDomain().getCodeSource().getLocation().getPath();
 		// Find the index of the dps-helper.jar substring inside the classDir string.
@@ -130,22 +130,6 @@ public class DpsHelper {
 		classDir = classDir.substring(0, idx);
 		System.out.println("DpsHelper classDir=" + classDir);
 		
-		// We have to get the correct version of the dps .so library suitable for a given OS version.
-		// In our case, we care only about the RHEL5, CentOS5, RHEL6, and CentOS6.
-		// RHEL and CentOS are fully binary compatible at the level of the OS major version numbers.
-		// That will narrow it down to RHEL5 and RHEL6.
-		// Let us get the OS version now.
-		String osVersion = System.getProperty("os.version");
-		System.out.println("DpsHelper: Linux OS Version = " + osVersion);
-		String soLibSubDirectory = "";
-		if (osVersion.contains(".el5") == true) {
-			soLibSubDirectory = "x86_64.RHEL5";
-		} else if (osVersion.contains(".el6.x86_64") == true) {
-			soLibSubDirectory = "x86_64.RHEL6";
-		} else if (osVersion.contains(".el6.ppc64") == true) {
-			soLibSubDirectory = "ppc64.RHEL6";
-		}
-
 		// Senthil added the following code block on Apr/07/2015.
 		// If users get a runtime exception while using the DPS APIs from a fused set of Java operators, they must first try
 		// by adding the @SharedLoader(true) annotation to their Java operator and see if that eliminates that
@@ -156,82 +140,77 @@ public class DpsHelper {
 		// After that they can try it and see if the workaround shown below fixes their class loader runtime exception problem.
 		boolean handleJavaOperatorsFusedCondition = false;		
 		
-		if (soLibSubDirectory == "") {
-			// We couldn't get the OS version.
-			dpsJavaLibLoaderLibraryLoaded = false;
-		} else {								
-			String dpsJavaLibLoaderLibName = classDir + "../../lib/" + soLibSubDirectory + "/libDpsJavaLibLoader.so";
-			// We will load the dps java libary loader .so file in which we have a single JNI C++ method to 
-			// load so many other DPS related back-end .so libraries.
-			// If you have a fully qualified file name for the .so file, then use the System.load call.
-			// If you don't have a fully qualified path and you only know the library name and then try to
-			// load it from the library search path, then use the System.loadLibrary call.
-
-			if (handleJavaOperatorsFusedCondition == true) {
-				// If multiple Java operators use the @SharedLoader(true) annotation, then those operators will use a single class loader.
-				// In that case, all those operators will invoke this constructor method only once thereby loading the DPS .so library
-				// only once. [@SharedLoader(true) will work only among operators with exactly the same @Libraries annotation. I also
-				// noticed it to be not working correctly in certain Linux VM environments.]
-				// If those operators don't use the @SharedLoader(true) annotation and if they are fused into a single PE or compiled into a
-				// standalone application, then they each will have their own class loader loading the same DPS .so file within a
-				// single process and that will lead to a runtime exception (UnSatisfiedLink error). We must avoid this condition where
-				// multiple class loaders attempting to load the DPS .so file within a single process (fused or standalone).
-				// The problem here is the filename of that .so file once loaded already in a given process will trigger that
-				// class loader exception claiming that a library with that particular file name is already loaded.
-				// One workaround we can think of is to make a copy of that .so library in different names for each call into this
-				// Java constructor function (where were are now) and load it using a unique file name. An obvious disadvantage of 
-				// this approach is that there will be many copies of that .so library file until the application is completely stopped.
-				// In addition, this may also use up additional memory because of multiple copies of that same .so library getting loaded.
-				// If this is agreeable to you, you can set the handleJavaOperatorsFusedCondition variable to true and try this workaround.
-				//
-				// Get the current time in millis.
-				long currentTimeInMilliSeconds = System.currentTimeMillis();
-				// Seed a random number.
-				Random rand = new Random(currentTimeInMilliSeconds);
-				currentTimeInMilliSeconds += rand.nextLong();
-				// Now copy the DPS file as a new random file.
-				String randomDpsJavaLibLoaderLibName = classDir + "../../lib/" + soLibSubDirectory + "/DJLL_" + currentTimeInMilliSeconds + ".so";
-																			
-				try {
-					Files.copy(Paths.get(dpsJavaLibLoaderLibName), Paths.get(randomDpsJavaLibLoaderLibName), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-				} catch (Exception ex) {
-					System.out.println("DpsHelper: Error in copying the DPS Java lib loader .so file(" +
-						randomDpsJavaLibLoaderLibName + "). Aborting now...");
-					throw(ex);
-				}
-																						
-				System.out.println("DpsHelper: Loading the dpsJavaLibLoader library-->" + randomDpsJavaLibLoaderLibName);
-				System.load(randomDpsJavaLibLoaderLibName);
-				dpsJavaLibLoaderLibraryLoaded = true;
-																															
-				// Delete the file we created above.
-				// This file will get deleted only when the application is closed.
-				try {
-					Files.delete(Paths.get(randomDpsJavaLibLoaderLibName));
-				} catch (Exception ex) {
-					;
-				}
-			} else {
-				// This is the only block of code we had before adding the if-else block here on Apr/07/2015 as a 
-				// potential workaround for the class loader runtime exception when DPS APIs are called from a fused group of
-				// Java operators. The following two lines are sufficient when the DPS client Java operators are not fused.
-				System.out.println("DpsHelper: Loading the dpsJavaLibLoader library-->" + dpsJavaLibLoaderLibName);
-				System.load(dpsJavaLibLoaderLibName);			
-				dpsJavaLibLoaderLibraryLoaded = true;
-			}
-		}
+                String dpsJavaLibLoaderLibName = classDir + "../../lib/libDpsJavaLibLoader.so";
+                // We will load the dps java libary loader .so file in which we have a single JNI C++ method to 
+                // load so many other DPS related back-end .so libraries.
+                // If you have a fully qualified file name for the .so file, then use the System.load call.
+                // If you don't have a fully qualified path and you only know the library name and then try to
+                // load it from the library search path, then use the System.loadLibrary call.
+                
+                if (handleJavaOperatorsFusedCondition == true) {
+                    // If multiple Java operators use the @SharedLoader(true) annotation, then those operators will use a single class loader.
+                    // In that case, all those operators will invoke this constructor method only once thereby loading the DPS .so library
+                    // only once. [@SharedLoader(true) will work only among operators with exactly the same @Libraries annotation. I also
+                    // noticed it to be not working correctly in certain Linux VM environments.]
+                    // If those operators don't use the @SharedLoader(true) annotation and if they are fused into a single PE or compiled into a
+                    // standalone application, then they each will have their own class loader loading the same DPS .so file within a
+                    // single process and that will lead to a runtime exception (UnSatisfiedLink error). We must avoid this condition where
+                    // multiple class loaders attempting to load the DPS .so file within a single process (fused or standalone).
+                    // The problem here is the filename of that .so file once loaded already in a given process will trigger that
+                    // class loader exception claiming that a library with that particular file name is already loaded.
+                    // One workaround we can think of is to make a copy of that .so library in different names for each call into this
+                    // Java constructor function (where were are now) and load it using a unique file name. An obvious disadvantage of 
+                    // this approach is that there will be many copies of that .so library file until the application is completely stopped.
+                    // In addition, this may also use up additional memory because of multiple copies of that same .so library getting loaded.
+                    // If this is agreeable to you, you can set the handleJavaOperatorsFusedCondition variable to true and try this workaround.
+                    //
+                    // Get the current time in millis.
+                    long currentTimeInMilliSeconds = System.currentTimeMillis();
+                    // Seed a random number.
+                    Random rand = new Random(currentTimeInMilliSeconds);
+                    currentTimeInMilliSeconds += rand.nextLong();
+                    // Now copy the DPS file as a new random file.
+                    String randomDpsJavaLibLoaderLibName = classDir + "../../lib/DJLL_" + currentTimeInMilliSeconds + ".so";
+                    
+                    try {
+                        Files.copy(Paths.get(dpsJavaLibLoaderLibName), Paths.get(randomDpsJavaLibLoaderLibName), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    } catch (Exception ex) {
+                        System.out.println("DpsHelper: Error in copying the DPS Java lib loader .so file(" +
+                                           randomDpsJavaLibLoaderLibName + "). Aborting now...");
+                        throw(ex);
+                    }
+                    
+                    System.out.println("DpsHelper: Loading the dpsJavaLibLoader library-->" + randomDpsJavaLibLoaderLibName);
+                    System.load(randomDpsJavaLibLoaderLibName);
+                    dpsJavaLibLoaderLibraryLoaded = true;
+                    
+                    // Delete the file we created above.
+                    // This file will get deleted only when the application is closed.
+                    try {
+                        Files.delete(Paths.get(randomDpsJavaLibLoaderLibName));
+                    } catch (Exception ex) {
+                        ;
+                    }
+                } else {
+                    // This is the only block of code we had before adding the if-else block here on Apr/07/2015 as a 
+                    // potential workaround for the class loader runtime exception when DPS APIs are called from a fused group of
+                    // Java operators. The following two lines are sufficient when the DPS client Java operators are not fused.
+                    System.out.println("DpsHelper: Loading the dpsJavaLibLoader library-->" + dpsJavaLibLoaderLibName);
+                    System.load(dpsJavaLibLoaderLibName);			
+                    dpsJavaLibLoaderLibraryLoaded = true;
+                }
 		
 		// Check if the dps java lib loader .so library was loaded successfully in the previous code block.
 		if (dpsJavaLibLoaderLibraryLoaded == false) {
-			Exception ex = new Exception("DpsHelper: Error in getting the Linux version number. Aborting now...");
-			System.out.println("DpsHelper: Error in getting the Linux version number. Aborting now...");
-			throw(ex);
+                    Exception ex = new Exception("DpsHelper: Error in getting the Linux version number. Aborting now...");
+                    System.out.println("DpsHelper: Error in getting the Linux version number. Aborting now...");
+                    throw(ex);
 		}
 
 		// In the code block shown above, we loaded the dps java lib loader .so library.
 		// But, our main dps .so library code heavily uses the libmemcached and libhiredis and libcassandra third party
 		// client libraries, which we built on our own and made it available in the 
-		// impl/lib/<OS_VERSION> directory of the dps toolkit. Our main dps .so library is also placed in that same directory.
+		// impl/lib directory of the dps toolkit. Our main dps .so library is also placed in that same directory.
 		// We were not able to access/load those back-end client libraries here inside the Java code via this Java API: System.load(XXXXX)
 		// We also tried the -Wl,-rpath,'$ORIGIN' linker option while building our dps .so library. That also
 		// didn't help. Finally the following technique worked like a charm.
@@ -239,60 +218,60 @@ public class DpsHelper {
 		// As mentioned in the comments above, the following JNI function is the lonely one
 		// included in the DPS java lib loader .so file we loaded above. It can be accessed now to
 		// load so many other dependent .so files from within that C++ method via dlopen.
-		String dlOpenResultString = dpsLoadBackEndDbClientLibraries(classDir + "../../lib/" + soLibSubDirectory);
+		String dlOpenResultString = dpsLoadBackEndDbClientLibraries(classDir + "../../ext/lib");
 		System.out.println(dlOpenResultString);
 		
 		if (dlOpenResultString.contains("failed") == true) {
-			Exception ex = new Exception(dlOpenResultString + ". Aborting now...");
-			throw(ex);
+                    Exception ex = new Exception(dlOpenResultString + ". Aborting now...");
+                    throw(ex);
 		}
-		
+                
 		// Now that we loaded all the back-end dependent libraries, let us load the main
 		// DPS .so file (libDistributedProcessStoreLib) file.
 		boolean dpsLibLoaded = false;
-		String dpsLibName = classDir + "../../lib/" + soLibSubDirectory + "/libDistributedProcessStoreLib.so";
-					
+		String dpsLibName = classDir + "../../lib/libDistributedProcessStoreLib.so";
+		
 		if (handleJavaOperatorsFusedCondition == true) {
-			// Get the current time in millis.
-			long currentTimeInMilliSeconds = System.currentTimeMillis();
-			// Seed a random number.
-			Random rand = new Random(currentTimeInMilliSeconds);
-			currentTimeInMilliSeconds += rand.nextLong();
-			// Now copy the DPS file as a new random file.
-			String randomDpsLibName = classDir + "../../lib/" + soLibSubDirectory + "/DPS_" + currentTimeInMilliSeconds + ".so";
-																		
-			try {
-				Files.copy(Paths.get(dpsLibName), Paths.get(randomDpsLibName), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-			} catch (Exception ex) {
-				System.out.println("DpsHelper: Error in copying the DPS .so file. Aborting now...");
-				throw(ex);
-			}
-																					
-			System.out.println("DpsHelper: Loading the dps library-->" + randomDpsLibName);
-			System.load(randomDpsLibName);
-			dpsLibLoaded = true;
-																														
-			// Delete the file we created above.
-			// This file will get deleted only when the application is closed.
-			try {
-				Files.delete(Paths.get(randomDpsLibName));
-			} catch (Exception ex) {
-				;
-			}
+                    // Get the current time in millis.
+                    long currentTimeInMilliSeconds = System.currentTimeMillis();
+                    // Seed a random number.
+                    Random rand = new Random(currentTimeInMilliSeconds);
+                    currentTimeInMilliSeconds += rand.nextLong();
+                    // Now copy the DPS file as a new random file.
+                    String randomDpsLibName = classDir + "../../lib/DPS_" + currentTimeInMilliSeconds + ".so";
+                    
+                    try {
+                        Files.copy(Paths.get(dpsLibName), Paths.get(randomDpsLibName), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    } catch (Exception ex) {
+                        System.out.println("DpsHelper: Error in copying the DPS .so file. Aborting now...");
+                        throw(ex);
+                    }
+                    
+                    System.out.println("DpsHelper: Loading the dps library-->" + randomDpsLibName);
+                    System.load(randomDpsLibName);
+                    dpsLibLoaded = true;
+                    
+                    // Delete the file we created above.
+                    // This file will get deleted only when the application is closed.
+                    try {
+                        Files.delete(Paths.get(randomDpsLibName));
+                    } catch (Exception ex) {
+                        ;
+                    }
 		} else {
-			// This is the only block of code we had before adding the if-else block here on Apr/07/2015 as a 
-			// potential workaround for the class loader runtime exception when DPS APIs are called from a fused group of
-			// Java operators. The following two lines are sufficient when the DPS client Java operators are not fused.
-			System.out.println("DpsHelper: Loading the dps library-->" + dpsLibName);
-			System.load(dpsLibName);			
-			dpsLibLoaded = true;
+                    // This is the only block of code we had before adding the if-else block here on Apr/07/2015 as a 
+                    // potential workaround for the class loader runtime exception when DPS APIs are called from a fused group of
+                    // Java operators. The following two lines are sufficient when the DPS client Java operators are not fused.
+                    System.out.println("DpsHelper: Loading the dps library-->" + dpsLibName);
+                    System.load(dpsLibName);			
+                    dpsLibLoaded = true;
 		}
 		
 		// Check if the dps .so library was loaded successfully in the previous code block.
 		if (dpsLibLoaded == false) {
-			Exception ex = new Exception("DpsHelper: Error in loading the DPS library. Aborting now...");
-			System.out.println("DpsHelper: Error in loading the DPS library. Aborting now...");
-			throw(ex);
+                    Exception ex = new Exception("DpsHelper: Error in loading the DPS library. Aborting now...");
+                    System.out.println("DpsHelper: Error in loading the DPS library. Aborting now...");
+                    throw(ex);
 		}
 	}
 	
