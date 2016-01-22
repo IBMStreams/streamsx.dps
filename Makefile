@@ -1,4 +1,20 @@
-# -*- makefile -*-
+###################################################################
+# Copyright (C) 2015, International Business Machines Corporation.
+# All Rights Reserved.
+###########################################################
+
+##
+#This Makefile builds the DPS toolkit.
+#Pre-built versions of the dependencies (curl, redis, e.t.c) have been included in the dependencies folder for the following supported platforms:
+# Linux x86_64: 
+# RedHat Enterprise Linux 6.4 (or an equivalent CentOS version)
+# RedHat Enterprise Linux 7.1 (or an equivalent CentOS version)
+# SUSE Linux Enterprise Server (SLES)) 11
+#Linux for IBM Power 8 Little Endian: 
+# RedHat Enterprise Linux 7.1 )
+#Linux for IBM Power 7 Big Endian: 
+# RedHat Enterprise Linux 6.4 (or an equivalent CentOS version)
+# To build the toolkit for any of the above platforms, run "make".  
 
 PWD = $(shell pwd)
 

@@ -1,4 +1,7 @@
-# -*- makefile -*-
+###################################################################
+# Copyright (C) 2015, International Business Machines Corporation.
+# All Rights Reserved.
+###########################################################
 
 #PACKAGES += aerospike
 PACKAGES += cassandra
