@@ -18,7 +18,7 @@
 # PROFITS, BUSINESS INTERRUPTION, LOSS OF PROGRAMS OR OTHER DATA   
 # ON YOUR INFORMATION HANDLING SYSTEM OR OTHERWISE.                
 #                                                                  
-# (C) Copyright IBM Corp. 2015, 2015  All Rights reserved.         
+# (C) Copyright IBM Corp. 2015, 2016  All Rights reserved.         
 #                                                                  
 # end_generated_IBM_copyright_prolog                               
 
@@ -26,16 +26,16 @@ DPS_TOOLKIT_HOME = $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.dps
 
 SPLC_FLAGS ?= -a -z -t $(DPS_TOOLKIT_HOME)
 SPLC = $(STREAMS_INSTALL)/bin/sc
-SPL_CMD_ARGS ?= --data-directory=./data --output-directory=./output/DpsTest1/Distributed
+SPL_CMD_ARGS ?= --data-directory=./data 
 SPL_MAIN_COMPOSITE = DpsTest1
 
 all: distributed
 
 standalone:
-	$(SPLC) $(SPLC_FLAGS) -T -M $(SPL_MAIN_COMPOSITE) $(SPL_CMD_ARGS)
+	$(SPLC) $(SPLC_FLAGS) -T -M $(SPL_MAIN_COMPOSITE) $(SPL_CMD_ARGS) --output-directory=./output/DpsTest1/Standalone
 
 distributed:
-	$(SPLC) $(SPLC_FLAGS) -M $(SPL_MAIN_COMPOSITE) $(SPL_CMD_ARGS)
+	$(SPLC) $(SPLC_FLAGS) -M $(SPL_MAIN_COMPOSITE) $(SPL_CMD_ARGS) --output-directory=./output/DpsTest1/Distributed
 
 clean: 
 	$(SPLC) $(SPLC_FLAGS) -C -M $(SPL_MAIN_COMPOSITE)
