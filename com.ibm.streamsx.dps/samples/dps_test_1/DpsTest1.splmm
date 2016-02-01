@@ -1,79 +1,28 @@
 /*
-================================================================================================
-"We are what we repeatedly do. Excellence, therefore, is not an act, but a habit." -- Aristotle
-
-"If you want to achieve excellence, you can get there today.
- As of this second, quit doing less-than-excellent work." -- Thomas J. Watson (Founder of IBM)
-================================================================================================
+ *  Licensed Materials - Property of IBM
+ *  Copyright IBM Corp. 2011, 2016
+ *  US Government Users Restricted Rights - Use, duplication or
+ *  disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
 */
 
+// Declare the use of the namespace under which all our DPS native functions are available.
+use com.ibm.streamsx.store.distributed::*;
+use com.ibm.streamsx.lock.distributed::*;
 /*
-# Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2015
-# US Government Users Restricted Rights - Use, duplication or
-# disclosure restricted by GSA ADP Schedule Contract with
-# IBM Corp.
-*/
-/*
-This is a test driver application available inside the dps toolkit. It shows a way for
-Streams applications to have a distributed process store (dps) for sharing data among 
-multiple PEs (Processing Elements) running on one or more machines. In this implementation of dps,
-we are using the following NoSQL databases as our distributed data stores
-
-1) memcached 1.4.15 or higher versions
-2) Redis 2.8.17 or higher versions    [No Redis provided HA facility in these versions]
-3) Apache Cassandra 2.1.0 or higher versions
-4) IBM Cloudant DBaaS  [Database as a service on the cloud]
-5) Apache HBase 0.98.8 or higher versions for Hadoop2
-6) MongoDB 2.6.6 or higher versions
-7) Couchbase 3.0.2 or higher versions
-8) Aerospike 3.4.1 or higher versions
-9) Redis Cluster 3.0.0 or higher version  [With HA facility for automatic fail-over when
-   a Redis instance or the entire machine crashes] 
-
-Making this facility available for Streams opens up new possibilities to share data even among PEs
-belonging to different Streams applications. Streams application designers/developers will be able to do
-neat things with this facility. memcached, redis, Cassandra, Cloudant, HBase, Mongo, 
-Couchbase and Aerospike are open source offerings based on BSD and Apache licensing schemes and
-they are used by many top flight commercial software companies. Depending on whether you are using 
-memcached or redis or Cassandra or Cloudant or HBase or Mongo or Couchbase or Aerospike, you must first
-do a simple configuration before attempting to compile and run this test SPL application.
-Please refer to this SPL project directory's etc/no-sql-kv-store-servers.cfg file.
-In addition, it is recommended that you read the doc/dps-usage-tips.txt file in this toolkit directory to get some
-tips about setting up a memcached or a redis or a Cassandra or Cloudant or HBase or Mongo or Couchbase or
-Aerospike back-end NoSQL store server environment.
-
-Important Note
---------------
-We have the following two completely different approaches for sharing data between
-Streams operators. We would like to suggest the following as a guideline about their usage.
-
-1) For sharing data among fused operators that are part of a single PE, it is a lot
-easier and faster to use our process store (ps) facility. Please refer to a different toolkit
-that gives an elaborate demonstration of that feature. It is available for download as a 
-separate toolkit from the IBMStreams github.
-
-2) For sharing data among non-fused operators that are part of different PEs, you could use
-our distributed process store (dps) facility. This toolkit contains the dps source code and a test application with
-a detailed explanation about using the dps. It is better to use this toolkit in Distributed mode rather than
-in Standalone mode. This package is available for download as a toolkit from the IBMStreams github.
-
-This test application below has plenty of assert statements. If you want to see those assertions printed, 
+ * This is a test driver application available inside the DPS toolkit. It shows a way for Streams applications to have a distributed process store (DPS) for sharing data among
+* multiple PEs (Processing Elements) running on one or more machines. 
+* It supports Redis v2.8.2+ and v3.x.  It might also work with the other NoSQL K/V stores mentioned but does not claim support for them.   
+* You must first do a simple configuration before attempting to compile and run this test SPL application.
+* Please refer to this SPL project directory's etc/no-sql-kv-store-servers.cfg file.
+* In addition, it is recommended that you read the documentation for the toolkit to get some tips about setting up a redis back-end.
+* Important Note
+* This test application below has plenty of assert statements. If you want to see those assertions printed, 
 you should build it without the -a flag i.e. with optimized code generation turned off.
 
 In one of the tests below, we will do one million inserts into the store. Please 
 ensure that your memcached server is started with the -m option to use at least 128MB memory.
 Other K/V stores mentioned above will also easily handle that test for million inserts.
 
-Following are the major parts that make up the dps facility:
-
-a) SPL test application (file you are reading now) to show how the dps native functions can be used for distributed data sharing.
-b) Native function model file (com.ibm.streamsx/store/distributed/native.funcion/function.xml) that shows a list of all the
-   dps native functions available for use. 
-c) Source code for the DistributedProcessStore available here in the impl/src and impl/include directories. 
-  (As a first step, run the mk script here in the ./impl directory. It will build a .so file and copy it
-   to a platform-specific location inside the impl/lib directory. After that, you can use the build and run
-   scripts available in this example directory to compile and run this test application.
 
 Our distributed process store provides a "global + distributed" in-memory cache for 
 different processes (multiple PEs from one or more Streams applications). We provide a set of free for all 
@@ -81,41 +30,24 @@ native function APIs to create/read/update/delete data items on one or more stor
 multiple writers and multiple readers for the same store. It is important to note that a Streams application 
 designer/developer should carefully address how different parts of his/her application will access the store 
 simultaneously i.e. who puts what, who gets what and at what frequency from where etc.
-
-Please refer to the doc/dps-usage-tips.txt file in this toolkit directory for configuring and running this
-test application using one or more memcached (OR) redis (OR) Cassandra (OR) Cloudant (OR) HBase (OR) Mongo (OR)
-Couchbase (OR) Aerospike servers. The same test driver code in this SPL application will work for memcached (OR)
-redis (OR) Cassandra (OR) Cloudant (OR) HBase (OR) Mongo (OR) Couchbase (OR) Aerospike environment without a need for recompiling.
-
-A disclaimer: There is no formal plan at this time (Feb/2015) to make either the ps or the dps features
-as part of the official InfoSphere Streams product. Both the process store (ps) and the 
-distributed process store (dps) toolkits are available for download in the IBMStreams github.
-Streams developers can download and use them as they see fit for their project needs.
-
-In jointly creating this useful toolkit, I had another great opportunity to
-collaborate with my great friend and our fantastic Streams designer/developer Bugra Gedik.
 */
-// Declare the use of the namespace under which all our dps native functions are available.
-use com.ibm.streamsx.store.distributed::*;
-use com.ibm.streamsx.lock.distributed::*;
-
 composite DpsTest1
 {
     graph
-    	// Kickstart our Distributed Process Store (dps) tests.
+    	// Kickstart our Distributed Process Store (DPS) tests.
     	// Because of the web based Interaction needs of Cloudant and due to its eventual consistency storage model,
     	// Cloudant is usually slow in comparison to Redis and it may not also handle the frequent 
     	// create_store/delete_store/create_same_store cycle we do in these tests. 
-    	// So, set your expectations accordingly when using the dps toolkit with not so fast NoSQL K/V stores such as
+    	// So, set your expectations accordingly when using the DPS toolkit with not so fast NoSQL K/V stores such as
     	// Cloudant, Cassandra, HBase, Mongo, Couchbase etc.
         () as Sink1 = GeneralTest() {}
         
-        // Our dps store also supports a distributed lock mechanism when multiple
+        // Our DPS store also supports a distributed lock mechanism when multiple
         // threads want to access the same store to do transaction based updates. 
         // i.e. a bunch of "get, put, remove" activities all done in one block.
         // Such things are better done within a critical section by acquiring a lock so that
         // two threads will not get into the same store at the same time.
-        // Let us do a few tests to show how our dps handles user defined distributed locks.
+        // Let us do a few tests to show how our DPS handles user defined distributed locks.
         //
 		// Please be aware that this particular test exercises heavy locking and unlocking of
 		// the K/V store to have protected read/write operation. If a chosen back-end data store
