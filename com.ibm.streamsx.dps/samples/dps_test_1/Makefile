@@ -22,11 +22,11 @@
 #                                                                  
 # end_generated_IBM_copyright_prolog                               
 
-DPS_TOOLKIT_HOME = ../..
+DPS_TOOLKIT_HOME = $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.dps
 
 SPLC_FLAGS ?= -a -z -t $(DPS_TOOLKIT_HOME)
 SPLC = $(STREAMS_INSTALL)/bin/sc
-SPL_CMD_ARGS ?= --data-directory=./data
+SPL_CMD_ARGS ?= --data-directory=./data --output-directory=./output/DpsTest1/Distributed
 SPL_MAIN_COMPOSITE = DpsTest1
 
 all: distributed
