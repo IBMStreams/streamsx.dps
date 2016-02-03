@@ -25,7 +25,7 @@ As shown in the figure above, an instance of the DPS accommodates one or more us
 Each store can hold an unlimited number of data items stored as key-value pairs created using any SPL type as a key and any SPL type as a value.
 Additionally, a DPS instance contains a store factory that can manufacture stores on demand.
 Similarly, any store can be accessed concurrently by any number of PEs running on different machines. 
-In order to ensure safe access (i.e. store operations do not override each other), each DPS instance contains a lock factory enabling you to create sharable locks for the purpose of locking a store during a critical private operation and then releasing the lock once that critical store operation has completed.
+In order to ensure safe access (i.e. store operations do not override each other), each DPS instance contains a lock factory enabling you to create shareable locks for the purpose of locking a store during a critical private operation and then releasing the lock once that critical store operation has completed.
 
 
 	
@@ -68,6 +68,28 @@ The DPS Toolkit also provides the following distributed locking functions which 
 This is achieved using a trust based cooperative locking scheme to gain exclusive access into the stores for performing a set of transaction based store activities.
 
 
++ Developing and running applications that use the DPS Toolkit
+
+
+To create applications that use the DPS Toolkit, you'll need to:
+1.  Install IBM InfoSphere Streams.  Configure the product environment variables by entering the following command: 
+      source product-installation-root-directory/4.1.0.0/bin/streamsprofile.sh
+2.  Ensure that all of the following additional RPMs required by the DPS toolkit are present on your system: 
+ * curl
+ * curl-devel
+ * lua
+ * lua-devel
+ * openssl-devel
+ * openldap-devel
+3. Install and configure a supported version of Redis. See [http://redis.io/topics/admin] for Redis store Linux administration requirements.  
+ 
+ **Additional notes for Redis**
+ * Redis 2.8.x: With this version of Redis, the DPS toolkit supports a multi-server setup. If you have multiple Redis servers configured, using the DPS Time To Live (TTL) APIs will result in better scalability of your put/get requests than using the APIs that take the user created store id as a function argument. Choose the APIs according to your functional and scaling needs. While running multiple Redis server instances either on a single machine or on multiple machines, the DPS logic will automatically shard (or distribute) the put/get workload to different Redis server instance. With the Redis v2.8.x data store, you can manually configure and start multiple instances of Redis to listen and run on different ports and machines. The DPS toolkit will internally treat these Redis v2.8.x multiple instances as multiple shards and distribute the key-value pairs among those instances to improve performance with increased memory capacity.
+ * Redis 3.0.x: If you choose to use this version to take advantage of the Redis built-in high availability and clustering, fail-over, replication and persistence features, it is important to note that, those new Redis 3.x features may impact the overall performance of reading from and writing data to the Redis cluster nodes.
+	
+4. Configure the DPS toolkit to connect to the data store from step 3. Copy the DPS toolkit sample configuration file from `STREAMS_INSTALL/samples/com.ibm.streamsx.dps/dp_test_1/etc/no-sql-kv-store-servers.cfg` to `your-project-directory/etc/no-sql-kv-store-servers.cfg`.If using the Redis v2.8.x store, specify `redis` in the configuration file; if using the Redis v3.x store, specify `redis-cluster` in the configuration file.  Each time you create a new SPL project, copy the configuration file from the example provided in the DPS toolkit to the /etc directory inside of your SPL project directory.  Make any configuration changes needed to the file, based on your application's needs. 
+
+ 
 # Using the toolkit in SPL applications
 All the functionality of the toolkit is available via the native functions in the `com.ibm.streamsx.store.distributed` and `com.ibm.streamsx.lock.distributed` namespaces. You need to include these namespaces in your SPL application via a use directive. 
 See the "Getting Started" section below and the native function documentation has more details on how to use the toolkit within applications written in SPL.
@@ -200,60 +222,6 @@ The examples in that package explain how to call the DPS APIs from different par
 * 062_data_sharing_between_non_fused_spl_custom_and_java_primitive_operators
 
 
-# Redis configuration
-
-The DPS Toolkit supports the Redis version 2.8.21 server and above (referred to as the DPS Toolkit redis implementation); and the Redis version 3.0.0 server (including support for the new cluster feature) and above (referred to as the DPS Toolkit redis-cluster implementation).
-
-**IMPORTANT TO NOTE:**
-* With the Redis v2.8.x data store, you can manually configure and start multiple instances of Redis to listen and run on different ports and machines. The DPS toolkit will internally treat these Redis v2.8.x multiple instances as multiple shards and distribute the key-value pairs among those instances to improve performance with increased memory capacity. Use of the Redis v2.8.x store in any form (single instance or multiple instances) must be identified as “redis” in the DPS toolkit configuration file.
-* The new Redis 3.x release is based on a completely new architecture with a built-in clustering and fault tolerance facility. The Redis v3.x data store offers an elaborate method to run multiple instances across one or more machines in a master/slave configuration for load balancing as well as for fault tolerance features. Use of the Redis v3.x store in any form (single instance mode or cluster mode) must be identified as “redis-cluster” in the DPS toolkit configuration file.
-
-# Prerequisites
-In addition to Redis, the DPS toolkit requires installation of one of the following supported operating system and `gcc` version combinations:
-
-On Linux x86_64: 
-* RedHat Enterprise Linux 6.4 (or an equivalent CentOS version) + gcc version 4.4.7 20120313 (Red Hat 4.4.7-3) (GCC)
-* RedHat Enterprise Linux 7.1 (or an equivalent CentOS version) + gcc version 4.8.3 20140911 (Red Hat 4.8.3-9) (GCC)
-* SUSE Linux Enterprise Server (SLES)) 11  + gcc version 4.3.4 ) 
-On Linux for IBM Power 8 Little Endian: 
-* RedHat Enterprise Linux 7.1 + gcc version 4.8.3 20140911 (Red Hat 4.8.3-9) (GCC)
-On Linux for IBM Power 7 Big Endian: 
-* RedHat Enterprise Linux 6.4 (or an equivalent CentOS version) + gcc version 4.4.7 20120313 (Red Hat 4.4.7-3) (GCC)
-   
-Additionally, one of the following Redis store versions are required:
-* Redis v2.8.21 or higher
-* Redis v3.0.0 or higher 
-See [http://redis.io/topics/admin] for Redis store Linux administration requirements. 
-
-
-# Redis configuration
-
-The DPS Toolkit supports the Redis version 2.8.21 server and above (referred to as the DPS Toolkit redis implementation); and the Redis version 3.0.0 server (including support for the new cluster feature) and above (referred to as the DPS Toolkit redis-cluster implementation).
-
-**IMPORTANT TO NOTE:**
-* With the Redis v2.8.x data store, you can manually configure and start multiple instances of Redis to listen and run on different ports and machines. The DPS toolkit will internally treat these Redis v2.8.x multiple instances as multiple shards and distribute the key-value pairs among those instances to improve performance with increased memory capacity. Use of the Redis v2.8.x store in any form (single instance or multiple instances) must be identified as “redis” in the DPS toolkit configuration file.
-* The new Redis 3.x release is based on a completely new architecture with a built-in clustering and fault tolerance facility. The Redis v3.x data store offers an elaborate method to run multiple instances across one or more machines in a master/slave configuration for load balancing as well as for fault tolerance features. Use of the Redis v3.x store in any form (single instance mode or cluster mode) must be identified as “redis-cluster” in the DPS toolkit configuration file.
-
-# Notes for Redis 2.8.x (redis) store
-With the Redis 2.8.x store, the DPS toolkit supports a multi-server setup. If you have multiple Redis servers configured, using the DPS Time To Live (TTL) APIs will result in better scalability of your put/get requests than using the APIs that take the user created store id as a function argument. Choose the APIs according to your functional and scaling needs.
-When configuring the system to run multiple Redis server instances on a single machine for scaling purposes, take into account the total number of CPU cores available on that single machine. Start only a suitable number of Redis server instances on a single machine to give them enough CPU cycles to handle your peak workload of put/get requests.  If you require more CPU cores than are available on a single machine, run Redis server instances on multiple machines. 
-
-While running multiple Redis server instances either on a single machine or on multiple machines, the DPS logic will automatically shard (or distribute) the put/get workload to different Redis server instance.
-# Notes for Redis 3.x (redis cluster)
-Redis version 3.0.0 and higher provides a new feature to install and run a Redis cluster. You can install multiple Redis instances and configure them with a replication factor. For every master Redis instance, you can have one or more slave instances. When the DPS toolkit writes data into the Redis v3.x cluster, it will be automatically sharded and distributed among all the master Redis instances running on your Redis cluster. Also, with the Redis v3.x store, when a master Redis instance fails, its slave copy will automatically take-over the operation to ensure as much continuous operation as possible on a subset of the Redis nodes. Note that high available requires three or more instances.
-
-# Installing the Client 
-In order to run and use the DPS toolkit, it is important to have the no-sql store client software available on all the machines where the Streams applications will be running. 
-The DPS toolkit manages the client installation for you by including the Redis client libraries (.so files) in the toolkit installation. 
-The DPS toolkit uses the hiredis C client and the hiredis-cluster wrapper include files for accessing the Redis no-sql store. The required header and library files are in the `impl/ext/` sub-directory of the DPS toolkit. 
-# Configuring the DPS toolkit
-Copy the DPS toolkit sample configuration file from `STREAMS_INSTALL/samples/com.ibm.streamsx.dps/dp_test_1/etc/no-sql-kv-store-servers.cfg` to `your-project-directory/etc/no-sql-kv-store-servers.cfg`.
-If using the Redis v2.8.x store, specify `redis` in the configuration file; if using the Redis v3.x store, specify `redis-cluster` in the configuration file.
-Each time you create a new SPL project, copy the configuration file from the example provided in the DPS toolkit to the /etc directory inside of your SPL project directory.
-Make any configuration changes needed to the file, based on your application's needs.
-
-
- 
 # Reference information
 [../../javadoc/dps/index.html| DPS Java API Reference]
   </info:description>
