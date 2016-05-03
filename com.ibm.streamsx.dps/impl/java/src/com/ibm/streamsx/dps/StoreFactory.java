@@ -218,6 +218,7 @@ try {
 	 * @param str string to encode
 	 * @return the encoded representation of the given string
 	 * @throws StoreFactoryException on error
+	*/
 
 	public String base64Encode(String str) throws StoreFactoryException;
 	/**Decode the given base64 string.
