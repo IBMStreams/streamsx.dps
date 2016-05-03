@@ -58,7 +58,6 @@ Store store = null;
 	 * @param name name of the new store
 	 * @param keySplTypeName the name of the SPL type for the keys, e.g. <pre>rstring </pre>
 	 * @param valueSplTypeName name of the SPL type for the values, e.g. <pre>{@code  map<rstring,int32>}</pre>
-	 * @param valueSplTypeName the name of the SPL type of the values in the store
 	 * @return the created or retrieved {@link Store}
 	 * @throws StoreFactoryException if an error occurs.
 	 */
@@ -197,15 +196,15 @@ try {
 	 *     
 	 * @param cmdType 1 or 2 for Cloudant database or document type API, respectively 
 	 * @param httpVerb HTTP command, e.g. GET, POST, e.t.c. COPY is not supported.
-	 * @param baseUrl: For the public cloud based Cloudant service, it must be in this format:
+	 * @param baseUrl For the public cloud based Cloudant service, it must be in this format:
 					  http://user:password@user.cloudant.com
 					 For the "Cloudant Local" on-premises infrastructure, it must be in this format: 
 				   http://user:password@XXXXX where XXXXX is a name or IP address of your on-premises "Cloudant Local" load balancer machine.
 	     NOTE: If you give an empty string for the URL, then the Cloudant server configured
 		  in the SPL project directory's etc/no-sql-kv-store-servers.cfg file will be used.
-		@param apiEndpoint: It should be a Cloudant DB or document related portion of the URL path as documented in the Cloudant APIs.
-		@param queryParams: It should be in this format name1=value1&amp;name2=value2
-		@param jsonRequest: This is your JSON request needed by the Cloudant API you are executing. Please ensure that any special  characters such as double quotes are properly escaped using the backslash character.     
+		@param apiEndpoint It should be a Cloudant DB or document related portion of the URL path as documented in the Cloudant APIs.
+		@param queryParams It should be in this format name1=value1&amp;name2=value2
+		@param jsonRequest This is your JSON request needed by the Cloudant API you are executing. Please ensure that any special  characters such as double quotes are properly escaped using the backslash character.     
 	 * @param httpResponseCode On succesful execution of the command, then this will be the HTTP response code returned by the Cloudant server.
 	 You have to interpret the meaning of the returned HTTP response code and make your further logic from there. 
 	 * @return the json response string.
