@@ -86,7 +86,7 @@ a user created store present in the back-end DB infrastructure. If this rule is 
 @param key The key for the new pair.        
 @param item The value for the new pair. Must be the same type as the **value** that was provided when the store was created.
 @param err Will be set to '0' on success, and will be non-zero otherwise. 
-@return If no error occurs, returns false if the item previously existed in the store, and true if the store did not contain an item with the same key.
+@return If no error occurs, returns true, and false otherwise.
      
 		rstring dummyRstring = &quot;&quot;;
 		uint32 dummyUint32 = 0u;
@@ -116,7 +116,7 @@ a user created store present in the back-end DB infrastructure. If this rule is 
 @param key The key for the new pair.        
 @param item The value for the new pair. Must be the same type as the **value** that was provided when the store was created.
 @param err Will be set to '0' on success, and will be non-zero otherwise. 
-@return If no error occurs, returns false if the item previously existed in the store, and true if the store did not contain an item with the same key.
+@return If no error occurs, returns true, and false otherwise.
 </description>
         <prototype>&lt;any T1, any T2> public stateful boolean dpsPutSafe(uint64 store, T1 key, T2 item, mutable uint64 err)</prototype>
       </function>
