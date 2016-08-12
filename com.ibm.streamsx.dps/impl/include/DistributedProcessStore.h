@@ -28,7 +28,9 @@ namespace distributed
 {
   class DistributedProcessStore
   {
-  public:           
+  public:
+	static std::string dpsConfigFile_;
+
     /// Destructor
     ///
     ~DistributedProcessStore();
@@ -353,6 +355,8 @@ namespace distributed
     SPL::boolean getNextForJava(SPL::uint64 store, SPL::uint64 iterator, unsigned char * &  key, SPL::uint32 & keySize,
     	unsigned char * & value, SPL::uint32 & valueSize, SPL::uint64 & err);
 
+    void setConfigFileForJava(SPL::rstring const & dpsConfigFile);
+
     /// Create a lock or get it if it already exists
     /// @param name of the lock
     /// @return lock handle
@@ -468,6 +472,12 @@ namespace distributed
     /// Get the singleton instance of the store store
     /// @return the global instance of the store store
     static DistributedProcessStore & getGlobalStore(); 
+
+    /// Set the dpsConfigFile
+    /// @param dpsConfigFile contains a relative path to the config file. The path is relative to the etc/dps-config directory.
+    static void setConfigFile(std::string dpsConfigFile) {
+    	DistributedProcessStore::dpsConfigFile_ = dpsConfigFile;
+    }
 
   private:
     DistributedProcessStore(); // no one should do this other than us

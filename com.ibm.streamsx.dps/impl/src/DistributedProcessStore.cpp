@@ -28,6 +28,7 @@
 #include <string>
 
 #include <streams_boost/filesystem/path.hpp>
+#include <streams_boost/filesystem/operations.hpp>
 #include <streams_boost/algorithm/string.hpp>
 
 using namespace std;
@@ -41,6 +42,8 @@ namespace streamsx {
 namespace store {
 namespace distributed 
 { 
+  std::string DistributedProcessStore::dpsConfigFile_ = "";
+
   DistributedProcessStore::DistributedProcessStore()
     : dbError_(new PersistenceError()),
       lkError_(new PersistenceError())
@@ -58,7 +61,7 @@ namespace distributed
   }
 
 
-  static void fetchDBConnectionParameters(std::string & noSqlKvStoreProductName, std::set<std::string> & dbServers)
+  static void fetchDBConnectionParameters(std::string & noSqlKvStoreProductName, std::set<std::string> & dbServers, std::string & dpsConfigFile)
   {
 	// Senthil commented the following code block on Nov/02/2013. Because, a stand-alone dps test from
 	// Java and Python will give core dump errors because of the PE-specific code below.
@@ -87,7 +90,17 @@ namespace distributed
 	cout << "Toolkit directory=" << toolkitDirectory << endl;
 	*/
 	// Refer to the etc directory with a relative path from the application directory.
-	std::string confFile = appDirectory + "/etc/no-sql-kv-store-servers.cfg";
+	std::string confFile;
+
+	if(dpsConfigFile == "") {
+		confFile = appDirectory + "/etc/no-sql-kv-store-servers.cfg";
+	} else {
+		streams_boost::filesystem::path configPath(dpsConfigFile);
+		if(configPath.is_relative()) {
+			configPath = streams_boost::filesystem::absolute(configPath, appDirectory);
+		}
+		confFile = configPath.string();
+	}
 
     // Format of this file is as shown below.
     // Several comment lines beginning with a # character.
@@ -146,7 +159,7 @@ namespace distributed
     std::set<std::string> dbServers;
     // Read the no-sql store product name and the
     // no-sql store server names from the configuration file.
-    fetchDBConnectionParameters(noSqlKvStoreProductName, dbServers);
+    fetchDBConnectionParameters(noSqlKvStoreProductName, dbServers, DistributedProcessStore::dpsConfigFile_);
     noSqlKvStoreProductName = streams_boost::to_lower_copy(noSqlKvStoreProductName);
 
 	// Verify if the user has configured a valid no-sql store product that we support.
@@ -449,6 +462,11 @@ namespace distributed
       SPL::boolean result = iter->getNext(store, key, keySize, value, valueSize, *dbError_);
 	  err = dbError_->getErrorCode();
 	  return result;
+  }
+
+  void DistributedProcessStore::setConfigFileForJava(SPL::rstring const & dpsConfigFile)
+  {
+	  setConfigFile(dpsConfigFile);
   }
 
    SPL::uint64 DistributedProcessStore::createOrGetLock(SPL::rstring const & name, SPL::uint64 & err)

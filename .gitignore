@@ -6,4 +6,5 @@ com.ibm.streamsx.dps/doc/spldoc
 *.jar
 toolkit.xml
 output
-
+.toolkitList
+*.splbuild

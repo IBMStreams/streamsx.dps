@@ -95,6 +95,8 @@ public class DpsHelper {
 		String baseUrl, String apiEndpoint, String queryParams, String jsonRequest);
 	private native String dpsBase64EncodeCpp(String str);
 	private native String dpsBase64DecodeCpp(String str);
+	private native String dpsSetConfigFileCpp(String dpsConfigFile);
+	
 	//
 	// JNI methods related to the distributed locks are declared below.
 	//
@@ -1257,6 +1259,10 @@ public class DpsHelper {
 		} // End of the while loop.
 		
 		return;
+	}
+	
+	public String dpsSetConfigFile(String dpsConfigFile) {
+		return(dpsSetConfigFileCpp(dpsConfigFile));
 	}
 	
 	// =======================================================

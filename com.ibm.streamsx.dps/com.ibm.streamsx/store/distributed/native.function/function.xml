@@ -473,6 +473,10 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
 </description>
         <prototype>public stateful void dpsBase64Decode(rstring str, mutable rstring decodedResultStr)</prototype>
       </function>
+      <function>
+        <description/>
+        <prototype>public stateful boolean dpsSetConfigFile(rstring dpsConfigFile)</prototype>
+      </function>
     </functions>
     <dependencies>
       <library>
@@ -480,7 +484,6 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
         <cmn:managedLibrary>
           <cmn:lib>DistributedProcessStoreLib</cmn:lib>
           <cmn:lib>memcached</cmn:lib>
-          <!-- <cmn:lib>sds</cmn:lib> -->
           <cmn:lib>hiredis</cmn:lib>
           <cmn:lib>uv</cmn:lib>
           <cmn:lib>crypto</cmn:lib>
@@ -491,8 +494,6 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
           <cmn:lib>json-c</cmn:lib>
           <cmn:lib>bson</cmn:lib>
           <cmn:lib>mongoc</cmn:lib>
-          <!-- <cmn:lib>couchbase</cmn:lib> -->
-          <!-- <cmn:lib>aerospike</cmn:lib> -->
           <cmn:command>../../../../impl/bin/archLevel</cmn:command>
         </cmn:managedLibrary>
       </library>
