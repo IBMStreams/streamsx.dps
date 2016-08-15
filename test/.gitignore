@@ -3,3 +3,9 @@ tmp/
 bin/
 .gradle/
 *.sab
+.project
+.classpath
+.namespace
+**/impl/java/bin
+**/dps.test.java
+**/dps/test/java

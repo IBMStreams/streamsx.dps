@@ -28,13 +28,12 @@ import com.ibm.streamsx.topology.tester.Condition;
 
 public abstract class AbstractDPSTest {
 
-	private static final String EXPECTED_FILENAME = "expected.txt";
-	private static final long TIMEOUT = 45;
-	private static final TimeUnit TIME_UNIT = TimeUnit.SECONDS;
+	public static final String EXPECTED_FILENAME = "expected.txt";
+	public static final long TIMEOUT = 45;
+	public static final TimeUnit TIME_UNIT = TimeUnit.SECONDS;
 	
 	private Properties props;
 	private String[] expected;
-	private Logger logger = LoggerFactory.getLogger(AbstractDPSTest.class);
 	
 	/* Abstracts */
 	abstract String getTestName();
@@ -99,20 +98,21 @@ public abstract class AbstractDPSTest {
 		return t;
 	}
 
-	private void compileToolkit(File toolkitPath) throws Exception {
+	protected void compileToolkit(File toolkitPath) throws Exception {
 		List<String> command = new ArrayList<>();
 		command.add(System.getenv("STREAMS_INSTALL") + "/bin/spl-make-toolkit");
 		command.add("-i");
 		command.add(toolkitPath.getAbsolutePath());
 
-		System.out.println("Indexing " + getTestName() + " toolkit...");
+		
+		Topology.TOPOLOGY_LOGGER.info("Indexing " + getTestName() + " toolkit...");
 		ProcessBuilder pb = new ProcessBuilder(command);
 		Process proc = pb.start();
 		boolean waitFor = proc.waitFor(TIMEOUT, TIME_UNIT);
 		if(waitFor == true) {
-			System.out.println("Toolkit indexing finished!");
+			Topology.TOPOLOGY_LOGGER.info("Toolkit indexing finished!");
 		} else {
-			System.out.println("Error indexing toolkit!");
+			Topology.TOPOLOGY_LOGGER.severe("Error indexing toolkit!");
 		}
 	}
 	
