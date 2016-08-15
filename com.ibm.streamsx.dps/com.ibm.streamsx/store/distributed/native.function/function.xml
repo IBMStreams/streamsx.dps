@@ -474,7 +474,8 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
         <prototype>public stateful void dpsBase64Decode(rstring str, mutable rstring decodedResultStr)</prototype>
       </function>
       <function>
-        <description/>
+        <description>Allows for setting a path to the configuration file. Relative paths are relative to the toolkit root directory. If not set, then 'etc/no-sql-kv-store-servers.cfg' file will be used.
+@param dpsConfigFile the path to the configuration file that should be used</description>
         <prototype>public stateful boolean dpsSetConfigFile(rstring dpsConfigFile)</prototype>
       </function>
     </functions>
@@ -484,16 +485,19 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
         <cmn:managedLibrary>
           <cmn:lib>DistributedProcessStoreLib</cmn:lib>
           <cmn:lib>memcached</cmn:lib>
+          <cmn:lib>sds</cmn:lib>
           <cmn:lib>hiredis</cmn:lib>
           <cmn:lib>uv</cmn:lib>
           <cmn:lib>crypto</cmn:lib>
           <cmn:lib>ssl</cmn:lib>
-          <cmn:lib>ldap_r</cmn:lib>
           <cmn:lib>cassandra</cmn:lib>
           <cmn:lib>curl</cmn:lib>
           <cmn:lib>json-c</cmn:lib>
           <cmn:lib>bson</cmn:lib>
           <cmn:lib>mongoc</cmn:lib>
+          <cmn:lib>couchbase</cmn:lib>
+          <cmn:lib>lua</cmn:lib>
+          <cmn:lib>aerospike</cmn:lib>
           <cmn:command>../../../../impl/bin/archLevel</cmn:command>
         </cmn:managedLibrary>
       </library>
