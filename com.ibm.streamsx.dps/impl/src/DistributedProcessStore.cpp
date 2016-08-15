@@ -92,15 +92,11 @@ namespace distributed
 	// Refer to the etc directory with a relative path from the application directory.
 	std::string confFile;
 
-	if(dpsConfigFile == "") {
-		confFile = appDirectory + "/etc/no-sql-kv-store-servers.cfg";
-	} else {
-		streams_boost::filesystem::path configPath(dpsConfigFile);
-		if(configPath.is_relative()) {
-			configPath = streams_boost::filesystem::absolute(configPath, appDirectory);
-		}
-		confFile = configPath.string();
+	streams_boost::filesystem::path configPath(dpsConfigFile);
+	if(configPath.is_relative()) {
+		configPath = streams_boost::filesystem::absolute(configPath, appDirectory);
 	}
+	confFile = configPath.string();
 
     // Format of this file is as shown below.
     // Several comment lines beginning with a # character.
@@ -159,7 +155,9 @@ namespace distributed
     std::set<std::string> dbServers;
     // Read the no-sql store product name and the
     // no-sql store server names from the configuration file.
-    fetchDBConnectionParameters(noSqlKvStoreProductName, dbServers, DistributedProcessStore::dpsConfigFile_);
+
+    std::string configFile = (DistributedProcessStore::dpsConfigFile_ == "") ? "etc/no-sql-kv-store-servers.cfg" : DistributedProcessStore::dpsConfigFile_;
+    fetchDBConnectionParameters(noSqlKvStoreProductName, dbServers, configFile);
     noSqlKvStoreProductName = streams_boost::to_lower_copy(noSqlKvStoreProductName);
 
 	// Verify if the user has configured a valid no-sql store product that we support.
