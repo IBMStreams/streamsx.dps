@@ -10,7 +10,8 @@ The following is required in order to run the automated tests:
  
 ## Setup
 
- 1. After cloning the repository, modify the ```junit.properties``` file to point to the address of 
+ 1. Clone the streamsx.dps respository
+ 2. Modify the ```junit.properties``` file to point to the address of 
  your Redis server as well as the path to the DPS toolkit.
  
 ## Running the Tests
