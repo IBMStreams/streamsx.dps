@@ -6,6 +6,7 @@ bin/
 .project
 .classpath
 .namespace
-**/impl/java/bin
-**/dps.test.java
-**/dps/test/java
+impl/bin/
+*$StreamsModel.java
+dps.test.java/
+dps/test/java/
