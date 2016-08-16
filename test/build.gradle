@@ -1,0 +1,19 @@
+apply plugin: 'java'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testCompile "junit:junit:4.11"  // Or whatever version
+    testCompile fileTree(dir: System.getenv('STREAMS_INSTALL') + '/lib', include: '*.jar')
+    testCompile files(System.getenv('STREAMS_INSTALL') + '/toolkits/com.ibm.streamsx.topology/lib/com.ibm.streamsx.topology.jar')
+}
+
+test {
+    //we want display the following test events
+    testLogging {
+        showStandardStreams = false // set to true to see output from tests
+        events "PASSED", "FAILED", "SKIPPED"
+    }
+}

@@ -1,0 +1,100 @@
+namespace application ;
+
+use com.ibm.streamsx.store.distributed::* ;
+use com.ibm.streamsx.topology.topic::Publish ;
+
+/*
+ * Tests: 
+ *  - dpsPutTTL
+ *  - dpsHasTTL
+ *  - dpsGetTTL
+ *  - dpsRemoveTTL
+ */
+public composite dpstest
+{
+	graph
+		(stream<boolean next> Beacon_1_out0) as Beacon_1 = Beacon()
+		{
+			param
+				iterations : 1u ;
+				initDelay : 10f;
+		}
+
+		(stream<rstring string> Custom_2_out0) as Custom_2 = Custom(Beacon_1_out0)
+		{
+			logic
+				onTuple Beacon_1_out0 :
+				{
+					mutable uint64 err = 0ul ;
+					mutable boolean res = false ;
+
+					// Put value in global storage
+					rstring myKey = "myTestKey" ;
+					uint32 myValue = 42 ;
+					res = dpsPutTTL(myKey, myValue, 10u, err) ;
+					if(err != 0ul)
+					{
+						rstring msg = dpsGetLastStoreErrorString() ;
+						rstring rc =(rstring) dpsGetLastStoreErrorCode() ;
+						rstring errorMsg = "[ERROR] Unexpected error in dpsPutTTL': rc = " + rc +
+							", msg = " + msg ;
+						println(errorMsg) ;
+						submit({ string = errorMsg }, Custom_2_out0) ;
+					}
+
+					assert(res == true && err == 0ul) ; // get has succeeded 
+
+					// Check for the existence of this key to ensure it is there in the global storage area of the back-end data store.
+					res = dpsHasTTL(myKey, err) ;
+					if(res == false)
+					{
+						rstring msg = dpsGetLastStoreErrorString() ;
+						rstring rc =(rstring) dpsGetLastStoreErrorCode() ;
+						rstring errorMsg = "[ERROR] Unexpected error in dpsHasTTL': rc = " + rc +
+							", msg = " + msg ;
+						println(errorMsg) ;
+						submit({ string = errorMsg }, Custom_2_out0) ;
+					}
+
+					assert(res == true && err == 0ul) ; // get has succeeded 	                
+
+					// Read value from global storage
+					mutable uint32 v = 0u ;
+					res = dpsGetTTL(myKey, v, err) ;
+					if(res == false)
+					{
+						rstring msg = dpsGetLastStoreErrorString() ;
+						rstring rc =(rstring) dpsGetLastStoreErrorCode() ;
+						rstring errorMsg = "[ERROR] Unexpected error in dpsGetTTL': rc = " + rc +
+							", msg = " + msg ;
+						println(errorMsg) ;
+						submit({ string = errorMsg }, Custom_2_out0) ;
+					}
+
+					assert(res == true && err == 0ul) ; // get has succeeded 
+					submit({ string = "v=" +(rstring) v }, Custom_2_out0) ;
+					res = dpsRemoveTTL(myKey, err) ;
+					if(res == false)
+					{
+						rstring msg = dpsGetLastStoreErrorString() ;
+						rstring rc =(rstring) dpsGetLastStoreErrorCode() ;
+						rstring errorMsg = "[ERROR] Unexpected error in dpsRemoveTTL': rc = " +
+							rc + ", msg = " + msg ;
+						println(errorMsg) ;
+						submit({ string = errorMsg }, Custom_2_out0) ;
+					}
+
+					assert(res == true && err == 0ul) ; // get has succeeded 		
+
+				}
+
+		}
+
+		() as Publish_3 = Publish(Custom_2_out0)
+		{
+			param
+				topic : "test.results" ;
+		}
+
+}
+

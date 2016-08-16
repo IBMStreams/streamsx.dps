@@ -28,7 +28,9 @@ namespace distributed
 {
   class DistributedProcessStore
   {
-  public:           
+  public:
+	static std::string dpsConfigFile_;
+
     /// Destructor
     ///
     ~DistributedProcessStore();
@@ -468,6 +470,12 @@ namespace distributed
     /// Get the singleton instance of the store store
     /// @return the global instance of the store store
     static DistributedProcessStore & getGlobalStore(); 
+
+    /// Set the dpsConfigFile
+    /// @param dpsConfigFile contains a relative path to the config file. The path is relative to the etc/dps-config directory.
+    static void setConfigFile(std::string dpsConfigFile) {
+    	DistributedProcessStore::dpsConfigFile_ = dpsConfigFile;
+    }
 
   private:
     DistributedProcessStore(); // no one should do this other than us

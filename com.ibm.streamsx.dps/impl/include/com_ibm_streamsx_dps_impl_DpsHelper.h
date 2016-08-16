@@ -265,6 +265,14 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsBase64Deco
 
 /*
  * Class:     com_ibm_streamsx_dps_impl_DpsHelper
+ * Method:    dpsSetConfigFileCpp
+ * Signature: (Ljava/lang/String;)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsSetConfigFileCpp
+  (JNIEnv *, jobject, jstring);
+
+/*
+ * Class:     com_ibm_streamsx_dps_impl_DpsHelper
  * Method:    dlCreateOrGetLockCpp
  * Signature: (Ljava/lang/String;)Ljava/lang/String;
  */

@@ -16,6 +16,12 @@ namespace streamsx {
 namespace store {
 namespace distributed
 {
+  inline SPL::boolean dpsSetConfigFile(SPL::rstring const & dpsConfigFile)
+  {
+	  DistributedProcessStore::setConfigFile(dpsConfigFile);
+	  return true;
+  }
+
   /// Create a distributed process store
   /// @param name of the store
   /// @param key a dummy key to indicate the type of this store's key

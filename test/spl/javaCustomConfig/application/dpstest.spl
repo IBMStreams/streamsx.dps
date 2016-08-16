@@ -1,0 +1,38 @@
+namespace application ;
+
+use com.ibm.streamsx.store.distributed::* ;
+use com.ibm.streamsx.topology.topic::Publish ;
+use dps.test.java::* ;
+
+/*
+ * Tests: 
+ *  - dpsPutTTL
+ *  - dpsHasTTL
+ *  - dpsGetTTL
+ *  - dpsRemoveTTL
+ */
+public composite dpstest()
+{
+	graph
+		(stream<boolean next> Beacon_1_out0) as Beacon_1 = Beacon()
+		{
+			param
+				iterations : 1u ;
+				initDelay : 10f;
+		}
+
+		() as Publish_3 = Publish(JavaDPSTestOp_4_out0)
+		{
+			param
+				topic : "test.results" ;
+		}
+
+		(stream<rstring string> JavaDPSTestOp_4_out0) as JavaDPSTestOp_4 =
+			JavaDPSTestOp(Beacon_1_out0)
+		{
+			param
+				dpsConfigFile: getSubmissionTimeValue("dps.config");
+		}
+
+}
+
