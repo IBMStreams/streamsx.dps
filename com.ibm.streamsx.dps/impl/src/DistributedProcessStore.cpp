@@ -462,11 +462,6 @@ namespace distributed
 	  return result;
   }
 
-  void DistributedProcessStore::setConfigFileForJava(SPL::rstring const & dpsConfigFile)
-  {
-	  setConfigFile(dpsConfigFile);
-  }
-
    SPL::uint64 DistributedProcessStore::createOrGetLock(SPL::rstring const & name, SPL::uint64 & err)
      {
        lkError_->reset();
