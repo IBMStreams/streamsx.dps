@@ -225,7 +225,7 @@ The examples in that package explain how to call the DPS APIs from different par
 # Reference information
 [../../javadoc/dps/index.html| DPS Java API Reference]
   </info:description>
-    <info:version>2.1.0</info:version>
+    <info:version>2.2.0</info:version>
     <info:requiredProductVersion>4.0.0.0</info:requiredProductVersion>
   </info:identity>
   <info:dependencies/>
