@@ -1,0 +1,99 @@
+namespace application ;
+
+use com.ibm.streamsx.store.distributed::* ;
+use com.ibm.streamsx.topology.topic::Publish ;
+
+public composite dpstest
+{
+	graph
+		(stream<boolean next> Beacon_1_out0) as Beacon_1 = Beacon()
+		{
+			param
+				iterations : 1u ;
+				initDelay : 10.0;
+		}
+
+		(stream<rstring string> Custom_2_out0) as Custom_2 = Custom(Beacon_1_out0)
+		{
+			logic
+				onTuple Beacon_1_out0 :
+				{
+					mutable uint64 err = 0ul ;
+					mutable boolean res = false ;
+					mutable uint64 os = 0ul ;
+
+					// === test user created stores === //
+					mutable rstring dummyRstring = "" ;
+					mutable uint32 dummyUint32 = 0u ;
+					os = dpsFindStore("testStore1", err) ;
+					if(os != 0ul && err == 0ul)
+					{
+						dpsRemoveStore(os, err) ; // cleanup previous test runs i
+						println("Store removed!") ;
+					}
+
+					os = dpsCreateStore("testStore1", dummyRstring, dummyUint32, err) ; // create store
+					if(err != 0ul)
+					{
+						rstring msg = dpsGetLastStoreErrorString() ;
+						rstring rc =(rstring) dpsGetLastStoreErrorCode() ;
+						rstring errorMsg =
+							"[ERROR] Unexpected error in creating store named 'testStore1': rc = " +
+							rc + ", msg = " + msg ;
+						println(errorMsg) ;
+						submit({ string = errorMsg }, Custom_2_out0) ;
+					}
+
+					assert(os != 0ul && err == 0ul) ;
+					rstring myKey = "myTestKey" ;
+					uint32 myValue = 42 ;
+					res = dpsPut(os, myKey, myValue, err) ; // put data
+					if(err != 0ul)
+					{
+						rstring rc =(rstring) dpsGetLastStoreErrorCode() ;
+						rstring errorMsg = "[ERROR] Unexpected error in dpsPut(): rc = " + rc +
+							", msg = " + dpsGetLastStoreErrorString() ;
+						println(errorMsg) ;
+						submit({ string = errorMsg }, Custom_2_out0) ;
+					}
+
+					assert(res == true && err == 0ul) ;
+					mutable int32 v = - 1 ;
+					res = dpsGet(os, myKey, v, err) ; // retrieve key value
+					if(err != 0ul)
+					{
+						rstring rc =(rstring) dpsGetLastStoreErrorCode() ;
+						rstring errorMsg = "[ERROR] Unexpected error in dpsGet(): rc = " + rc +
+							", msg = " + dpsGetLastStoreErrorString() ;
+						println(errorMsg) ;
+						submit({ string = errorMsg }, Custom_2_out0) ;
+					}
+
+					assert(res == true && err == 0ul) ; // get has succeeded 
+
+					// submit results from get
+					submit({ string = "v=" +(rstring) v }, Custom_2_out0) ;
+					res = dpsRemoveStore(os, err) ;
+					if(err != 0ul)
+					{
+						rstring rc =(rstring) dpsGetLastStoreErrorCode() ;
+						rstring errorMsg =
+							"[ERROR] Unexpected error in removing store named 'testStore1': rc = " +
+							rc + ", msg = " + dpsGetLastStoreErrorString() ;
+						println(errorMsg) ;
+						submit({ string = errorMsg }, Custom_2_out0) ;
+					}
+
+					assert(res == true && err == 0ul) ;
+				}
+
+		}
+
+		() as Publish_3 = Publish(Custom_2_out0)
+		{
+			param
+				topic : "test.results" ;
+		}
+
+}
+

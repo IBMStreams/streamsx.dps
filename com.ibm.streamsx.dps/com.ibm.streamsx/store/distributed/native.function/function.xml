@@ -473,6 +473,11 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
 </description>
         <prototype>public stateful void dpsBase64Decode(rstring str, mutable rstring decodedResultStr)</prototype>
       </function>
+      <function>
+        <description>Allows for setting a path to the configuration file. Relative paths are relative to the toolkit root directory. If not set, then 'etc/no-sql-kv-store-servers.cfg' file will be used.
+@param dpsConfigFile the path to the configuration file that should be used</description>
+        <prototype>public stateful boolean dpsSetConfigFile(rstring dpsConfigFile)</prototype>
+      </function>
     </functions>
     <dependencies>
       <library>
@@ -494,7 +499,7 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
           <!-- <cmn:lib>couchbase</cmn:lib> -->
           <!-- <cmn:lib>aerospike</cmn:lib> -->
           <cmn:command>../../../../impl/bin/archLevel</cmn:command>
-        </cmn:managedLibrary>
+        </cmn:managedLibrary>        
       </library>
     </dependencies>
   </functionSet>
