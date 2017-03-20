@@ -51,7 +51,7 @@
 Any PE, regardless of whether it originally created the store and populated it with its original contents (if any), can safely access the store (shown in the physical view layer) to save and retrieve contents. To access the store, the PE requires a valid store name or a store handle. 
 </div>
 
-<p class="p"><br/><img class="image" src="file:///homes/hny4/ndsilva/git/streamsx.dps/com.ibm.streamsx.dps/doc/icons/overview.png" alt=""/><br/>
+<p class="p"><br/><img class="image" src="../../../../icons/overview.png" alt=""/><br/>
 </p>
 
 <p class="p">As shown in the figure above, an instance of the DPS accommodates one or more user-created stores.  Each store can hold an unlimited number of data items stored as key-value pairs created using any SPL type as a key and any SPL type as a value. Additionally, a DPS instance contains a store factory that can manufacture stores on demand. Similarly, any store can be accessed concurrently by any number of PEs running on different machines.  In order to ensure safe access (i.e. store operations do not override each other), each DPS instance contains a lock factory enabling you to create sharable locks for the purpose of locking a store during a critical private operation and then releasing the lock once that critical store operation has completed.
