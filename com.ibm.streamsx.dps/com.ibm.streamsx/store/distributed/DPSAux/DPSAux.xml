@@ -1,0 +1,36 @@
+<?xml version="1.0" ?>
+<operatorModel
+  xmlns="http://www.ibm.com/xmlns/prod/streams/spl/operator" 
+  xmlns:cmn="http://www.ibm.com/xmlns/prod/streams/spl/common" 
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.ibm.com/xmlns/prod/streams/spl/operator operatorModel.xsd">
+  <cppOperatorModel>
+    <context>
+      <description>The **DPSAux** operator's purpose is to support primitive Java operators that desire to use the DPS toolkit Java APIs. An instance of this operator must be included in the application graph in order for such Java operators within the application to work correctly.</description>
+      <metrics>
+      </metrics>
+      <customLiterals>
+      </customLiterals>
+      <customOutputFunctions/>
+      <libraryDependencies>
+        <library>
+          <cmn:description>DPS Library</cmn:description>
+          <cmn:managedLibrary>
+            <cmn:lib>DistributedProcessStoreLib</cmn:lib>
+            <cmn:libPath>../../../../impl/lib</cmn:libPath>
+             <cmn:libPath>../../../../impl/ext/lib</cmn:libPath>
+            <cmn:includePath>../../../../impl/include</cmn:includePath>
+          </cmn:managedLibrary>
+        </library>
+      </libraryDependencies>
+      <providesSingleThreadedContext>Never</providesSingleThreadedContext>
+    </context>  
+    <parameters>
+      <allowAny>false</allowAny>
+    </parameters>
+    <inputPorts>
+    </inputPorts>
+    <outputPorts>
+    </outputPorts>
+  </cppOperatorModel>
+</operatorModel>

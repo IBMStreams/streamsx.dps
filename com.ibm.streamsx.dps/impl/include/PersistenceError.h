@@ -10,6 +10,7 @@
 
 #include <string>
 #include <inttypes.h>
+#include "DpsConstants.h"
 
 namespace com {
 namespace ibm {
@@ -21,7 +22,7 @@ namespace store
   public:
     /// Default constructor
     PersistenceError() 
-      : errorCode_(0), errorCodeTTL_(0) {}
+      : errorCode_(DPS_NO_ERROR), errorCodeTTL_(DPS_NO_ERROR) {}
         
     /// Constructor
     /// @param errorStr error string
@@ -35,26 +36,26 @@ namespace store
     /// @return true if there is an error, false otherwise
     bool hasError() const
     {
-      return errorCode_!=0;
+      return errorCode_ != DPS_NO_ERROR;
     }
 
     /// Check if there is error or not for the TTL operation.
     /// @return true if there is an error, false otherwise
     bool hasErrorTTL() const
     {
-      return errorCodeTTL_!=0;
+      return errorCodeTTL_ != DPS_NO_ERROR;
     }
 
     /// Reset the error code
     void reset()
     {
-      set("", 0);
+      set("", DPS_NO_ERROR);
     }
 
     /// Reset the error code for TTL operations
     void resetTTL()
     {
-      setTTL("", 0);
+      setTTL("", DPS_NO_ERROR);
     }
 
     /// Get the error string

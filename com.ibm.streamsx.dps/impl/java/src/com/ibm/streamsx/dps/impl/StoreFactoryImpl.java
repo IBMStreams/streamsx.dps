@@ -11,7 +11,6 @@
 package com.ibm.streamsx.dps.impl;
 
 import com.ibm.streamsx.dps.Store;
-import com.ibm.streamsx.dps.StoreException;
 import com.ibm.streamsx.dps.StoreFactory;
 import com.ibm.streamsx.dps.StoreFactoryException;
 

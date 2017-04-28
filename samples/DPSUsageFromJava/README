@@ -1,0 +1,16 @@
+This application demonstrates how to use the DPS toolkit Java API from a Java operator.
+To compile this application from the command line, run the Makefile by typing "make"
+Launch by submitting the job to the domain:
+streamtool submitjob -d [domain] /output/JavaDPSDemo/Distributed/JavaDPSDemo.sab
+
+
+To compile this sample application in Studio, the library containing the DPS Java API must be both on the toolkit path and in the Java classpath.
+
+Add the jar to the classpath through Studio:
+1. Right click on the project, select "Build Path" > "Configure Build Path"
+2. In the "Libraries" tab, click "Add External Jars"
+3. Browse to <STREAMS_INSTALL>/toolkits/com.ibm.streamsx.dps/impl/java/lib and select "dps-helper.jar"
+4. Click OK and build the project.
+
+Then you can build and launch the build configuration.
+

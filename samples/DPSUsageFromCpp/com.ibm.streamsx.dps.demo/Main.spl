@@ -1,0 +1,107 @@
+// begin_generated_IBM_copyright_prolog                             
+//                                                                  
+// This is an automatically generated copyright prolog.             
+// After initializing,  DO NOT MODIFY OR MOVE                       
+// **************************************************************** 
+// THIS SAMPLE CODE IS PROVIDED ON AN "AS IS" BASIS. IBM MAKES NO   
+// REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED, CONCERNING    
+// USE OF THE SAMPLE CODE, OR THE COMPLETENESS OR ACCURACY OF THE   
+// SAMPLE CODE. IBM DOES NOT WARRANT UNINTERRUPTED OR ERROR-FREE    
+// OPERATION OF THIS SAMPLE CODE. IBM IS NOT RESPONSIBLE FOR THE    
+// RESULTS OBTAINED FROM THE USE OF THE SAMPLE CODE OR ANY PORTION  
+// OF THIS SAMPLE CODE.                                             
+//                                                                  
+// LIMITATION OF LIABILITY. IN NO EVENT WILL IBM BE LIABLE TO ANY   
+// PARTY FOR ANY DIRECT, INDIRECT, SPECIAL OR OTHER CONSEQUENTIAL   
+// DAMAGES FOR ANY USE OF THIS SAMPLE CODE, THE USE OF CODE FROM    
+// THIS [ SAMPLE PACKAGE,] INCLUDING, WITHOUT LIMITATION, ANY LOST  
+// PROFITS, BUSINESS INTERRUPTION, LOSS OF PROGRAMS OR OTHER DATA   
+// ON YOUR INFORMATION HANDLING SYSTEM OR OTHERWISE.                
+//                                                                  
+// (C) Copyright IBM Corp. 2016  All Rights reserved.         
+//                                                                  
+// end_generated_IBM_copyright_prolog             
+/*
+This example shows how to call the Distributed Process Store (dps)
+native function APIs from both within the built-in as well as the
+C++ primitive operators.
+
+
+IMPORTANT
+--------- 
+Before doing anything with this example, you must first configure the name of your back-end 
+NoSQL DB store and the name(s) of your one or more back-end server(s).
+Please take a look inside the ../etc/no-sql-kv-store-servers.cfg file and
+ensure that everything is in order as required. 
+================================================================================  
+*/
+namespace com.ibm.streamsx.dps.demo;
+
+// Declare the use of the two namespaces containing the distributed process store native functions.
+// You are also encouraged to refer to the native function model XML files available inside
+// the com.ibm.streamsx directory of the dps toolkit project.
+//This application stores transactions in a NoSQL db store using a C++ operator
+use com.ibm.streamsx.store.distributed::*;
+use com.ibm.streamsx.lock.distributed::*;
+
+composite Main {
+	
+	graph
+
+//This operator is required in order for the C++ operators to function properly.
+		() as DPSAux_3 = DPSAux()
+		{
+		}
+		
+		//data is read from filesource but could easily be any other adapter
+		stream<rstring id, float64 amount>  Data = FileSource(){
+			param
+				file: "transactions.txt";
+		}		
+		
+		stream<rstring storeName>  TransactionSink = Transactions(Data) {
+		
+		}
+		
+		() as Printer = Custom(TransactionSink){
+			logic
+				onTuple TransactionSink:{
+				
+					//this custom will read how many elements are in the store, 
+					//iterate over a few of them
+					// and delete the store
+						mutable uint64 err = 0ul;
+					mutable uint64 storeId = dpsFindStore(storeName, err);
+					if (storeId == 0ul) {
+						printStringLn("Unable to find the " +storeName + " inside the screen writer sink.");
+						abort();
+					}
+					err = 0ul;
+					printStringLn("================ Final Results Begin ================");
+					printStringLn("There are " + ((rstring) dpsSize(storeId, err)) + " elements in the store");
+					printStringLn("\n\nSample contents of the Transaction store [Transaction Id => Amount]");
+
+					// Iterate over the store store.
+					mutable uint64 it = dpsBeginIteration(storeId, err);
+					mutable rstring id = "";
+					mutable float64 value = 0.0;
+		
+					if (it == 0ul) {
+						printStringLn("Unable to get an iterator for the store");
+						abort();
+					}
+
+					mutable int32 count = 0;
+					while(count < 10 && 	dpsGetNext(storeId, it, id, value, err)){
+						printStringLn("'"+id+"' => '"+((rstring)value)+"'");        
+						count++;                 
+					}
+
+					dpsEndIteration(storeId, it, err);
+					printStringLn("Removing the " + storeName +" store");
+					dpsRemoveStore(storeId, err);
+					printStringLn("================ End Results  ================");
+					
+				}
+		}
+}

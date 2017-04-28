@@ -5,27 +5,22 @@
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 */
+#include <dlfcn.h>
 #include "DistributedProcessStore.h"
-#include "MemcachedDBLayer.h"
-#include "RedisDBLayer.h"
-#include "CassandraDBLayer.h"
-#include "CloudantDBLayer.h"
-#include "HBaseDBLayer.h"
-#include "MongoDBLayer.h"
-#include "CouchbaseDBLayer.h"
-#include "AerospikeDBLayer.h"
-#include "RedisClusterDBLayer.h"
+#include "DPSToolkitResource.h"
 
 #include <SPL/Runtime/ProcessingElement/ProcessingElement.h>
 #include <SPL/Runtime/ProcessingElement/PE.h> // non-kosher
-#include <SPL/Runtime/Serialization/NetworkByteBuffer.h> 
+#include <SPL/Runtime/Serialization/NetworkByteBuffer.h>
 #include <SPL/Runtime/Utility/Mutex.h>
+#include <SPL/Runtime/Function/SPLFunctions.h>
 
 #include <iostream>
 #include <fstream>
 #include <string>
 
 #include <streams_boost/filesystem/path.hpp>
+#include <streams_boost/filesystem/operations.hpp>
 #include <streams_boost/algorithm/string.hpp>
 
 using namespace std;
@@ -37,8 +32,10 @@ namespace com {
 namespace ibm {
 namespace streamsx {
 namespace store {
-namespace distributed 
-{ 
+namespace distributed
+{
+  std::string DistributedProcessStore::dpsConfigFile_ = "";
+
   DistributedProcessStore::DistributedProcessStore()
     : dbError_(new PersistenceError()),
       lkError_(new PersistenceError())
@@ -46,7 +43,7 @@ namespace distributed
     connectToDatabase();
   }
 
-  DistributedProcessStore::~DistributedProcessStore() 
+  DistributedProcessStore::~DistributedProcessStore()
   {
   }
 
@@ -56,7 +53,7 @@ namespace distributed
   }
 
 
-  static void fetchDBConnectionParameters(std::string & noSqlKvStoreProductName, std::set<std::string> & dbServers)
+  static void fetchDBConnectionParameters(std::string & noSqlKvStoreProductName, std::set<std::string> & dbServers, std::string & dpsConfigFile)
   {
 	// Senthil commented the following code block on Nov/02/2013. Because, a stand-alone dps test from
 	// Java and Python will give core dump errors because of the PE-specific code below.
@@ -84,8 +81,15 @@ namespace distributed
 	cout << "Output directory=" << outputDirectory << endl;
 	cout << "Toolkit directory=" << toolkitDirectory << endl;
 	*/
-	// Refer to the etc directory with a relative path from the application directory.
-	std::string confFile = appDirectory + "/etc/no-sql-kv-store-servers.cfg";
+
+	// Refer to the file path provided in parameter dpsConfigFile
+	// if it is relative, prepend the application directory
+	std::string confFile;
+	streams_boost::filesystem::path configPath(dpsConfigFile);
+	if(configPath.is_relative()) {
+		configPath = streams_boost::filesystem::absolute(configPath, appDirectory);
+	}
+	confFile = configPath.string();
 
     // Format of this file is as shown below.
     // Several comment lines beginning with a # character.
@@ -129,22 +133,35 @@ namespace distributed
     }
 
     if (serverCnt == 0) {
+       SPLAPPLOG(L_ERROR, DPSMSG_CANNOT_GET_PRODUCT_NAME(confFile), "DistributedProcessStore");
        std::string error = "Cannot get NoSQL K/V store product name and/or the server names from the configuration file '"+confFile+"'";
-       SPLLOG(L_ERROR, error, "DistributedProcessStore");
+       SPLAPPTRC(L_ERROR, error, "DistributedProcessStore");
        throw(SPL::SPLRuntimeException("fetchDBParameters", error));
     }
   }
 
+  void load_dependent_lib(std::string toolkitDir, std::string lib){
+	  std::string libToLoad = toolkitDir + "/" + lib;
+	  void *handle = dlopen(libToLoad.c_str(), RTLD_NOW|RTLD_GLOBAL);
+	 if (handle == NULL) {
+    	std::string err = "DpsHelper: dlopen failed for " +lib;
+        err.append(dlerror());
+        SPLAPPTRC(L_ERROR, err, "DistributedProcessStore");
+	 	SPLAPPLOG(L_ERROR, DPSMSG_DLOPEN_FAILED(lib,dlerror()), "DistributedProcessStore");
+	 }
+  }
   // any errors in here are thrown during static initialization, so we
-  // better log, not just throw (as SPL runtime is not around to catch it) 
+  // better log, not just throw (as SPL runtime is not around to catch it)
   void DistributedProcessStore::connectToDatabase()
   {
     dbError_->reset();
     std::string noSqlKvStoreProductName = "";
     std::set<std::string> dbServers;
+
     // Read the no-sql store product name and the
     // no-sql store server names from the configuration file.
-    fetchDBConnectionParameters(noSqlKvStoreProductName, dbServers);
+    std::string configFile = (DistributedProcessStore::dpsConfigFile_ == "") ? "etc/no-sql-kv-store-servers.cfg" : DistributedProcessStore::dpsConfigFile_;
+    fetchDBConnectionParameters(noSqlKvStoreProductName, dbServers, configFile);
     noSqlKvStoreProductName = streams_boost::to_lower_copy(noSqlKvStoreProductName);
 
 	// Verify if the user has configured a valid no-sql store product that we support.
@@ -152,37 +169,82 @@ namespace distributed
     //
 	// Deallocate the current object pointed to by this auto_ptr typed db_ object and
 	// assign it to a new DBLayer instance.
+    void* handle = NULL;
+    std::string  kvLibName =  "";
+    std::string toolkitDir = ProcessingElement::pe().getToolkitDirectory("com.ibm.streamsx.dps")  + "/impl/ext/lib" ;
+    std::string streamsLibDir = SPL::Functions::Utility::getEnvironmentVariable("STREAMS_INSTALL") + "/ext/lib" ;
 	if (noSqlKvStoreProductName.compare("memcached") == 0) {
 		// reset method below is part of the C++ std::auto_ptr class.
-		db_.reset(new MemcachedDBLayer());
+		kvLibName= "libDPSMemcached.so";
 	} else if (noSqlKvStoreProductName.compare("redis") == 0) {
-		db_.reset(new RedisDBLayer());
+		load_dependent_lib(toolkitDir, "libuv.so");
+		load_dependent_lib(toolkitDir, "libhiredis.so");
+		kvLibName= "libDPSRedis.so";
 	} else if (noSqlKvStoreProductName.compare("cassandra") == 0) {
-		db_.reset(new CassandraDBLayer());
+		load_dependent_lib(toolkitDir, "libjson-c.so");
+		load_dependent_lib(toolkitDir, "libuv.so");
+		load_dependent_lib(toolkitDir, "libcassandra.so");
+		kvLibName= "libDPSCassandra.so";
 	} else if (noSqlKvStoreProductName.compare("cloudant") == 0) {
-		db_.reset(new CloudantDBLayer());
+		load_dependent_lib(toolkitDir, "libjson-c.so");
+		load_dependent_lib(toolkitDir, "libcurl.so");
+		kvLibName= "libDPSCloudant.so";
 	} else if (noSqlKvStoreProductName.compare("hbase") == 0) {
-		db_.reset(new HBaseDBLayer());
+		load_dependent_lib(toolkitDir, "libjson-c.so");
+		load_dependent_lib(toolkitDir, "libcurl.so");
+		kvLibName= "libDPSHBase.so";
 	} else if (noSqlKvStoreProductName.compare("mongo") == 0) {
-		db_.reset(new MongoDBLayer());
-	} else if (noSqlKvStoreProductName.compare("couchbase") == 0) {
-		db_.reset(new CouchbaseDBLayer());
-	} else if (noSqlKvStoreProductName.compare("aerospike") == 0) {
-		db_.reset(new AerospikeDBLayer());
+		load_dependent_lib(toolkitDir, "libjson-c.so");
+		load_dependent_lib(toolkitDir, "libbson.so");
+		load_dependent_lib(toolkitDir, "libmongoc.so");
+		kvLibName= "libDPSMongo.so";
+ 	} else if (noSqlKvStoreProductName.compare("couchbase") == 0) {
+ 		load_dependent_lib(toolkitDir, "libjson-c.so");
+ 		load_dependent_lib(toolkitDir,"libcurl.so");
+ 		load_dependent_lib(toolkitDir, "libcouchbase.so");
+ 		kvLibName= "libDPSCouchbase.so";
+#if !( defined (__PPC64__) )
+ 	} else if (noSqlKvStoreProductName.compare("aerospike") == 0) {
+ 		load_dependent_lib(toolkitDir, "libaerospike.so");
+ 		kvLibName= "libDPSAerospike.so";
+#endif
 	} else if (noSqlKvStoreProductName.compare("redis-cluster") == 0) {
-		db_.reset(new RedisClusterDBLayer());
+		load_dependent_lib(toolkitDir, "libuv.so");
+		load_dependent_lib(toolkitDir,"libhiredis.so");
+		kvLibName= "libDPSRedisCluster.so";
 	} else {
 		// Invalid no-sql store product name configured. Abort now.
+		SPLAPPLOG(L_ERROR, DPSMSG_INVALID_PRODUCT(noSqlKvStoreProductName), "DistributedProcessStore");
 		std::string error = "Invalid NoSQL store product name is specified in the configuration file: " + noSqlKvStoreProductName;
-		SPLLOG(L_ERROR, error, "DistributedProcessStore");
+		SPLAPPTRC(L_ERROR, error, "DistributedProcessStore");
 		throw(SPL::SPLRuntimeException("DistributedProcessStore::connectToDatabase", error));
+	}
+//	cout << "Going to load " << kvLibName << endl;
+	handle = dlopen(kvLibName.c_str(), RTLD_NOW|RTLD_GLOBAL);
+	if (handle == NULL) {
+	      std::string error = "Cannot initialize libraries for chosen database " + noSqlKvStoreProductName + ", error message: ";
+	      error.append(dlerror());
+	      SPLAPPTRC(L_ERROR, error, "DistributedProcessStore");
+	      SPLAPPLOG(L_ERROR, DPSMSG_CANNOT_OPEN_LIBS(noSqlKvStoreProductName,dlerror()), "DistributedProcessStore");
+	      throw(SPL::SPLRuntimeException("DistributedProcessStore::connectToDatabase", error));
+	}
+	DBLayer *(*objPtr)()= (DBLayer *(*)())dlsym(handle, "create");
+	DBLayer *newDb = (*objPtr)();
+	if (newDb != NULL) {
+		db_.reset(newDb);
+	} else {
+         SPLAPPLOG(L_ERROR, DPSMSG_CANNOT_INIT_LIBS(noSqlKvStoreProductName,kvLibName), "DistributedProcessStore");
+		 std::string error = "Cannot initialize libraries for chosen database " + noSqlKvStoreProductName + ", library " + kvLibName + " missing or corrupted";
+		 SPLAPPTRC(L_ERROR, error, "DistributedProcessStore");
+		 throw(SPL::SPLRuntimeException("DistributedProcessStore::connectToDatabase", error));
 	}
 
     db_->connectToDatabase(dbServers, *dbError_);
     if(dbError_->hasError()) {
       std::string error = "Cannot connect to database. ";
       error += "Details: '"+dbError_->getErrorStr()+"'.";
-      SPLLOG(L_ERROR, error, "DistributedProcessStore");
+      SPLAPPTRC(L_ERROR, error, "DistributedProcessStore");
+      SPLAPPLOG(L_ERROR, DPSMSG_CANNOT_CONNECT(dbError_->getErrorStr()), "DistributedProcessStore");
       throw(SPL::SPLRuntimeException("DistributedProcessStore::connectToDatabase", error));
     }
   }
@@ -273,14 +335,14 @@ namespace distributed
 	// Return the dps object pointer.
 	return *res;
   }
-        
+
   SPL::uint64 DistributedProcessStore::findStore(SPL::rstring const & name, SPL::uint64 & err)
   {
     dbError_->reset();
     SPL::uint64 res = db_->findStore(name, *dbError_);
     err = dbError_->getErrorCode();
     return res;
-  }            
+  }
 
   SPL::boolean DistributedProcessStore::removeStore(SPL::uint64 store, SPL::uint64 & err)
   {
@@ -294,14 +356,14 @@ namespace distributed
   {
     dbError_->reset();
     db_->clear(store, *dbError_);
-    err = dbError_->getErrorCode();            
+    err = dbError_->getErrorCode();
   }
-        
+
   SPL::uint64 DistributedProcessStore::size(SPL::uint64 store, SPL::uint64 & err)
   {
     dbError_->reset();
     SPL::uint64 size = db_->size(store, *dbError_);
-    err = dbError_->getErrorCode();            
+    err = dbError_->getErrorCode();
     return size;
   }
 
@@ -756,5 +818,11 @@ namespace distributed
          decodedResultStr = static_cast<SPL::rstring> (_decodedResultStr);
      }
 
+
+     void DistributedProcessStore::persist(SPL::uint64 & err){
+         dbError_->reset();
+         db_->persist(*dbError_);
+         err = dbError_->getErrorCode();
+      }
 } } } } }
-     
+

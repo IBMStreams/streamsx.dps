@@ -1616,6 +1616,14 @@ namespace distributed
 		return(false);
 	  }
 
+	  if (redis_reply->str == NULL) {
+			// Null pointer returned in place of the store name.
+			dbError.set("Redis returned a NULL pointer. Unable to get the store name for the StoreId " + storeIdString,
+				DPS_GET_STORE_CONTENTS_HASH_ERROR);
+			freeReplyObject(redis_reply);
+			return(false);
+	  }
+
 	  storeName = string(redis_reply->str);
 	  freeReplyObject(redis_reply);
 
@@ -1643,6 +1651,14 @@ namespace distributed
 		return(false);
 	  }
 
+	  if (redis_reply->str == NULL) {
+			// Null pointer returned in place of the SPL type name for the key.
+			dbError.set("Redis returned a NULL pointer. Unable to get the SPL type name of the key for the StoreId " + storeIdString,
+				DPS_GET_STORE_CONTENTS_HASH_ERROR);
+			freeReplyObject(redis_reply);
+			return(false);
+	  }
+
 	  keySplTypeName = string(redis_reply->str);
 	  freeReplyObject(redis_reply);
 
@@ -1668,6 +1684,14 @@ namespace distributed
 			". " + std::string(redis_reply->str), DPS_GET_STORE_CONTENTS_HASH_ERROR);
 		freeReplyObject(redis_reply);
 		return(false);
+	  }
+
+	  if (redis_reply->str == NULL) {
+			// Null pointer returned in place of the SPL type name for the value.
+			dbError.set("Redis returned a NULL pointer. Unable to get the SPL type name of the value for the StoreId " + storeIdString,
+				DPS_GET_STORE_CONTENTS_HASH_ERROR);
+			freeReplyObject(redis_reply);
+			return(false);
 	  }
 
 	  valueSplTypeName = string(redis_reply->str);
@@ -1990,7 +2014,7 @@ namespace distributed
 			  SPLAPPTRC(L_DEBUG, "Inside newIterator, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisDBLayer");
 		  }
 
-		  return(false);
+		  return(NULL);
 	  }
 
 	  // Get the general information about this store.
@@ -2924,3 +2948,11 @@ namespace distributed
   }
 
 } } } } }
+
+using namespace com::ibm::streamsx::store;
+using namespace com::ibm::streamsx::store::distributed;
+extern "C" {
+	DBLayer * create(){
+	   return new RedisDBLayer();
+	}
+}

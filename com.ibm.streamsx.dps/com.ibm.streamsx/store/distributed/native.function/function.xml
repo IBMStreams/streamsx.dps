@@ -86,7 +86,7 @@ a user created store present in the back-end DB infrastructure. If this rule is 
 @param key The key for the new pair.        
 @param item The value for the new pair. Must be the same type as the **value** that was provided when the store was created.
 @param err Will be set to '0' on success, and will be non-zero otherwise. 
-@return If no error occurs, returns false if the item previously existed in the store, and true if the store did not contain an item with the same key.
+@return If no error occurs, returns true, and false otherwise.
      
 		rstring dummyRstring = &quot;&quot;;
 		uint32 dummyUint32 = 0u;
@@ -116,7 +116,7 @@ a user created store present in the back-end DB infrastructure. If this rule is 
 @param key The key for the new pair.        
 @param item The value for the new pair. Must be the same type as the **value** that was provided when the store was created.
 @param err Will be set to '0' on success, and will be non-zero otherwise. 
-@return If no error occurs, returns false if the item previously existed in the store, and true if the store did not contain an item with the same key.
+@return If no error occurs, returns true, and false otherwise.
 </description>
         <prototype>&lt;any T1, any T2> public stateful boolean dpsPutSafe(uint64 store, T1 key, T2 item, mutable uint64 err)</prototype>
       </function>
@@ -251,6 +251,12 @@ it does safety checks and is therefore slower.</description>
 @param err Contains the error code describing the result of the operation.  Will be '0' if the store was successfully emptied, otherwise will have a non-zero value.  
 </description>
         <prototype>public stateful void dpsClear(uint64 store, mutable uint64 err)</prototype>
+      </function>
+        <function>
+        <description>Persist any operations involving stores used in this application to disk.
+@param err contains the error code for this function call.  Will be '0' if no error occurs and if  all write operations received before this function was called have been committed to storage.  It also returns '0' if the database does not support this operation.  It will be non-zero if an error occurs.
+</description>
+        <prototype>public stateful void dpsPersist(mutable uint64 err)</prototype>
       </function>
       <function>
         <description>Get the total number of key-value pairs in the given store.
@@ -411,8 +417,8 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
         <prototype>public stateful void dpsGetDetailsAboutThisMachine(mutable rstring machineName, mutable rstring osVersion, mutable rstring cpuArchitecture)</prototype>
       </function>
       <function>
-        <description>This function can be used to execute simple arbitrary back-end data store (fire and forget) native commands. This includes any Redis native commands that don't have to fetch and return key-value pairs or return size of the database, like Insert and Delete. However, key and value can only have string types. 
-@param cmd the Redis command to execute.
+        <description>This function can be used to execute simple arbitrary back-end data store (fire and forget) native commands. This includes any  native commands that don't have to fetch and return key-value pairs or return size of the database, like Insert and Delete. However, key and value can only have string types. 
+@param cmd the  command to execute.
 @param err a mutable variable that will contain the error code in case an error occurs executing the command. Will be '0' on success and non-zero otherwise.
 @return true if the one way command was successful, and false otherwise.
 
@@ -473,26 +479,17 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
 </description>
         <prototype>public stateful void dpsBase64Decode(rstring str, mutable rstring decodedResultStr)</prototype>
       </function>
+      <function>
+        <description>Allows for setting a path to the configuration file. Relative paths are relative to the toolkit root directory. If not set, then 'etc/no-sql-kv-store-servers.cfg' file will be used.
+@param dpsConfigFile the path to the configuration file that should be used</description>
+        <prototype>public stateful boolean dpsSetConfigFile(rstring dpsConfigFile)</prototype>
+      </function>
     </functions>
     <dependencies>
       <library>
         <cmn:description>Distributed process store library</cmn:description>
         <cmn:managedLibrary>
-          <cmn:lib>DistributedProcessStoreLib</cmn:lib>
-          <cmn:lib>memcached</cmn:lib>
-          <cmn:lib>sds</cmn:lib>
-          <cmn:lib>hiredis</cmn:lib>
-          <cmn:lib>uv</cmn:lib>
-          <cmn:lib>crypto</cmn:lib>
-          <cmn:lib>ssl</cmn:lib>
-          <cmn:lib>cassandra</cmn:lib>
-          <cmn:lib>curl</cmn:lib>
-          <cmn:lib>json-c</cmn:lib>
-          <cmn:lib>bson</cmn:lib>
-          <cmn:lib>mongoc</cmn:lib>
-          <cmn:lib>couchbase</cmn:lib>
-          <cmn:lib>lua</cmn:lib>
-          <cmn:lib>aerospike</cmn:lib>
+          <cmn:lib>DistributedProcessStoreLib</cmn:lib> 
           <cmn:command>../../../../impl/bin/archLevel</cmn:command>
         </cmn:managedLibrary>
       </library>

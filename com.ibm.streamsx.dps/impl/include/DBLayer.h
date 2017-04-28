@@ -13,6 +13,7 @@
 #include <set>
 
 #include "PersistenceError.h"
+#include <SPL/Runtime/Common/RuntimeDebug.h>
 
 namespace com {
 namespace ibm {
@@ -317,6 +318,14 @@ namespace store {
     /// @param lkError lock error
     virtual uint32_t getPidForLock(std::string const & name, PersistenceError & lkError) = 0;
 
+    /// persist changes to disk, that may have resided in memory only so far
+    /// @param dbError error from the database
+    virtual void persist(PersistenceError & dbError)
+    {
+    	SPLAPPTRC(L_DEBUG, "Called persist() on DBlayer '" << getNoSqlDbProductName() << "' that does not support this function. Returning success." , "DBLayer");
+    }
+
   };
+
 } } } } 
 #endif /* DB_LAYER_H_ */

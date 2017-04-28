@@ -30,7 +30,7 @@ copied into the impl/lib directory within the OS specific sub-directory.
 #include "DBLayer.h"
 
 #include <curl/curl.h>
-#include <json/json.h>
+#include <json-c/json.h>
 #include <libcouchbase/couchbase.h>
 #include <set>
 #include <vector>
