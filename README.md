@@ -24,6 +24,9 @@ There are plenty of details available about the installation, configuration, API
 built-in example etc. Please refer to the com.ibm.streamsx.dps/doc/dps-usage-tips.txt file
 for getting a good start in using this toolkit.  
 
+Things to consider when working with this toolkit:
+* [The messages and the NLS for toolkits](https://github.com/IBMStreams/administration/wiki/Messages-and-National-Language-Support-for-toolkits)
+
 To learn more about Streams:
 * [IBM Streams on Github](http://ibmstreams.github.io)
 * [Introduction to Streams Quick Start Edition](http://ibmstreams.github.io/streamsx.documentation/docs/4.1/qse-intro/)
