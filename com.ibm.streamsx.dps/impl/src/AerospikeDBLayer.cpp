@@ -1767,7 +1767,7 @@ namespace distributed
 			  SPLAPPTRC(L_DEBUG, "Inside newIterator, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "AerospikeDBLayer");
 		  }
 
-		  return(false);
+		  return(NULL);
 	  }
 
 	  // Get the general information about this store.
@@ -3282,3 +3282,10 @@ namespace distributed
 
 
 } } } } }
+using namespace com::ibm::streamsx::store;
+using namespace com::ibm::streamsx::store::distributed;
+extern "C" {
+	DBLayer * create(){
+	   return new AerospikeDBLayer();
+	}
+}

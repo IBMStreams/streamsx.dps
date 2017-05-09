@@ -11,7 +11,7 @@ package com.ibm.streamsx.dl;
 import com.ibm.streamsx.dl.impl.LockFactoryImpl;
 /**
  * This is the main entry point into the locking API, used to create a {@link LockFactory}.
- * 
+ * It is assumed that the {@link DistributedStores} class has been configured using its initialize method before attempts to utilize the <code>DistributedLocks</code> are made.
  */
 public class DistributedLocks {
 	// Get a Lock factory ONLY ONCE per object of this class per Process (i.e. PE).

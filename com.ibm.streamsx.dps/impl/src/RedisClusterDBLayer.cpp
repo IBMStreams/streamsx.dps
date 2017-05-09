@@ -1542,6 +1542,14 @@ namespace distributed
 		return(false);
 	  }
 
+	  if (redis_cluster_reply->str == NULL) {
+			// Null pointer returned in place of the store name.
+			dbError.set("Redis returned a NULL pointer. Unable to get the store name for the StoreId " + storeIdString,
+				DPS_GET_STORE_CONTENTS_HASH_ERROR);
+			freeReplyObject(redis_cluster_reply);
+			return(false);
+	  }
+
 	  storeName = string(redis_cluster_reply->str);
 	  freeReplyObject(redis_cluster_reply);
 
@@ -1569,6 +1577,14 @@ namespace distributed
 		return(false);
 	  }
 
+	  if (redis_cluster_reply->str == NULL) {
+			// Null pointer returned in place of the SPL type name for the key.
+			dbError.set("Redis returned a NULL pointer. Unable to get the SPL type name of the key for the StoreId " + storeIdString,
+				DPS_GET_STORE_CONTENTS_HASH_ERROR);
+			freeReplyObject(redis_cluster_reply);
+			return(false);
+	  }
+
 	  keySplTypeName = string(redis_cluster_reply->str);
 	  freeReplyObject(redis_cluster_reply);
 
@@ -1594,6 +1610,14 @@ namespace distributed
 			". Error=" + std::string(redis_cluster_reply->str), DPS_GET_STORE_CONTENTS_HASH_ERROR);
 		freeReplyObject(redis_cluster_reply);
 		return(false);
+	  }
+
+	  if (redis_cluster_reply->str == NULL) {
+			// Null pointer returned in place of the SPL type name for the value.
+			dbError.set("Redis returned a NULL pointer. Unable to get the SPL type name of the value for the StoreId " + storeIdString,
+				DPS_GET_STORE_CONTENTS_HASH_ERROR);
+			freeReplyObject(redis_cluster_reply);
+			return(false);
 	  }
 
 	  valueSplTypeName = string(redis_cluster_reply->str);
@@ -1940,7 +1964,7 @@ namespace distributed
 			  SPLAPPTRC(L_DEBUG, "Inside newIterator, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisClusterDBLayer");
 		  }
 
-		  return(false);
+		  return(NULL);
 	  }
 
 	  // Get the general information about this store.
@@ -2862,5 +2886,55 @@ namespace distributed
 		  return(_lockOwningPid);
 	  }
   }
+  void RedisClusterDBLayer::persist(PersistenceError & dbError){
+	 	  // In the Redis-cluster wrapper hiredis API, we must pass the key. Usually, it is the second token in
+	 	  // the command string passed by the caller. Let us parse it now.
+	 	  string keyString = "";
+	 	  string cmd = "WAIT 1 0";
+	 	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+
+	 	  if (redis_cluster_reply == NULL) {
+	 		  dbError.set("Inside persist: Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+	 		  SPLAPPTRC(L_ERROR, "Inside persist: Unable to connect to the redis-cluster server(s). '" <<
+	 				  cmd << "'. Failed with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+	 	  }
+
+	 	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
+	 		  // Problem in running an arbitrary data store command.
+
+	 		  SPLAPPTRC(L_ERROR, "Inside dpsPersist, server returned an error.", "RedisClusterDBLayer");
+	 		  if (redis_cluster_reply->str != NULL){
+	 			 SPLAPPTRC(L_ERROR, "Message from Redis: " + std::string(redis_cluster_reply->str), "RedisClusterDBLayer");
+	 			 dbError.set("dpsPersist failed for Redis, server message: " + std::string(redis_cluster_reply->str), DPS_MAKE_DURABLE_ERROR);
+	 		  } else{
+		 			 dbError.set("dpsPersist failed for Redis, server returned error.", DPS_MAKE_DURABLE_ERROR);
+	 		  }
+	 		  freeReplyObject(redis_cluster_reply);
+	 		  return;
+	 	  }
+
+	 	  if (redis_cluster_reply->type == REDIS_REPLY_INTEGER){
+	 		  if (redis_cluster_reply->integer !=  1){
+	 			  //didn't write to at least one slave
+	 			std::ostringstream ostr;
+	 			ostr <<  redis_cluster_reply->integer;
+	 			 dbError.set("dpsPersist: return value should be at least 1, return value  from Redis is  " + ostr.str(), DPS_MAKE_DURABLE_ERROR);
+	 			SPLAPPTRC(L_ERROR, "dpsPersist: WAIT return value is " <<  ostr.str() << ", should be 1. ", "RedisClusterDBLayer");
+	 		  } else{
+	 			 SPLAPPTRC(L_DEBUG, "dpsPersist, WAIT returned successfully, wrote to "  << redis_cluster_reply->integer <<" slaves.", "RedisClusterDBLayer");
+	 		  }
+	 	  } else {
+	 		    SPLAPPTRC(L_ERROR, "Inside dpsPersist, should have returned an integer but returned unknown reply type", "RedisClusterDBLayer");
+	 	  }
+	 	  freeReplyObject(redis_cluster_reply);
+  }
 
 } } } } }
+
+using namespace com::ibm::streamsx::store;
+using namespace com::ibm::streamsx::store::distributed;
+extern "C" {
+	DBLayer * create(){
+	   return new RedisClusterDBLayer();
+	}
+}

@@ -1,0 +1,15 @@
+--- curl-7.49.0/m4/libtool.m4.orig	2016-05-27 13:43:01.175477951 -0400
++++ curl-7.49.0/m4/libtool.m4	2016-05-27 13:47:59.295110760 -0400
+@@ -1417,9 +1417,9 @@
+ 	  x86_64-*linux*)
+ 	    LD="${LD-ld} -m elf_x86_64"
+ 	    ;;
+-	  powerpcle-*linux*)
+-	    LD="${LD-ld} -m elf64lppc"
+-	    ;;
++	  powerpcle-*linux*|ppc64le*-*linux*|powerpc64le*-*linux*)
++            LD="${LD-ld} -m elf64lppc"
++            ;;
+ 	  powerpc-*linux*)
+ 	    LD="${LD-ld} -m elf64ppc"
+ 	    ;;

@@ -45,7 +45,7 @@ if [ "$1" == "libPath" ]; then
     fi
 
     # construct a library pathname
-    OSSTR="$here/../lib/${MACH}.${OSLVL%%.*}"
+    OSSTR="${MACH}.${OSLVL%%.*}"
     
   else
 
@@ -54,17 +54,89 @@ if [ "$1" == "libPath" ]; then
   fi
 
   # return a library pathname, but warn if it does not exist
-  [ -d $OSSTR ] || echo warning: non-existant library path $OSSTR 1>&2
-  echo ${OSSTR}
+  # [ -d $OSSTR ] || echo warning: non-existant library path $OSSTR 1>&2
+  echo $here/../lib # /${OSSTR}
+  echo $here/../ext/lib #/${OSSTR}
 
 elif [ "$1" == "includePath" ]; then
   # echo any computed include paths here, if needed
-  echo ../../../../impl/include
+  here=$( cd ${0%/*} ; pwd )
+  echo $here/../include
+  echo $here/../ext/lib
 
 elif [ "$1" == "lib" ]; then
   # echo any computed library names here, if needed
-  :
-
+  #Determine which files to add to include path
+  if [ -f "etc/no-sql-kv-store-servers.cfg" ]
+  then
+	  cat "etc/no-sql-kv-store-servers.cfg" | while read line
+	  do
+	     if [ "$line" = "redis" ]
+	     then
+	     	:
+			# do not output any libraries here, because the libs are loaded at runtime via dlopen()
+	     	# See DistributedProcessStore.cpp for the list of libs loaded at runtime
+	     	# This is the original list for reference : 
+	     	#echo "hiredis"
+	     	#echo "DPSRedis"
+	     	#echo "uv"
+	     elif [ "$line" = "redis-cluster" ]
+	     then
+	     	echo "hiredis"
+	     	echo "DPSRedisCluster"
+	     	echo "uv"
+	     elif [ "$line" =  "hbase" ]
+	     then
+	     	echo "DPSHBase"
+	     	echo "ssl"
+	     	echo "curl"
+	     	echo "crypto"
+	     	echo "json-c"
+		elif [ "$line" =  "couchbase" ]
+	     then
+	     	echo "DPSCouchbase"
+			echo "couchbase"
+			echo "ssl"
+	     	echo "curl"
+	     	echo "ldap"
+	     	echo "crypto"
+	     	echo "json-c"	     	
+	     elif [ "$line" =  "aerospike" ]
+	     then
+	     	echo "DPSAerospike"
+	     	echo "aerospike"
+	    elif [ "$line" =  "mongo" ]
+	     then
+	     	echo "DPSMongo"
+	     	echo "mongoc"
+	     	echo "bson"
+	     	echo "json-c"
+	     	echo "ssl"
+	     	echo "uv"
+	     	echo "crypto"
+	     elif [ "$line" =  "memcached" ]
+	     then
+	      	echo "memcached"
+	     	echo "DPSMemcached"
+	     elif [ "$line" =  "cloudant" ]
+	     then
+	     	echo "DPSCloudant"
+	     	echo "ssl"
+	     	echo "ldap"
+	     	echo "crypto"
+	     	echo "curl"
+	     	echo "json-c"
+	     elif [ "$line" =  "cassandra" ]
+	     then
+	     	echo "cassandra"
+	     	echo "DPSCassandra"
+	     	echo "ssl"
+	     	echo "uv"
+	     	echo "crypto"
+	     	echo "json-c"
+		 fi
+	  done
+  fi
 else
   echo "unsupported option"
 

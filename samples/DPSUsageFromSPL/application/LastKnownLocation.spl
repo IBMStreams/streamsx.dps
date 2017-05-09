@@ -1,0 +1,159 @@
+// begin_generated_IBM_copyright_prolog                             
+//                                                                  
+// This is an automatically generated copyright prolog.             
+// After initializing,  DO NOT MODIFY OR MOVE                       
+// **************************************************************** 
+// THIS SAMPLE CODE IS PROVIDED ON AN "AS IS" BASIS. IBM MAKES NO   
+// REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED, CONCERNING    
+// USE OF THE SAMPLE CODE, OR THE COMPLETENESS OR ACCURACY OF THE   
+// SAMPLE CODE. IBM DOES NOT WARRANT UNINTERRUPTED OR ERROR-FREE    
+// OPERATION OF THIS SAMPLE CODE. IBM IS NOT RESPONSIBLE FOR THE    
+// RESULTS OBTAINED FROM THE USE OF THE SAMPLE CODE OR ANY PORTION  
+// OF THIS SAMPLE CODE.                                             
+//                                                                  
+// LIMITATION OF LIABILITY. IN NO EVENT WILL IBM BE LIABLE TO ANY   
+// PARTY FOR ANY DIRECT, INDIRECT, SPECIAL OR OTHER CONSEQUENTIAL   
+// DAMAGES FOR ANY USE OF THIS SAMPLE CODE, THE USE OF CODE FROM    
+// THIS [ SAMPLE PACKAGE,] INCLUDING, WITHOUT LIMITATION, ANY LOST  
+// PROFITS, BUSINESS INTERRUPTION, LOSS OF PROGRAMS OR OTHER DATA   
+// ON YOUR INFORMATION HANDLING SYSTEM OR OTHERWISE.                
+//                                                                  
+// (C) Copyright IBM Corp. 2016  All Rights reserved.         
+//                                                                  
+// end_generated_IBM_copyright_prolog                               
+namespace application;
+
+
+use com.ibm.streamsx.store.distributed::* ;
+use com.ibm.streamsx.lock.distributed::* ;
+
+
+/**This sample demonstrates the use of the DPS toolkit to store and retreive data.
+ * The data is real taxi data from over 200 Taxis generally in and around London on December 31, 2013. 
+ * The data is found in the file data/taxiLocationData within this project.
+* One part of the application receives taxi location data and saves it in a NoSQL back end  using the DPS toolkit
+ * Another part of the application responds to queries of taxi location by id and returns the last known data for the taxi.
+ */
+
+
+
+composite LastKnownLocation {
+
+type
+/**Incoming data type for the operator */
+ TaxiLocationInfo = rstring taxi_Id, float64 latitude, float64 longitude,  int64 timeStamp ;
+
+	graph
+	
+		stream< rstring taxi_Id, float64 latitude, float64 longitude, int64 timeStamp> RawData = FileSource()
+		{
+			param
+				file : "input/taxiLocationData.txt" ;
+				format : csv ;
+		}
+
+		//input into the query stream to search for taxis by location
+		// in this application called the TaxiSearchStream
+		stream<rstring  idToLookup> TaxiSearchStream =
+			FileSource()
+		{
+			param
+				file : "input/taxiSearchQueries.txt" ;
+				initDelay : 5.0 ;
+				format : csv ;
+		}
+
+		
+		
+		() as TaxiDataSink = Custom(RawData) {
+			logic	
+				state: {
+					
+					rstring storeName = "TaxiStore";
+					uint64 storeHandle = createTaxiStore();
+					mutable rstring dummyRstring = "";
+    				mutable tuple<float64 latitude, float64 longitude, int64 timeStamp> taxiInfoTuple = {};
+				}				
+				onTuple RawData :{
+					mutable uint64 err = 0ul;
+					assignFrom(taxiInfoTuple, RawData);
+					dpsPut(storeHandle, RawData.taxi_Id, taxiInfoTuple,err);
+					if (err != 0ul) {
+							printStringLn("Unexpected error saving tuple: rc = " + (rstring)dpsGetLastStoreErrorCode() + 
+						", msg = " + dpsGetLastStoreErrorString());
+					}
+				}
+		}
+		stream<TaxiLocationInfo> FoundTaxis = Custom(TaxiSearchStream)
+		{	
+
+				logic 
+					state: {
+					
+						mutable uint64 rc = 0ul;
+						//only need to find the store once
+						mutable uint64 store_handle =	dpsFindStore("TaxiStore",rc);
+					}
+				onTuple TaxiSearchStream:{
+					mutable int32 count  = 0;
+					while (store_handle == 0ul && count  < 5){
+						block(2.0);
+						printStringLn("waiting for store to be created..");
+						store_handle =	dpsFindStore("TaxiStore",rc);
+						count++;
+					}
+					mutable uint64 err = 0ul;
+					mutable tuple<float64 latitude, float64 longitude, int64 timeStamp> retrievedTaxiData = {};
+					boolean exists  = dpsGet(store_handle,TaxiSearchStream.idToLookup, retrievedTaxiData, err);
+					if (exists) {
+						rstring loc = "(" + (rstring)retrievedTaxiData.latitude + ", "+ (rstring)retrievedTaxiData.longitude + ")";
+						printStringLn("Taxi with id " + TaxiSearchStream.idToLookup +  " was last seen at: " + loc);
+					} else {
+						printStringLn("No data for taxi " + TaxiSearchStream.idToLookup + " found in store");
+					}
+					mutable TaxiLocationInfo outTuple = {};
+					assignFrom(outTuple, retrievedTaxiData);
+					outTuple.taxi_Id = TaxiSearchStream.idToLookup;
+					submit(outTuple,FoundTaxis);
+				}
+				
+				onPunct TaxiSearchStream: {
+					if (currentPunct() == Sys.FinalMarker) {
+						mutable uint64 err = 0ul;
+						printStringLn("Received final punctuation, cleaning up");
+						uint64 size = dpsSize(store_handle,err);
+						printStringLn("There are "  + (rstring)size + " taxis in the TaxiStore store"); 
+						err = 0ul;
+						dpsRemoveStore(store_handle, err);
+						if (err != 0ul){
+							printStringLn("dpsRemoveStore FAILED to remove store TaxiStore: " +  dpsGetLastStoreErrorString());
+						}
+					}
+				}
+		}
+
+		
+		() as QueryAnswerWriter = FileSink(FoundTaxis)
+		{
+			param
+				file : "results/foundTaxis.txt" ;
+				format : csv ;
+				flush : 1u ;
+				quoteStrings: false;
+		}
+}
+
+
+public stateful uint64 createTaxiStore(){
+	mutable uint64 err = 0ul;
+	mutable rstring dummyRstring ="";
+	//The TaxiStore will consist of tuple as its value and a rstring key.
+	mutable tuple<float64 latitude, float64 longitude, int64 timeStamp> taxiInfoTuple = {};
+	mutable uint64 store_handle = dpsCreateOrGetStore("TaxiStore",dummyRstring, taxiInfoTuple, err);
+	
+	if (err != 0ul) {
+		printStringLn("Unexpected error creating TaxiStore: rc = " + (rstring)dpsGetLastStoreErrorCode() + 
+			", msg = " + dpsGetLastStoreErrorString());
+	}
+	return store_handle;
+}

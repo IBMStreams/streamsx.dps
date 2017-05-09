@@ -1,0 +1,18 @@
+# -*- makefile -*-
+
+#################################################
+# Common Makefile variables
+#################################################
+
+# Helper scripts and locations
+PWD = $(shell pwd)
+PLATFORM_INFO = $(PWD)/../platform-info.pl
+OS = $(shell $(PLATFORM_INFO) --osname_rpm_format)
+ARCH = $(shell $(PLATFORM_INFO) --arch)
+OSVER = $(shell $(PLATFORM_INFO) --osver)
+ARCH_CFLAG = $(if $(filter ppc64, $(shell uname -m)),-m64,)
+
+# Default target directory
+TARGETDIR ?= $(PWD)/../../com.ibm.streamsx.dps/impl/ext
+
+export STOP_RECURSE

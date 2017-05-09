@@ -56,7 +56,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "DBLayer.h"
 
-#include "hiredis.h"
+#include "hiredis/hiredis.h"
 #include "hiredis-cluster/cluster.h"
 #include "hiredis-cluster/hirediscommand.h"
 #include <tr1/memory>
@@ -183,6 +183,7 @@ namespace distributed
     bool acquireLock(uint64_t lock, double leaseTime, double maxWaitTimeToAcquireLock, PersistenceError & lkError);
     bool removeLock(uint64_t lock, PersistenceError & lkError);
     uint32_t getPidForLock(std::string const & name, PersistenceError & lkError);
+    void persist(PersistenceError & dbError);
 
   };
 } } } } }

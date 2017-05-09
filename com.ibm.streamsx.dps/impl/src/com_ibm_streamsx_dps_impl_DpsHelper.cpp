@@ -606,6 +606,17 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsBase64Deco
 	return (env->NewStringUTF(resultString));
 }
 
+JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsSetConfigFileCpp
+  (JNIEnv *env, jobject obj, jstring dpsConfigFile) {
+	const char *str = env->GetStringUTFChars(dpsConfigFile, 0);
+	SPL::rstring _str = std::string(str);
+
+	DistributedProcessStore::setConfigFile(_str);
+
+	char booleanResult[40] = "true";
+	return (env->NewStringUTF(booleanResult));
+}
+
 JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dlCreateOrGetLockCpp
   (JNIEnv *env, jobject obj, jstring name) {
 	const char *str = env->GetStringUTFChars(name, 0);

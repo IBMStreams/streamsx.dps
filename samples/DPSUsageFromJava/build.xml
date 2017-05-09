@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+// *******************************************************************************
+// * Copyright (C)2016, International Business Machines Corporation and *
+// * others. All Rights Reserved. *
+// *******************************************************************************
+-->
+<!-- Build file to compile the Java artifacts -->
+<project name="DPSUsageFromJava" basedir="." default="all">
+
+	<property environment="env" />
+	<property name="streams.install" value="${env.STREAMS_INSTALL}" />
+
+	<property name="src.dir" value="impl/java/src" />
+	<property name="build.dir" value="impl/java/bin" />
+	<property name="lib.dir" value="lib" />
+	<property name="gensrc.dir" value="${basedir}/impl/java/src-gen" />
+	<property name="spl-mt" value="${streams.install}/bin/spl-make-toolkit" />
+	<property name="spl-sc" value="${streams.install}/bin/sc" />
+	<property name="app.name" value="com.ibm.streamsx.dps.sample::JavaDPSDemo" />
+
+
+	<target name="all" depends="compile-java,make-toolkit"/>
+	<target name="init">
+			<mkdir dir="${build.dir}" />
+			<mkdir dir="${lib.dir}" />
+			<mkdir dir="${gensrc.dir}" />
+		<mkdir dir="data" />
+
+		</target>
+	<target name="clean" depends="make-toolkit-clean">
+		<delete dir="${build.dir}" />
+		<delete dir="${impl.lib.dir}" />
+		<delete dir="impl/java/bin"/>
+		<delete dir="${gensrc.dir}"/>
+	</target>
+
+
+	<path id="cp.streams">
+			<pathelement path="${streams.install}/lib/com.ibm.streams.operator.jar"/>
+			<pathelement path="${streams.install}/lib/com.ibm.streams.operator.samples.jar"/>
+			<pathelement path="${streams.install}/ext/lib/log4j*.jar"/>
+			<pathelement path="${streams.install}/ext/lib/JSON4J.jar"/>
+			<pathelement path="${streams.install}/ext/lib/commons-math-*.jar"/>
+	</path>
+
+	<path id="dps-lib">
+		<pathelement path="${streams.install}/toolkits/com.ibm.streamsx.dps/impl/java/lib/dps-helper.jar"/>
+	</path>
+
+
+	<path id="cp.compile">
+		<path refid="cp.streams" />
+		<path refid="dps-lib" />
+	</path>
+	
+	
+	<target name="make-toolkit">
+		<exec executable="${spl-mt}" failonerror="true">
+			<arg value="-i"/>
+			<arg value="."/>
+	    </exec>
+	</target>
+
+	<target name="make-toolkit-clean">
+		<exec executable="${spl-mt}"  failonerror="true">
+			<arg value="-c"/>
+			<arg value="-i"/>
+			<arg value="."/>
+    </exec>
+	</target>
+
+
+	<target name="compile-java" depends="init">
+		<javac srcdir="${src.dir}" destdir="${build.dir}" debug="true"
+			includeantruntime="no"
+			excludes="application/**/*$StreamsModel.java" >
+			<classpath>
+				<path refid="cp.compile" />
+			</classpath>
+			<compilerarg line="-s ${gensrc.dir}"/>
+		</javac>
+	</target>
+</project>

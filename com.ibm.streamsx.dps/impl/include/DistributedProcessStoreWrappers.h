@@ -16,6 +16,16 @@ namespace streamsx {
 namespace store {
 namespace distributed
 {
+
+  /// Set the path of the DPS configuration file
+  /// @param dpsConfigFile the path string
+  /// @return indication if the operation succeeded
+  inline SPL::boolean dpsSetConfigFile(SPL::rstring const & dpsConfigFile)
+  {
+    DistributedProcessStore::setConfigFile(dpsConfigFile);
+    return true;	// TODO do something more sensible here ?
+  }
+
   /// Create a distributed process store
   /// @param name of the store
   /// @param key a dummy key to indicate the type of this store's key
@@ -194,6 +204,13 @@ namespace distributed
     return DistributedProcessStore::getGlobalStore().size(store, err);    
   }
 
+  /// flush unpersisted data in the back end database to disk
+  /// @return true on success, false on failure
+  /// @param err GlobalStore error code
+  inline void  dpsPersist(SPL::uint64 & err)
+  {
+   DistributedProcessStore::getGlobalStore().persist(err);
+  }
   /// Begin the iteration on the given store. No other operations that can
   /// modify the state can be used until after a matching endIteration()
   /// call.                                                             

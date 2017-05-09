@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2015
+# Copyright IBM Corp. 2011, 2016
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -105,7 +105,6 @@ interface with many different back-end in-memory stores.
 #define COUCHBASE_META_DATA_BUCKET_QUOTA_IN_MB						"100"
 #define COUCHBASE_TTL_BUCKET_QUOTA_IN_MB							"200"
 
-
 // This constant tells how many bytes of "comma separated based64 encoded key data" a catalog segment can hold.
 // memcached has a default max size for a data item to be 1MB. During the server start-up, it can be
 // configured to go upto 128MB. Redis supports a maximum data item length of 512MB.
@@ -207,6 +206,9 @@ interface with many different back-end in-memory stores.
 #define DPS_STORE_REMOVAL_ERROR										152 // Used in Couchbase, Aerospike
 #define DPS_STORE_CLEAR_NULL_KEY_ERROR								153 // Used in Aerospike
 #define DPS_STORE_ITERATION_NULL_KEY_ERROR							154 // Used in Aerospike
+#define DPS_MAKE_DURABLE_ERROR										155
+#define DPS_STORE_FATAL_ERROR										156
+#define DPS_STORE_UNKNOWN_STATE_ERROR								157
 
 #define DL_CONNECTION_ERROR											501
 #define DL_GET_LOCK_ID_ERROR										502

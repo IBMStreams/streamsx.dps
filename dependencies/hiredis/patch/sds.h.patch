@@ -1,0 +1,22 @@
+--- hiredis-0.13.3/sds.h.orig	2016-05-27 13:22:18.410499697 -0400
++++ hiredis-0.13.3/sds.h	2016-05-27 13:37:08.880365569 -0400
+@@ -39,6 +39,9 @@
+ #include "win32.h"
+ #endif
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
+ typedef char *sds;
+ 
+ struct sdshdr {
+@@ -102,4 +105,9 @@
+ sds sdsRemoveFreeSpace(sds s);
+ size_t sdsAllocSize(sds s);
+ 
++ 
++#ifdef __cplusplus
++}
++#endif
++
+ #endif

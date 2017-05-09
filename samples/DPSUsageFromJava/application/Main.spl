@@ -1,0 +1,193 @@
+// begin_generated_IBM_copyright_prolog                             
+//                                                                  
+// This is an automatically generated copyright prolog.             
+// After initializing,  DO NOT MODIFY OR MOVE                       
+// **************************************************************** 
+// THIS SAMPLE CODE IS PROVIDED ON AN "AS IS" BASIS. IBM MAKES NO   
+// REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED, CONCERNING    
+// USE OF THE SAMPLE CODE, OR THE COMPLETENESS OR ACCURACY OF THE   
+// SAMPLE CODE. IBM DOES NOT WARRANT UNINTERRUPTED OR ERROR-FREE    
+// OPERATION OF THIS SAMPLE CODE. IBM IS NOT RESPONSIBLE FOR THE    
+// RESULTS OBTAINED FROM THE USE OF THE SAMPLE CODE OR ANY PORTION  
+// OF THIS SAMPLE CODE.                                             
+//                                                                  
+// LIMITATION OF LIABILITY. IN NO EVENT WILL IBM BE LIABLE TO ANY   
+// PARTY FOR ANY DIRECT, INDIRECT, SPECIAL OR OTHER CONSEQUENTIAL   
+// DAMAGES FOR ANY USE OF THIS SAMPLE CODE, THE USE OF CODE FROM    
+// THIS [ SAMPLE PACKAGE,] INCLUDING, WITHOUT LIMITATION, ANY LOST  
+// PROFITS, BUSINESS INTERRUPTION, LOSS OF PROGRAMS OR OTHER DATA   
+// ON YOUR INFORMATION HANDLING SYSTEM OR OTHERWISE.                
+//                                                                  
+// (C) Copyright IBM Corp. 2016  All Rights reserved.         
+//                                                                  
+// end_generated_IBM_copyright_prolog             
+/*
+ * This is the main application for this sample.
+* The purpose of this sample is to demonstrate how to use the DPS toolkit Java functions from within a Java operator.
+* Before running this sample, you must first configure the name of your back-end 
+* NoSQL DB store and the name(s) of your one or more back-end server(s).
+* Please take a look inside the etc/no-sql-kv-store-servers.cfg file for more information.
+*  Read the comments available above the invocations of those  Java operators in this SPL file and the additional comments inside those Java operators to learn more.
+* This sample will write some stock ticker symbols and company names to a store called "Tickers_Store"  from an SPL operator
+ *Afterwards, a Java operator will read the ticker symbols from the "Tickers_Store" and create another store called "TickerIds_Store",
+ * that maps ticker symbols to a generated id
+ * Downstream, a subsequent SPL operator will read from that store to verify that all types of operators can read and write to and from  the same backend
+ * 
+ * Note the inclusion of the DPSAux operator - it must be present in all applications where Java operators that use DPS API are present.
+*/
+namespace application;
+
+use com.ibm.streamsx.store.distributed::*;
+use com.ibm.streamsx.lock.distributed::*;
+
+composite JavaDPSDemo {
+	graph
+		
+		//This operator is required in order for the Java operators to function properly.
+		() as DPSAux_3 = DPSAux()
+		{
+		}
+		
+		//Create a store using the DPS SPL functions and 
+		// populate that store with a few data items.
+		stream<rstring ticker_symbol> Tickers = Custom() {
+			logic
+				onProcess: {
+				    
+					// Create a new named store that can be accessed by any other operator
+					// even if it is not fused with this Tickers operator.
+					mutable uint64 err = 0ul;
+					// Indicate what SPL type will make up the key and value of this store.
+					// Simply pass a dummy key and dummy value so that their SPL types will be automatically inferred during the creation of that store.
+					// Important note: After creating a store this way, there will not be any check done during the future put operations to validate whether you are
+					// using the correct data types indicated at the time of store creation via dummy key and dummy value. It is better to have all the
+					// entries to have uniform key:value data types in order for that store to be practically useful. 
+					// So do not use  dpsPut with different data types for keys and values of any given store, as the resulting behavior is unspecified.
+					rstring dummyRstring = "";
+					uint64 t1s = dpsCreateOrGetStore("Tickers_Store", dummyRstring, dummyRstring, err);
+					
+					if (err != 0ul || t1s == 0ul) {
+						printStringLn("Error while creating the Tickers store: " + dpsGetLastStoreErrorString());
+						abort();
+					}
+					err = 0ul;
+					// Add a few entries into the Tickers distributed process store.
+					// "ticker symbol => company name"
+					dpsPut(t1s, "IBM", "IBM Corporation", err);
+					dpsPut(t1s, "F", "Ford Motor Company", err);
+					dpsPut(t1s, "BA", "The Boeing Company", err);
+					dpsPut(t1s, "T", "AT&T Inc.", err);
+					dpsPut(t1s, "CSCO", "Cisco Systems, Inc.", err);
+					dpsPut(t1s, "GOOG", "Google Inc.", err);
+					dpsPut(t1s, "INTC", "Intel Corporation", err);
+					
+					// Pick a subset of the tickers we added, and send that
+					// subset to a Java primitive operator
+					submit({ticker_symbol = "IBM"}, Tickers);
+					submit({ticker_symbol = "T"}, Tickers);
+					submit({ticker_symbol = "GOOG"}, Tickers);
+					submit({ticker_symbol = "BA"}, Tickers);
+					submit(Sys.WindowMarker, Tickers);
+				}				
+		}
+		
+		//Now, use the Java API to retrieve the data we stored in the Tickers operator from the DPS store
+		//The TickerIdGenerator is a Java operator within this project that uses the DPS Java APIs
+		// [Please refer to the impl/java/src/com/acme/test/TickerIdGenerator.java file in this project]
+		//  
+		// This primitive operator will pull out the "ticker symbol and the company name" from Tickers_Store only for
+		// the ticker symbols recieved as input
+		// Then, it will create a unique ticker id for that ticker symbol and insert 
+		// "ticker symbol => unique ticker id" in a new store called "TickerId_Store".
+		stream<rstring ticker_symbol> IdGenerator = TickerIdGenerator(Tickers) {
+		}
+		
+		
+		// We are going to fuse this operator with the JavaOperator specified above.
+		// This will demonstrate how two Java operators fused into a single PE can
+		// keep using the DPS APIs. This is done using the @SharedLoader annotation inside
+		// those Java operators. Please read the comments specified inside of those
+		// two Java operators.
+		() as DummyOp =  DataStoreTester(Tickers) {
+		}
+
+
+		
+
+		//This operator will try to read from the TickerId_Store created within the Java primitive operator.
+		// This demonstrates that Java and SPL operators can use the DPS toolkit to communicate with the same backend.
+		stream<rstring ticker_symbol, uint64 ticker_id>  RetrievedIds = Custom(IdGenerator){
+			logic
+				onTuple IdGenerator : {
+					mutable uint64 err = 0ul;
+					
+					mutable uint64 storeId = dpsFindStore("TickerId_Store", err);
+					
+					if (storeId == 0ul) {
+						printStringLn("Unable to find the TickerId_Store");
+						abort();
+					}					
+
+					mutable rstring key = ticker_symbol;
+					mutable uint64 id = 0ul;
+					
+					err = 0ul;
+					//retrieve the value for this key
+					dpsGet(storeId,key,id,err);
+					if (err == 0ul){
+						printStringLn("'"+key+"' => '"+(rstring)id+"'");
+						submit({ticker_symbol=IdGenerator.ticker_symbol, ticker_id=id}, RetrievedIds);
+					}
+					
+				}
+				onPunct IdGenerator:{
+				   
+				   if (currentPunct() == Sys.FinalMarker) {
+						mutable uint64 err = 0ul;
+		
+						mutable uint64 id_store = dpsFindStore("TickerId_Store", err);
+						mutable uint64 ts_id = dpsFindStore("Tickers_Store", err);
+						
+						printStringLn("\n\n================ Final Results Begin ================");
+						printStringLn("\nContents of the Tickers_Store [TickerSymbol => CompanyName]");
+	
+						// Iterate the Tickers store.
+						mutable uint64 it = dpsBeginIteration(ts_id, err);
+						mutable rstring key = "";
+						mutable rstring value = "";
+	
+						if (it == 0ul) {
+							printStringLn("Unable to get an iterator for the Tickers_Store");
+							abort();
+						}
+	
+						while(dpsGetNext(ts_id, it, key, value, err)) {
+							printStringLn("'"+key+"' => '"+(rstring)value+"'");
+						}                            
+	
+						dpsEndIteration(ts_id, it, err);
+						
+						printStringLn("\n\nContents of the TickerId_Store [TickerSymbol => UniqueTickerId]");
+	
+						// Iterate the RetrievedIds store.
+						it = dpsBeginIteration(id_store, err);
+				
+						mutable uint64 value2 = 0ul;
+						while(dpsGetNext(id_store, it, key, value2, err)) {  
+							printStringLn("'"+key+"' => '"+(rstring)value2+"'");                            
+						}
+
+						dpsEndIteration(id_store, it, err);			
+						printStringLn("\n\n================ Final Results End ================");
+						
+						dpsRemoveStore(ts_id, err);
+						dpsRemoveStore(id_store, err);
+					}
+				}
+		}
+		
+		() as Sink = FileSink(RetrievedIds){
+			param
+				file: "TickersAndIds.txt";
+		}
+}

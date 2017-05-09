@@ -26,9 +26,19 @@ namespace streamsx {
 namespace store {
 namespace distributed 
 {
+/***
+ * This function is a utility to load the dependencies for a specific kv store's client libraries.
+ * Pass in root to toolkit directory and the name of the library to load (e.g. "/home/dpstoolkit" and "libhiredis.so" respectively.
+ * Will log an error if it fails.
+ */
+	void load_dependent_lib(std::string toolkitDir, std::string lib);
   class DistributedProcessStore
   {
-  public:           
+  public:
+
+	// store the path of the configuration file
+    static std::string dpsConfigFile_;
+
     /// Destructor
     ///
     ~DistributedProcessStore();
@@ -36,6 +46,8 @@ namespace distributed
     /// Get the DB layer
     /// @return the DB layer
     DBLayer & getDBLayer();
+
+    void persist(SPL::uint64 & err);
 
     /// Connect to the database. This function will read db name, user,
     /// and password from the data directory and connect to the
@@ -469,6 +481,13 @@ namespace distributed
     /// @return the global instance of the store store
     static DistributedProcessStore & getGlobalStore(); 
 
+    /// Set the dpsConfigFile
+    /// @param dpsConfigFile contains a path to the config file. If the path is relative, the application directory is prepended
+    static void setConfigFile(std::string dpsConfigFile)
+    {
+    	DistributedProcessStore::dpsConfigFile_ = dpsConfigFile;
+    }
+
   private:
     DistributedProcessStore(); // no one should do this other than us
     std::auto_ptr<DBLayer> db_;
@@ -589,7 +608,7 @@ namespace distributed
       value_nbf >> value;
     } 
     if(valueSize>0)
-      delete [] valueData;
+      free(valueData);
     return res;           
   }
 
@@ -610,7 +629,7 @@ namespace distributed
       value_nbf >> value;
     }
     if(valueSize>0)
-      delete [] valueData;
+      free(valueData);
     return res;
   }
 
@@ -632,7 +651,7 @@ namespace distributed
       value_nbf >> value;
     }
     if(valueSize>0)
-      delete [] valueData;
+      free(valueData);
     return res;
   }
 
@@ -708,9 +727,9 @@ namespace distributed
         nbf_value >> value;
       }
       if(keySize>0)
-        delete [] keyData;
+        free(keyData);
       if(valueSize>0)
-        delete [] valueData;
+        free(valueData);
       return res;
     }
 
