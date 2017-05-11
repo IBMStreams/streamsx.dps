@@ -1,0 +1,70 @@
+/*
+=================================================================================================
+**** TIPS ABOUT CALLING THE dps APIs FROM INSIDE THE USER-WRITTEN NATIVE FUNCTIONS ****
+
+This is how we can access the native functions within a C++ primitive operator.
+In this example, our goal is to use the dps native function APIs directly
+inside the C++ primitive operator.
+
+1) Refer to the ../../impl/bin/archLevel file that we created in this example directory.
+(A common practice is to copy an existing archLevel file and modify it to suit your project's needs.)
+In that file, search for com.ibm.streamsx.dps and you will see in two different places where we
+have set the path to point to the impl/lib and impl/include directories belonging to the
+dps toolkit present in your $STREAMS_INSTALL directory. 
+
+2) In this C++ operator's  model XML file, the archLevel file referred to above is being used to
+   automatically add the DPS include  directory and the required  K/V store third party libraries in
+   the operator model XML file. That XML file is located in this 
+   <Project_Directory>/com.acme.test/TickerIdGenerator/TickerIdGenerator.xml.
+
+3) We have to include the dps wrapper include file in this native function include file.
+   [See the first non-commented line below this comment block.]
+
+4) Finally, we will add "using namespace" of the C++ implementation for the
+dps into this C++ operator's scope. That will allow us to use any of the
+dps's public member functions within this C++ operator code.
+
+That is it. Now, you can call any of the dps native function APIs inside this
+C++ primitive operator.
+=================================================================================================
+*/
+
+/* Additional includes go here */
+#include "DistributedProcessStoreWrappers.h"
+using namespace com::ibm::streamsx::store::distributed;
+using namespace std;
+
+<%SPL::CodeGen::headerPrologue($model);%>
+
+class MY_OPERATOR : public MY_BASE_OPERATOR 
+{
+public:
+  // Constructor
+  MY_OPERATOR();
+
+  // Destructor
+  virtual ~MY_OPERATOR(); 
+
+  // Notify port readiness
+  void allPortsReady(); 
+
+  // Notify pending shutdown
+  void prepareToShutdown(); 
+
+  // Processing for source and threaded operators   
+  void process(uint32_t idx);
+    
+  // Tuple processing for mutating ports 
+  void process(Tuple & tuple, uint32_t port);
+    
+  // Tuple processing for non-mutating ports
+  void process(Tuple const & tuple, uint32_t port);
+
+  // Punctuation processing
+  void process(Punctuation const & punct, uint32_t port);
+private:
+  // Members
+}; 
+
+<%SPL::CodeGen::headerEpilogue($model);%>
+

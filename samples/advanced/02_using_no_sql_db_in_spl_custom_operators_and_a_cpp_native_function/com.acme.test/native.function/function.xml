@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<functionModel xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.ibm.com/xmlns/prod/streams/spl/function" xmlns:cmn="http://www.ibm.com/xmlns/prod/streams/spl/common" xsi:schemaLocation="http://www.ibm.com/xmlns/prod/streams/spl/function functionModel.xsd">
+  <functionSet>
+    <headerFileName>Functions.h</headerFileName>
+    <cppNamespaceName>calling_dps_apis_from_a_native_function</cppNamespaceName>
+    <functions>
+      <function>
+        <description>An example native function</description>
+        <prototype cppName="">public void generateTickerIds(list&lt;rstring&gt; listOfStockPicks)</prototype>
+      </function>
+    </functions>
+    <dependencies>
+		<library>
+        	<cmn:description/>
+        	<cmn:managedLibrary>
+              	<cmn:includePath>../../impl/include</cmn:includePath>
+           	</cmn:managedLibrary>
+		</library>
+       
+		<library>
+        	<cmn:description/>
+          	<cmn:managedLibrary>
+				<cmn:lib>DistributedProcessStoreLib</cmn:lib>
+				<cmn:command>../../impl/bin/archLevel</cmn:command>
+          	</cmn:managedLibrary>
+		</library>
+    </dependencies>
+  </functionSet>
+</functionModel>

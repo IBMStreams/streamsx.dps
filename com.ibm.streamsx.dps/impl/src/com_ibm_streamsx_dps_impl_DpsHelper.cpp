@@ -176,14 +176,14 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsPutSafeCpp
 }
 
 JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsPutTTLCpp
-  (JNIEnv *env, jobject obj, jobject keyData, jint keySize, jobject valueData, jint valueSize, jint ttl) {
+  (JNIEnv *env, jobject obj, jobject keyData, jint keySize, jobject valueData, jint valueSize, jint ttl, jboolean encodeKey, jboolean encodeValue) {
 	uint64 dpsErrorCode = 0;
 	jbyte* byteBuffer1;
 	jbyte* byteBuffer2;
 	byteBuffer1 = (jbyte*) env->GetDirectBufferAddress(keyData);
 	byteBuffer2 = (jbyte*) env->GetDirectBufferAddress(valueData);
 
-	boolean result = dpsPutTTLForJava((char const *)byteBuffer1, keySize, (unsigned char const *)byteBuffer2, valueSize, ttl, dpsErrorCode);
+	boolean result = dpsPutTTLForJava((char const *)byteBuffer1, keySize, (unsigned char const *)byteBuffer2, valueSize, ttl, dpsErrorCode, encodeKey, encodeValue);
 
 	char booleanResult[40] = "false";
 
@@ -276,7 +276,7 @@ JNIEXPORT jobjectArray JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsGetSa
 }
 
 JNIEXPORT jobjectArray JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsGetTTLCpp
-  (JNIEnv *env, jobject obj, jobject keyData, jint keySize) {
+  (JNIEnv *env, jobject obj, jobject keyData, jint keySize, jboolean encodeKey, jboolean encodeValue) {
 	uint64 dpsErrorCode = 0;
 	jbyte* byteBuffer1;
 	byteBuffer1 = (jbyte*) env->GetDirectBufferAddress(keyData);
@@ -286,7 +286,7 @@ JNIEXPORT jobjectArray JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsGetTT
 	jobject resultStringObject;
 	jobjectArray resultArray;
 
-	boolean result = dpsGetTTLForJava((char const *)byteBuffer1, keySize, valueDataBuffer, valueSize, dpsErrorCode);
+	boolean result = dpsGetTTLForJava((char const *)byteBuffer1, keySize, valueDataBuffer, valueSize, dpsErrorCode, encodeKey, encodeValue);
 
 	char booleanResult[40] = "false";
 
@@ -335,12 +335,12 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsRemoveCpp
 }
 
 JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsRemoveTTLCpp
-  (JNIEnv *env, jobject obj, jobject keyData, jint keySize) {
+  (JNIEnv *env, jobject obj, jobject keyData, jint keySize, jboolean encodeKey) {
 	uint64 dpsErrorCode = 0;
 	jbyte* byteBuffer1;
 	byteBuffer1 = (jbyte*) env->GetDirectBufferAddress(keyData);
 
-	boolean result = dpsRemoveTTLForJava((char const *)byteBuffer1, keySize, dpsErrorCode);
+	boolean result = dpsRemoveTTLForJava((char const *)byteBuffer1, keySize, dpsErrorCode, encodeKey);
 
 	char booleanResult[40] = "false";
 
@@ -375,12 +375,12 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsHasCpp
 }
 
 JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsHasTTLCpp
-  (JNIEnv *env, jobject obj, jobject keyData, jint keySize) {
+  (JNIEnv *env, jobject obj, jobject keyData, jint keySize, jboolean encodeKey) {
 	uint64 dpsErrorCode = 0;
 	jbyte* byteBuffer1;
 	byteBuffer1 = (jbyte*) env->GetDirectBufferAddress(keyData);
 
-	boolean result = dpsHasTTLForJava((char const *)byteBuffer1, keySize, dpsErrorCode);
+	boolean result = dpsHasTTLForJava((char const *)byteBuffer1, keySize, dpsErrorCode, encodeKey);
 
 	char booleanResult[40] = "false";
 
@@ -572,6 +572,33 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsRunDataSto
    return (env->NewStringUTF(resultString));
 }
 
+// This is used for executing two-way Redis commands.
+JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsRunDataStoreCommandCpp3
+  (JNIEnv *env, jobject obj, jobject cmdList, jint cmdListSize) {
+   SPL::uint64 dpsErrorCode = 0;
+   SPL::rstring redisResultString = "";
+   // We can't send a jobject to the DPS C++ layers.
+   // cmdList is originally a java.util.List<RString>.
+   // In this JNI layer, it is in the form of SPL::list<rstring>.
+   // We will send the serialized form of this data structure to the DPS C++ layer.  
+   jbyte* byteBuffer1;
+   byteBuffer1 = (jbyte*) env->GetDirectBufferAddress(cmdList);
+   boolean result = dpsRunDataStoreCommandForJava((unsigned char *)byteBuffer1, cmdListSize, redisResultString, dpsErrorCode);
+
+   char booleanResult[40] = "false";
+
+   if (result == true) {
+	   strcpy(booleanResult, "true");
+   }
+
+   // Result string format: "booleanResult,errorCode,resultString"
+   // Result of executing a Redis command such as HMGET, MGET or GET of a JSON string could be very long.
+   // We will support upto 128KB long result string.
+   char resultString[128*1024];
+   sprintf(resultString, "%s,%ld,%s", booleanResult, dpsErrorCode, redisResultString.c_str());
+   return (env->NewStringUTF(resultString));
+}
+
 JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsBase64EncodeCpp
   (JNIEnv *env, jobject obj, jstring normalStr) {
 	const char *str = env->GetStringUTFChars(normalStr, 0);
@@ -615,6 +642,38 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsSetConfigF
 
 	char booleanResult[40] = "true";
 	return (env->NewStringUTF(booleanResult));
+}
+
+JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsIsConnectedCpp
+  (JNIEnv *env, jobject obj) {
+	boolean result = dpsIsConnected();
+        uint64 dpsErrorCode = 0;
+	char booleanResult[40] = "false";
+
+	if (result == true) {
+		strcpy(booleanResult, "true");
+	}
+
+	// Result string format: "booleanResult,errorCode"
+	char resultString[260];
+	sprintf(resultString, "%s,%ld", booleanResult, dpsErrorCode);
+	return (env->NewStringUTF(resultString));
+}
+
+JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsReconnectCpp
+  (JNIEnv *env, jobject obj) {
+	boolean result = dpsReconnect();
+        uint64 dpsErrorCode = 0;
+	char booleanResult[40] = "false";
+
+	if (result == true) {
+		strcpy(booleanResult, "true");
+	}
+
+	// Result string format: "booleanResult,errorCode"
+	char resultString[260];
+	sprintf(resultString, "%s,%ld", booleanResult, dpsErrorCode);
+	return (env->NewStringUTF(resultString));
 }
 
 JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dlCreateOrGetLockCpp

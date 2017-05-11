@@ -9,14 +9,6 @@ extern "C" {
 #endif
 /*
  * Class:     com_ibm_streamsx_dps_impl_DpsHelper
- * Method:    dpsLoadBackEndDbClientLibraries
- * Signature: (Ljava/lang/String;)Ljava/lang/String;
- */
-JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsLoadBackEndDbClientLibraries
-  (JNIEnv *, jobject, jstring);
-
-/*
- * Class:     com_ibm_streamsx_dps_impl_DpsHelper
  * Method:    dpsGetLastStoreErrorCodeCpp
  * Signature: ()J
  */
@@ -98,10 +90,10 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsPutSafeCpp
 /*
  * Class:     com_ibm_streamsx_dps_impl_DpsHelper
  * Method:    dpsPutTTLCpp
- * Signature: (Ljava/nio/ByteBuffer;ILjava/nio/ByteBuffer;II)Ljava/lang/String;
+ * Signature: (Ljava/nio/ByteBuffer;ILjava/nio/ByteBuffer;IIZZ)Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsPutTTLCpp
-  (JNIEnv *, jobject, jobject, jint, jobject, jint, jint);
+  (JNIEnv *, jobject, jobject, jint, jobject, jint, jint, jboolean, jboolean);
 
 /*
  * Class:     com_ibm_streamsx_dps_impl_DpsHelper
@@ -122,10 +114,10 @@ JNIEXPORT jobjectArray JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsGetSa
 /*
  * Class:     com_ibm_streamsx_dps_impl_DpsHelper
  * Method:    dpsGetTTLCpp
- * Signature: (Ljava/nio/ByteBuffer;I)[Ljava/lang/Object;
+ * Signature: (Ljava/nio/ByteBuffer;IZZ)[Ljava/lang/Object;
  */
 JNIEXPORT jobjectArray JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsGetTTLCpp
-  (JNIEnv *, jobject, jobject, jint);
+  (JNIEnv *, jobject, jobject, jint, jboolean, jboolean);
 
 /*
  * Class:     com_ibm_streamsx_dps_impl_DpsHelper
@@ -138,10 +130,10 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsRemoveCpp
 /*
  * Class:     com_ibm_streamsx_dps_impl_DpsHelper
  * Method:    dpsRemoveTTLCpp
- * Signature: (Ljava/nio/ByteBuffer;I)Ljava/lang/String;
+ * Signature: (Ljava/nio/ByteBuffer;IZ)Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsRemoveTTLCpp
-  (JNIEnv *, jobject, jobject, jint);
+  (JNIEnv *, jobject, jobject, jint, jboolean);
 
 /*
  * Class:     com_ibm_streamsx_dps_impl_DpsHelper
@@ -154,10 +146,10 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsHasCpp
 /*
  * Class:     com_ibm_streamsx_dps_impl_DpsHelper
  * Method:    dpsHasTTLCpp
- * Signature: (Ljava/nio/ByteBuffer;I)Ljava/lang/String;
+ * Signature: (Ljava/nio/ByteBuffer;IZ)Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsHasTTLCpp
-  (JNIEnv *, jobject, jobject, jint);
+  (JNIEnv *, jobject, jobject, jint, jboolean);
 
 /*
  * Class:     com_ibm_streamsx_dps_impl_DpsHelper
@@ -249,6 +241,14 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsRunDataSto
 
 /*
  * Class:     com_ibm_streamsx_dps_impl_DpsHelper
+ * Method:    dpsRunDataStoreCommandCpp3
+ * Signature: (Ljava/util/List;)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsRunDataStoreCommandCpp3
+  (JNIEnv *, jobject, jobject, jint);
+
+/*
+ * Class:     com_ibm_streamsx_dps_impl_DpsHelper
  * Method:    dpsBase64EncodeCpp
  * Signature: (Ljava/lang/String;)Ljava/lang/String;
  */
@@ -270,6 +270,22 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsBase64Deco
  */
 JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsSetConfigFileCpp
   (JNIEnv *, jobject, jstring);
+
+/*
+ * Class:     com_ibm_streamsx_dps_impl_DpsHelper
+ * Method:    dpsIsConnectedCpp
+ * Signature: ()Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsIsConnectedCpp
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     com_ibm_streamsx_dps_impl_DpsHelper
+ * Method:    dpsReconnectCpp
+ * Signature: ()Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsReconnectCpp
+  (JNIEnv *, jobject);
 
 /*
  * Class:     com_ibm_streamsx_dps_impl_DpsHelper
