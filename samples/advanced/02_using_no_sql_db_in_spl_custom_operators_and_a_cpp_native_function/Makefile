@@ -24,7 +24,17 @@
 
 DPS_TOOLKIT_HOME ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.dps
 
-SPLC_FLAGS ?= -a -z -t $(DPS_TOOLKIT_HOME)
+# If the user wants to use a different version of
+# the DPS toolkit than the one shipped in the
+# $STREAMS_INSTALL/toolkits directory, (s)he can
+# always set the STREAMS_SPLPATH environment variable
+# and point to a specific version of the DPS toolkit.
+ifndef STREAMS_SPLPATH
+   SPLC_FLAGS ?= -a -z -t $(DPS_TOOLKIT_HOME)
+else
+   SPLC_FLAGS ?= -a -z 
+endif
+
 SPLC = $(STREAMS_INSTALL)/bin/sc
 SPL_CMD_ARGS ?= --data-directory=./data 
 SPL_MAIN_COMPOSITE = com.acme.test::Main

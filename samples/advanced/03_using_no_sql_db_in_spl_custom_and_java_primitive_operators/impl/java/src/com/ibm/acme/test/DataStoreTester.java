@@ -50,7 +50,7 @@ description="Java Operator DataStoreTester")
 //Add the DPS toolkit's Java library (dps-helper.jar) to the path of this operator.
 //There are 2 ways to do this:
 //1. If your application will have access to the Streams install location at runtime, then you can specify the full path to the location of the dps-helper.jar file present inside the DPS toolkit as follows:
-@Libraries("/homes/hny5/sen/my_ghe/streamsx.dps/com.ibm.streamsx.dps/impl/java/lib/dps-helper.jar")
+@Libraries("@STREAMS_INSTALL@/toolkits/com.ibm.streamsx.dps/impl/java/lib/dps-helper.jar")
 //if that path will be accessible at runtime. 
 //2. Or, you can copy the dps-helper.jar from <STREAMS_INTSALL>/toolkits/com.ibm.streamsx.dps/impl/java/lib/dps-helper.jar into the lib folder of this application and reference it as follows:
 //@Libraries("lib/dps-helper.jar")

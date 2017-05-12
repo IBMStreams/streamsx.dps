@@ -23,7 +23,35 @@
 # end_generated_IBM_copyright_prolog                               
 
 DPS_TOOLKIT_HOME ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.dps
-SPLC_FLAGS ?= -a -z -t $(DPS_TOOLKIT_HOME)
+
+# If the user wants to use a different version of
+# the DPS toolkit than the one shipped in the
+# $STREAMS_INSTALL/toolkits directory, (s)he can
+# always set the STREAMS_SPLPATH environment variable
+# and point to a specific version of the DPS toolkit.
+#
+# IMPORTANT 
+# ---------
+# If the user wants to point to a different DPS toolkit,
+# then it is necessary to make changes in the following
+# three files present in this project directory as well.
+# 1) build.xml in the same directory as this Makefile.
+#    --> In that file, search for dps-helper.jar and change its path to
+#        point to the new DPS toolkit directory being used.
+#
+# 2) impl/java/src/com/acme/test/TickerIdGenerator.java
+#    --> Search for @Libraries and change the path to point to the
+#        new DPS toolkit directory where the dps-helper.jar is located.
+#
+# 3) impl/java/src/com/ibm/acme/test/DataStoreTest.java
+#    --> Search for @Libraries and change the path to point to the
+#        new DPS toolkit directory where the dps-helper.jar is located.
+ifndef STREAMS_SPLPATH
+   SPLC_FLAGS ?= -a -z -t $(DPS_TOOLKIT_HOME)
+else
+   SPLC_FLAGS ?= -a -z 
+endif
+
 SPLC = $(STREAMS_INSTALL)/bin/sc
 SPL_CMD_ARGS ?= --data-directory=./data 
 SPL_MAIN_COMPOSITE = com.acme.test::Main
