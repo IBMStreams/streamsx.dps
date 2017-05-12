@@ -1,0 +1,144 @@
+#!/bin/sh
+#set -x
+
+# Output appropriate libPath information for toolkits  
+# that support multiple platforms.
+
+if [ "$1" == "libPath" ]; then
+
+  here=$( cd ${0%/*} ; pwd )
+  OS=`uname -s`
+  MACH=`uname -i`
+  if [ "${MACH}" = "i386" ] ; then
+    MACH=x86
+  fi
+
+  if [ "${OS}" = "Linux" ] ; then
+
+    # choose a library path for RedHat-based distributions
+    if [ -f /etc/redhat-release ] ; then
+
+     # parse the distribution name and version from its banner
+     OSDIST=`awk 'FNR == 1 {print substr($1, 0)}' /etc/redhat-release`
+     OSVER=`cat /etc/redhat-release | sed s/.*release\ // | sed s/\ .*//`
+
+     # adjust name and version as necessary for derivatives of RedHat distribution
+     if [ "$OSDIST" == 'Red' ] ; then OSDIST='RHEL' ; fi
+     if [ "$OSDIST" == 'BluVector' ] ; then OSDIST='CentOS' ; OSVER=6 ; fi
+
+     # concatenate the name and version for use below in constructing a library pathname
+     OSLVL=$OSDIST${OSVER}
+
+    elif [ -f /etc/SuSE-release ] ; then
+
+     # parse the distribution name and version from its banner
+     OSVER=`awk 'FNR == 2 {print $3}' /etc/SuSE-release`
+
+     # concatenate the name and version for use below in constructing a library pathname
+     OSLVL=SLES${OSVER}
+
+    else
+
+      # this should cause a link error on unsupported distributions
+      OSLVL="unsupported Linux distribution"
+
+    fi
+
+    # construct a library pathname
+    OSSTR="${MACH}.${OSLVL%%.*}"
+    
+  else
+
+    # this should cause a link error on unsupported operating systems
+    OSSTR="${MACH}.unsupported OS"
+  fi
+
+  # return a library pathname, but warn if it does not exist
+  # [ -d $OSSTR ] || echo warning: non-existant library path $OSSTR 1>&2
+  echo $here/../lib # /${OSSTR}
+  echo $here/../ext/lib #/${OSSTR}
+
+elif [ "$1" == "includePath" ]; then
+  # echo any computed include paths here, if needed
+  here=$( cd ${0%/*} ; pwd )
+  echo $here/../include
+  echo $here/../ext/lib
+
+elif [ "$1" == "lib" ]; then
+  # echo any computed library names here, if needed
+  #Determine which files to add to include path
+  if [ -f "etc/no-sql-kv-store-servers.cfg" ]
+  then
+	  cat "etc/no-sql-kv-store-servers.cfg" | while read line
+	  do
+	     if [ "$line" = "redis" ]
+	     then
+	     	:
+			# do not output any libraries here, because the libs are loaded at runtime via dlopen()
+	     	# See DistributedProcessStore.cpp for the list of libs loaded at runtime
+	     	# This is the original list for reference : 
+	     	#echo "hiredis"
+	     	#echo "DPSRedis"
+	     	#echo "uv"
+	     elif [ "$line" = "redis-cluster" ]
+	     then
+	     	echo "hiredis"
+	     	echo "DPSRedisCluster"
+	     	echo "uv"
+	     elif [ "$line" =  "hbase" ]
+	     then
+	     	echo "DPSHBase"
+	     	echo "ssl"
+	     	echo "curl"
+	     	echo "crypto"
+	     	echo "json-c"
+		elif [ "$line" =  "couchbase" ]
+	     then
+	     	echo "DPSCouchbase"
+			echo "couchbase"
+			echo "ssl"
+	     	echo "curl"
+	     	echo "ldap"
+	     	echo "crypto"
+	     	echo "json-c"	     	
+	     elif [ "$line" =  "aerospike" ]
+	     then
+	     	echo "DPSAerospike"
+	     	echo "aerospike"
+	    elif [ "$line" =  "mongo" ]
+	     then
+	     	echo "DPSMongo"
+	     	echo "mongoc"
+	     	echo "bson"
+	     	echo "json-c"
+	     	echo "ssl"
+	     	echo "uv"
+	     	echo "crypto"
+	     elif [ "$line" =  "memcached" ]
+	     then
+	      	echo "memcached"
+	     	echo "DPSMemcached"
+	     elif [ "$line" =  "cloudant" ]
+	     then
+	     	echo "DPSCloudant"
+	     	echo "ssl"
+	     	echo "ldap"
+	     	echo "crypto"
+	     	echo "curl"
+	     	echo "json-c"
+	     elif [ "$line" =  "cassandra" ]
+	     then
+	     	echo "cassandra"
+	     	echo "DPSCassandra"
+	     	echo "ssl"
+	     	echo "uv"
+	     	echo "crypto"
+	     	echo "json-c"
+		 fi
+	  done
+  fi
+else
+  echo "unsupported option"
+
+fi
+# end of archLevel script

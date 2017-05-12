@@ -113,7 +113,7 @@ namespace distributed
     bool putSafe(uint64_t store, char const * keyData, uint32_t keySize,
              unsigned char const * valueData, uint32_t valueSize, PersistenceError & dbError);
     bool putTTL(char const * keyData, uint32_t keySize,
-             unsigned char const * valueData, uint32_t valueSize, uint32_t ttl, PersistenceError & dbError);
+             unsigned char const * valueData, uint32_t valueSize, uint32_t ttl, PersistenceError & dbError, bool encodeKey=true, bool encodeValue=true);
     bool get(uint64_t store, char const * keyData, uint32_t keySize,
              unsigned char * & valueData, uint32_t & valueSize,
              PersistenceError & dbError);
@@ -122,15 +122,18 @@ namespace distributed
              PersistenceError & dbError);
     bool getTTL(char const * keyData, uint32_t keySize,
              unsigned char * & valueData, uint32_t & valueSize,
-             PersistenceError & dbError);
+             PersistenceError & dbError, bool encodeKey=true);
     bool remove(uint64_t store, char const * keyData, uint32_t keySize, PersistenceError & dbError);
-    bool removeTTL(char const * keyData, uint32_t keySize, PersistenceError & dbError);
+    bool removeTTL(char const * keyData, uint32_t keySize, PersistenceError & dbError, bool encodeKey=true);
     bool has(uint64_t store, char const * keyData, uint32_t keySize, PersistenceError & dbError);
-    bool hasTTL(char const * keyData, uint32_t keySize, PersistenceError & dbError);
+    bool hasTTL(char const * keyData, uint32_t keySize, PersistenceError & dbError, bool encodeKey=true);
     void clear(uint64_t store, PersistenceError & dbError);
     uint64_t size(uint64_t store, PersistenceError & dbError);
     void base64_encode(std::string const & str, std::string & base64);
     void base64_decode(std::string & base64, std::string & result);
+    bool isConnected();
+    bool reconnect(std::set<std::string> & dbServers, PersistenceError & dbError);
+
     CassandraDBLayerIterator * newIterator(uint64_t store, PersistenceError & dbError);
     void deleteIterator(uint64_t store, Iterator * iter, PersistenceError & dbError);
     bool storeIdExistsOrNot(std::string storeIdString, PersistenceError & dbError);
@@ -147,6 +150,7 @@ namespace distributed
 	bool runDataStoreCommand(uint32_t const & cmdType, std::string const & httpVerb,
 		std::string const & baseUrl, std::string const & apiEndpoint, std::string const & queryParams,
 		std::string const & jsonRequest, std::string & jsonResponse, PersistenceError & dbError);
+        bool runDataStoreCommand(std::vector<std::string> const & cmdList, std::string & resultValue, PersistenceError & dbError);
 
 	// Lock related methods.
     uint64_t createOrGetLock(std::string const & name, PersistenceError & lkError);

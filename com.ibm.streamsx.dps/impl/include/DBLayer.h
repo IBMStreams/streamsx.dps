@@ -102,9 +102,11 @@ namespace store {
     /// @param valueSize item's value size
     /// @param ttl data item expiry time in seconds
     /// @return true if the put operation is successful, false otherwise
+    /// @param encodeKey item's key data should be encoded or not before storing in the back-end data store.  
+    /// @param encodeValue item's value is encoded or not in the back-end data store.  
     virtual bool putTTL(char const * keyData, uint32_t keySize,
                      unsigned char const * valueData, uint32_t valueSize, uint32_t ttl,
-                     PersistenceError & dbError) = 0;
+                     PersistenceError & dbError, bool encodeKey=true, bool encodeValue=true) = 0;
 
     /// Get an item from the given store (A better performing version with no safety checks)
     /// @param store store id
@@ -139,10 +141,12 @@ namespace store {
     /// @param valueSize item's value size
     /// @return true if there was a TTL based data item with the given key and a matching
     /// type for its value, false otherwise
-    /// @param dbError error from the database
+    /// @param dbError error from the databas
+    /// @param encodeKey item's key data should be encoded or not before reading from the back-end data store.
+    /// @param encodeValue item's value is encoded or not in the back-end data store.
     virtual bool getTTL(char const * keyData, uint32_t keySize,
                      unsigned char * & valueData, uint32_t & valueSize,
-                     PersistenceError & dbError) = 0;
+                     PersistenceError & dbError, bool encodeKey=true) = 0;
 
     /// Remove an item from the given store
     /// @param store store id
@@ -158,8 +162,9 @@ namespace store {
     /// @return true if there was an item with the given key, false
     /// otherwise
     /// @param dbError error from the database
+    /// @param encodeKey item's key should be encoded or not before removing it from the back-end data store.
     virtual bool removeTTL(char const * keyData, uint32_t keySize,
-                        PersistenceError & dbError) = 0;
+                        PersistenceError & dbError, bool encodeKey=true) = 0;
 
     /// Check if an item is in the given store
     /// @param store store id
@@ -174,8 +179,9 @@ namespace store {
     /// @param key item's key
     /// @return true if there is an item with the given key, false otherwise
     /// @param dbError error from the database
+    /// @param encodeKey item's key should be encoded or not before checking for existence in the back-end data store.
     virtual bool hasTTL(char const * keyData, uint32_t keySize,
-                     PersistenceError & dbError) = 0;
+                     PersistenceError & dbError, bool encodeKey=true) = 0;
 
     /// Clear the given store 
     /// @param store store id
@@ -242,6 +248,23 @@ namespace store {
             	std::string const & baseUrl, std::string const & apiEndpoint, std::string const & queryParams,
             	std::string const & jsonRequest, std::string & jsonResponse, PersistenceError & dbError) = 0;
 
+    /// If users want to send any valid Redis command to the Redis server made up as individual parts,
+    /// this API can be used. This will work only with Redis. Users simply have to split their
+    /// valid Redis command into individual parts that appear between spaces and pass them in 
+    /// exacly in that order via a list<rstring>. DPS back-end code will put them together 
+    /// correctly before executing the command on a configured Redis server. This API will also
+    /// return the resulting value from executing any given Redis command as a string. It is upto
+    /// the caller to interpret the Redis returned value and make sense out of it.
+    /// In essence, it is a two way Redis command which is very diffferent from the other plain
+    /// API that is explained above. [NOTE: If you have to deal with storing or fetching 
+    /// non-string complex Streams data types, you can't use this API. Instead, use the other
+    /// DPS put/get/remove/has DPS APIs.]
+    /// @param cmdList A list of distinct parts that make up a valid Redis command.
+    /// @param resultValue A string containing what was returned by the Redis server as a result of executing the given command.
+    /// @param err Error code. 0 means command was executed fine. Non-zero code means error while executing the Redis command.
+    /// @return true if there was no error. Otherwise, an error.
+    virtual bool runDataStoreCommand(std::vector<std::string> const & cmdList, std::string & resultValue, PersistenceError & dbError) = 0;
+
     /// Base64 encode a given string. Encoded result will be returned in a
     /// user provided modifiable string passed as a second function argument.
     /// @param str should contain the string to be base64 encoded.
@@ -254,6 +277,13 @@ namespace store {
     /// @param decodedResultStr will be filled with the base64 decoded result.
     virtual void base64_decode(std::string & str, std::string & decodedResultStr) = 0;
 
+    /// Is the connection to the back-end data store active?
+    /// @return true if connection is active or false if connection is inactive.
+    virtual bool isConnected() = 0;
+
+    /// Reestablish the connection to the back-end data store if needed.
+    /// @return true if connection is active or false if connection is inactive.
+    virtual bool reconnect(std::set<std::string> & dbServers, PersistenceError & dbError) = 0;
 
     /// A store iterator
     class Iterator

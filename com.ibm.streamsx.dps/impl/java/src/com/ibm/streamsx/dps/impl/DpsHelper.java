@@ -45,6 +45,7 @@ import com.ibm.streams.operator.Tuple;
 import com.ibm.streams.operator.Type;
 import com.ibm.streams.operator.encoding.BinaryEncoding;
 import com.ibm.streams.operator.meta.TupleType;
+import com.ibm.streams.operator.types.*;
 
 public class DpsHelper {	
 	// Following are the declarations for the distributed process store related JNI methods.
@@ -58,14 +59,14 @@ public class DpsHelper {
 	private native String dpsRemoveStoreCpp(long store);
 	private native String dpsPutCpp(long store, ByteBuffer keyData, int keySize, ByteBuffer valueData, int valueSize);
 	private native String dpsPutSafeCpp(long store, ByteBuffer keyData, int keySize, ByteBuffer valueData, int valueSize);
-	private native String dpsPutTTLCpp(ByteBuffer keyData, int keySize, ByteBuffer valueData, int valueSize, int ttl);
+	private native String dpsPutTTLCpp(ByteBuffer keyData, int keySize, ByteBuffer valueData, int valueSize, int ttl, boolean encodeKey, boolean encodeValue);
 	private native Object[] dpsGetCpp(long store, ByteBuffer keyData, int keySize);
 	private native Object[] dpsGetSafeCpp(long store, ByteBuffer keyData, int keySize);
-	private native Object[] dpsGetTTLCpp(ByteBuffer keyData, int keySize);
+	private native Object[] dpsGetTTLCpp(ByteBuffer keyData, int keySize, boolean encodeKey, boolean encodeValue);
 	private native String dpsRemoveCpp(long store, ByteBuffer keyData, int keySize);
-	private native String dpsRemoveTTLCpp(ByteBuffer keyData, int keySize);
+	private native String dpsRemoveTTLCpp(ByteBuffer keyData, int keySize, boolean encodeKey);
 	private native String dpsHasCpp(long store, ByteBuffer keyData, int keySize);
-	private native String dpsHasTTLCpp(ByteBuffer keyData, int keySize);
+	private native String dpsHasTTLCpp(ByteBuffer keyData, int keySize, boolean encodeKey);
 	private native String dpsClearCpp(long store);
 	private native String dpsSizeCpp(long store);
 	private native String dpsBeginIterationCpp(long store);
@@ -78,9 +79,12 @@ public class DpsHelper {
 	private native String dpsRunDataStoreCommandCpp1(String cmd);
 	private native String dpsRunDataStoreCommandCpp2(int cmdType, String httpVerb,
 		String baseUrl, String apiEndpoint, String queryParams, String jsonRequest);
+	private native String dpsRunDataStoreCommandCpp3(ByteBuffer cmdList, int cmdListSize);
 	private native String dpsBase64EncodeCpp(String str);
 	private native String dpsBase64DecodeCpp(String str);
 	private native String dpsSetConfigFileCpp(String dpsConfigFile);
+        private native String dpsIsConnectedCpp();
+        private native String dpsReconnectCpp();
 	//
 	// JNI methods related to the distributed locks are declared below.
 	//
@@ -417,6 +421,53 @@ public class DpsHelper {
 		scanner.close();		
 		return(booleanResult);		
 	}
+
+        /// If users want to send any valid Redis command to the Redis server made up as individual parts,
+        /// this API can be used. This will work only with Redis. Users simply have to split their
+        /// valid Redis command into individual parts that appear between spaces and pass them in 
+        /// exacly in that order via a list<rstring>. DPS back-end code will put them together 
+        /// correctly before executing the command on a configured Redis server. This API will also
+        /// return the resulting value from executing any given Redis command as a string. It is upto
+        /// the caller to interpret the Redis returned value and make sense out of it.
+        /// In essence, it is a two way Redis command which is very diffferent from the other plain
+        /// API that is explained above. [NOTE: If you have to deal with storing or fetching 
+        /// non-string complex Streams data types, you can't use this API. Instead, use the other
+        /// DPS put/get/remove/has DPS APIs.]
+        public boolean dpsRunDataStoreCommand(java.util.List<RString> cmdList, String[] resultString) throws Exception {
+                // We have to serialize the cmdList before calling the JNI C code.
+                String cmdListSplTypeName = "list<rstring>";
+                String otherSplTypeName = "dummy";
+		Object[] byteBufferArray = nbfEncodeKeyAndValue(cmdList, null, cmdListSplTypeName, otherSplTypeName);
+		
+		// We need to have the cmdList serialized properly. If not, throw an exception.
+		if ((byteBufferArray[0] == null) || (byteBufferArray[1] == null)) {
+			// Something went seriously wrong.
+			throw new Exception("dpsRunDataStoreCommand: Unable to serialize the command list.");
+		}
+		
+		String result = dpsRunDataStoreCommandCpp3((ByteBuffer)byteBufferArray[0], ((Integer)byteBufferArray[1]).intValue());
+		// Parse the result string [Format: "booleanResult,errorCode,redisResultString"]
+		Scanner scanner = new Scanner(result);
+		scanner.useDelimiter(",");
+		boolean booleanResult = scanner.nextBoolean();
+		long errorCode = scanner.nextLong();
+		int tokenCnt = 0;
+                resultString[0] = "";
+		
+		// We have to assemble rest of all the available tokens to form our JSON response.
+		while(scanner.hasNext() == true) {
+			if (tokenCnt > 0) {
+				// Add the comma back into the response string if we have more than one token.
+				resultString[0] += ",";				
+			}
+
+			resultString[0] += scanner.next();
+			tokenCnt++;
+		}
+		
+		scanner.close();		
+	        return(booleanResult);
+        }
 	
 	// Base64 encode the given string.
 	public String dpsBase64Encode(String str) {
@@ -506,7 +557,7 @@ public class DpsHelper {
 	// This function doesn't need an user created store to perform the put operation since the data item will be
 	// stored in a flat memory space inside the chosen back-end store infrastructure.
 	// (It is a type generic method that can take any key type and any value type.)
-	public <T1, T2> boolean dpsPutTTL(T1 key, T2 value, int ttl, String keySplTypeName, String valueSplTypeName, long[] err) throws Exception {
+	public <T1, T2> boolean dpsPutTTL(T1 key, T2 value, int ttl, String keySplTypeName, String valueSplTypeName, long[] err, boolean encodeKey, boolean encodeValue) throws Exception {
 		Object[] byteBufferArray = nbfEncodeKeyAndValue(key, value, keySplTypeName, valueSplTypeName);
 		
 		// We need to have both the key and value serialized properly. If not, throw an exception.
@@ -517,7 +568,7 @@ public class DpsHelper {
 		}
 		
         String result = dpsPutTTLCpp((ByteBuffer)byteBufferArray[0], ((Integer)byteBufferArray[1]).intValue(),
-        	(ByteBuffer)byteBufferArray[2], ((Integer)byteBufferArray[3]).intValue(), ttl);
+        	(ByteBuffer)byteBufferArray[2], ((Integer)byteBufferArray[3]).intValue(), ttl, encodeKey, encodeValue);
 		// Parse the result string [Format: "booleanResult,errorCode"]
 		Scanner scanner = new Scanner(result);
 		scanner.useDelimiter(",");
@@ -675,7 +726,7 @@ public class DpsHelper {
 	// passed to this method as a TYPE GENERIC third argument. If the dummy value is a collection
 	// type such as List<?>, then that dummy value must include one element with any random value so that
 	// we will know the generic type of the element in that collection data item.
-	public <T1> Object dpsGetTTL(T1 key, String keySplTypeName, String valueSplTypeName, long[] err) throws Exception {
+	public <T1> Object dpsGetTTL(T1 key, String keySplTypeName, String valueSplTypeName, long[] err, boolean encodeKey, boolean encodeValue) throws Exception {
 		Object[] byteBufferArray = nbfEncodeKeyAndValue(key, null, keySplTypeName, valueSplTypeName);
 		
 		// We need to have the key erialized properly. If not, throw an exception.
@@ -684,7 +735,7 @@ public class DpsHelper {
 			throw new Exception("dpsGetTTL: Unable to serialize the key.");
 		}
 		
-        Object[] resultArray = dpsGetTTLCpp((ByteBuffer)byteBufferArray[0], ((Integer)byteBufferArray[1]).intValue());
+        Object[] resultArray = dpsGetTTLCpp((ByteBuffer)byteBufferArray[0], ((Integer)byteBufferArray[1]).intValue(), encodeKey, encodeValue);
     	// Java is not as convenient as C++ in the sense that we can't pass by reference in Java.
     	// Hence, we can't return multiple values from a method to the caller.
     	// One way to do that in Java is by stuffing the multiple return value items in an object array.
@@ -704,6 +755,16 @@ public class DpsHelper {
 		
 		// Decode the data item value.
 		if (err[0] == 0) {
+                   // If the caller requested for not to encode value, then we just read a string value that was stored in clear.
+                   // There is no need to deserialize it. We can return the plain string value stored in clear as it is.
+                   if (encodeValue == false) {
+                      // This is a value stored as plain string in the back-end data store.
+                      RString resultValue = new RString(byteBuffer2, byteBuffer2.remaining());
+                      // Release the memory allocated by the C++ DPS code.
+                      byteBuffer2 = null;
+                      return(resultValue);
+                   }            
+
 			StreamSchema ss2 = null;
 			
 			// If the dummy data item value passed to this method is already made of a tuple type, we can directly use that dummy tuple object here.
@@ -757,7 +818,7 @@ public class DpsHelper {
 	}	
 
 	// Remove a TTL based K/V pair stored in the global area of the back-end data store.
-	public <T1> boolean dpsRemoveTTL(T1 key, String keySplTypeName, String valueSplTypeName, long[] err) throws Exception {
+	public <T1> boolean dpsRemoveTTL(T1 key, String keySplTypeName, String valueSplTypeName, long[] err, boolean encodeKey) throws Exception {
 		Object[] byteBufferArray = nbfEncodeKeyAndValue(key, null, keySplTypeName, valueSplTypeName);
 		
 		// We need to have the key erialized properly. If not, throw an exception.
@@ -766,7 +827,7 @@ public class DpsHelper {
 			throw new Exception("dpsRemoveTTL: Unable to serialize the key.");
 		}
 		
-        String result = dpsRemoveTTLCpp((ByteBuffer)byteBufferArray[0], ((Integer)byteBufferArray[1]).intValue());
+        String result = dpsRemoveTTLCpp((ByteBuffer)byteBufferArray[0], ((Integer)byteBufferArray[1]).intValue(), encodeKey);
 		// Parse the result string [Format: "booleanResult,errorCode"]
 		Scanner scanner = new Scanner(result);
 		scanner.useDelimiter(",");
@@ -797,7 +858,7 @@ public class DpsHelper {
 	}
 
 	// Check if a TTL based K/V pair for a given key exists in the global area of the back-end data store.
-	public <T1> boolean dpsHasTTL(T1 key, String keySplTypeName, String valueSplTypeName, long[] err) throws Exception {
+	public <T1> boolean dpsHasTTL(T1 key, String keySplTypeName, String valueSplTypeName, long[] err, boolean encodeKey) throws Exception {
 		Object[] byteBufferArray = nbfEncodeKeyAndValue(key, null, keySplTypeName, valueSplTypeName);
 		
 		// We need to have the key erialized properly. If not, throw an exception.
@@ -806,7 +867,7 @@ public class DpsHelper {
 			throw new Exception("dpsHasTTL: Unable to serialize the key.");
 		}
         
-        String result = dpsHasTTLCpp((ByteBuffer)byteBufferArray[0], ((Integer)byteBufferArray[1]).intValue());
+        String result = dpsHasTTLCpp((ByteBuffer)byteBufferArray[0], ((Integer)byteBufferArray[1]).intValue(), encodeKey);
 		// Parse the result string [Format: "booleanResult,errorCode"]
 		Scanner scanner = new Scanner(result);
 		scanner.useDelimiter(",");
@@ -1143,6 +1204,28 @@ public class DpsHelper {
 		
 		return;
 	}
+
+	// Check if there is an active connection to the back-end data store.
+	public boolean dpsIsConnected() {
+               String result = dpsIsConnectedCpp();
+		// Parse the result string [Format: "booleanResult,errorCode"]
+		Scanner scanner = new Scanner(result);
+		scanner.useDelimiter(",");
+		boolean booleanResult = scanner.nextBoolean();
+		scanner.close();
+		return(booleanResult);		
+	}	
+
+	// Reconnect to the back-end data store.
+	public boolean dpsReconnect() {
+               String result = dpsReconnectCpp();
+		// Parse the result string [Format: "booleanResult,errorCode"]
+		Scanner scanner = new Scanner(result);
+		scanner.useDelimiter(",");
+		boolean booleanResult = scanner.nextBoolean();
+		scanner.close();
+		return(booleanResult);		
+	}	
 	
 	// =======================================================
 	// Distributed lock related API calls are processed below.

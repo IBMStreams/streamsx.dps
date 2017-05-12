@@ -1058,7 +1058,7 @@ namespace distributed
   // Put a data item with a TTL (Time To Live in seconds) value into the global area of the HBase K/V store.
   bool HBaseDBLayer::putTTL(char const * keyData, uint32_t keySize,
 		  	  	  	  	    unsigned char const * valueData, uint32_t valueSize,
-							uint32_t ttl, PersistenceError & dbError)
+							uint32_t ttl, PersistenceError & dbError, bool encodeKey, bool encodeValue)
   {
 	  SPLAPPTRC(L_DEBUG, "Inside putTTL.", "HBaseDBLayer");
 
@@ -1119,7 +1119,23 @@ namespace distributed
 
 		// In our HBase dps implementation, data item keys can have space characters.
 		string base64_data_item_key;
-		base64_encode(string(keyData, keySize), base64_data_item_key);
+
+                if (encodeKey == true) {
+	           base64_encode(string(keyData, keySize), base64_data_item_key);
+                } else {
+                   // Since the key data sent here will always be in the network byte buffer format (NBF), 
+                   // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+                   // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+                   // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+                   if ((uint8_t)keyData[0] < 0x80) {
+                      // Skip the first length byte. 
+                      base64_data_item_key = string(&keyData[1], keySize-1);  
+                   } else {
+                      // Skip the five bytes at the beginning that represent the length of the key data.
+                      base64_data_item_key = string(&keyData[5], keySize-5);
+                   }
+                }
+
 		// Let us convert the valueData in our K/V pair to a string.
 		// In this HBase CPP file, we added a new b64_encode and b64_decode methods specifically for this purpose.
 		// Let us go ahead and convert the binary data buffer into a string.
@@ -1235,14 +1251,29 @@ namespace distributed
 
   // Get a TTL based data item that is stored in the global area of the HBase K/V store.
    bool HBaseDBLayer::getTTL(char const * keyData, uint32_t keySize,
-                              unsigned char * & valueData, uint32_t & valueSize, PersistenceError & dbError)
+                              unsigned char * & valueData, uint32_t & valueSize, PersistenceError & dbError, bool encodeKey)
    {
 		SPLAPPTRC(L_DEBUG, "Inside getTTL.", "HBaseDBLayer");
 
 		// Since this is a data item with TTL, it is stored in the global area of HBase and not inside a user created store.
 		string data_item_key = string(keyData, keySize);
 		string base64_encoded_data_item_key;
-		base64_encode(data_item_key, base64_encoded_data_item_key);
+
+                if (encodeKey == true) {
+	           base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+                } else {
+                   // Since the key data sent here will always be in the network byte buffer format (NBF), 
+                   // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+                   // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+                   // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+                   if ((uint8_t)keyData[0] < 0x80) {
+                      // Skip the first length byte. 
+                      base64_encoded_data_item_key = string(&keyData[1], keySize-1);  
+                   } else {
+                      // Skip the five bytes at the beginning that represent the length of the key data.
+                      base64_encoded_data_item_key = string(&keyData[5], keySize-5);
+                   }
+                }
 
 		// Get the data from the TTL table (not from the user created tables).
 		string storeRowName = string(DPS_TOKEN) + "_" + string(DPS_STORE_INFO_TYPE) + "_" + string(DPS_TTL_STORE_TOKEN);
@@ -1345,13 +1376,29 @@ namespace distributed
 
   // Remove a TTL based data item that is stored in the global area of the HBase K/V store.
   bool HBaseDBLayer::removeTTL(char const * keyData, uint32_t keySize,
-                                PersistenceError & dbError)
+                                PersistenceError & dbError, bool encodeKey)
   {
 		SPLAPPTRC(L_DEBUG, "Inside removeTTL.", "HBaseDBLayer");
 
 		// In our HBase dps implementation, data item keys can have space characters.
 		string base64_data_item_key;
-		base64_encode(string(keyData, keySize), base64_data_item_key);
+
+                if (encodeKey == true) {
+	           base64_encode(string(keyData, keySize), base64_data_item_key);
+                } else {
+                   // Since the key data sent here will always be in the network byte buffer format (NBF), 
+                   // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+                   // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+                   // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+                   if ((uint8_t)keyData[0] < 0x80) {
+                      // Skip the first length byte. 
+                      base64_data_item_key = string(&keyData[1], keySize-1);  
+                   } else {
+                      // Skip the five bytes at the beginning that represent the length of the key data.
+                      base64_data_item_key = string(&keyData[5], keySize-5);
+                   }
+                }
+
 		// We are ready to remove a data item from the HBase table.
 		// This action is performed on the TTL row that takes the following name.
 		string storeRowName = string(DPS_TOKEN) + "_" + string(DPS_STORE_INFO_TYPE) + "_" + string(DPS_TTL_STORE_TOKEN);
@@ -1416,14 +1463,29 @@ namespace distributed
 
   // Check for the existence of a TTL based data item that is stored in the global area of the HBase K/V store.
   bool HBaseDBLayer::hasTTL(char const * keyData, uint32_t keySize,
-                             PersistenceError & dbError)
+                             PersistenceError & dbError, bool encodeKey)
   {
 		SPLAPPTRC(L_DEBUG, "Inside hasTTL.", "HBaseDBLayer");
 
 		// Since this is a data item with TTL, it is stored in the global area of HBase and not inside a user created store.
 		string data_item_key = string(keyData, keySize);
 		string base64_encoded_data_item_key;
-		base64_encode(data_item_key, base64_encoded_data_item_key);
+
+                if (encodeKey == true) {
+	           base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+                } else {
+                   // Since the key data sent here will always be in the network byte buffer format (NBF), 
+                   // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+                   // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+                   // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+                   if ((uint8_t)keyData[0] < 0x80) {
+                      // Skip the first length byte. 
+                      base64_encoded_data_item_key = string(&keyData[1], keySize-1);  
+                   } else {
+                      // Skip the five bytes at the beginning that represent the length of the key data.
+                      base64_encoded_data_item_key = string(&keyData[5], keySize-5);
+                   }
+                }
 
 		// Get the data from the TTL table (not from the user created tables).
 		string storeRowName = string(DPS_TOKEN) + "_" + string(DPS_STORE_INFO_TYPE) + "_" + string(DPS_TTL_STORE_TOKEN);
@@ -2335,6 +2397,14 @@ namespace distributed
 		// user provided return variable.
 		jsonResponse = string(curlBuffer);
 		return(true);
+  }
+
+  bool HBaseDBLayer::runDataStoreCommand(std::vector<std::string> const & cmdList, std::string & resultValue, PersistenceError & dbError) {
+		// This API can only be supported in Redis.
+		// HBase doesn't have a way to do this.
+		dbError.set("From HBase data store: This API to run native data store commands is not supported in HBase.", DPS_RUN_DATA_STORE_COMMAND_ERROR);
+		SPLAPPTRC(L_DEBUG, "From HBase data store: This API to run native data store commands is not supported in HBase. " << DPS_RUN_DATA_STORE_COMMAND_ERROR, "HBaseDBLayer");
+		return(false);
   }
 
   // This method will get the data item from the store for a given key.
@@ -4390,6 +4460,17 @@ namespace distributed
 	  }
 
 	  return(hBaseResult);
+  }
+
+  // This method will return the status of the connection to the back-end data store.
+  bool HBaseDBLayer::isConnected() {
+          // Not implemented at this time.
+          return(true);
+  }
+
+  bool HBaseDBLayer::reconnect(std::set<std::string> & dbServers, PersistenceError & dbError) {
+          // Not implemented at this time.
+          return(true);
   }
 
 } } } } }

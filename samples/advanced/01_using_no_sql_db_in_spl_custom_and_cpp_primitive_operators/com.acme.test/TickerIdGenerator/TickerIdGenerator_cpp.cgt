@@ -1,0 +1,141 @@
+/* Additional includes go here */
+
+<%SPL::CodeGen::implementationPrologue($model);%>
+
+// Constructor
+MY_OPERATOR::MY_OPERATOR()
+{
+    // Initialization code goes here
+}
+
+// Destructor
+MY_OPERATOR::~MY_OPERATOR() 
+{
+    // Finalization code goes here
+}
+
+// Notify port readiness
+void MY_OPERATOR::allPortsReady() 
+{
+    // Notifies that all ports are ready. No tuples should be submitted before
+    // this. Source operators can use this method to spawn threads.
+
+    /*
+      createThreads(1); // Create source thread
+    */
+}
+ 
+// Notify pending shutdown
+void MY_OPERATOR::prepareToShutdown() 
+{
+    // This is an asynchronous call
+}
+
+// Processing for source and threaded operators   
+void MY_OPERATOR::process(uint32_t idx)
+{
+    // A typical implementation will loop until shutdown
+    /*
+      while(!getPE().getShutdownRequested()) {
+          // do work ...
+      }
+    */
+}
+
+// Tuple processing for mutating ports 
+//
+// What is the simple business logic being performed here?
+// This primitive operator will pull out the "ticker symbol and the company name" from Thing1_Store ONLY for
+// those ticker symbols sent in the stock picks list as an input tuple attribute.
+// Then, it will create a unique ticker id for every ticker symbol specified in the stock picks list and insert 
+// "ticker symbol => unique ticker id" in a new store called "Thing2_Store".
+void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
+{
+	// Our input tuple has only one attribute that is of type list<rstring>.
+	// That attribute carries the caller's favorite stock picks.
+	// Let us get that now.
+	ValueHandle handle1 = tuple.getAttribute(0); // Access it by attribute position.
+	List & list = handle1;
+	SPL::list<rstring> & list1 = static_cast<SPL::list<rstring> &> (list);
+	// Let us get the store id for the "Thing1 store", where the complete set of
+	// "ticker symbol to company name" mappings are kept.
+	uint64 e1 = 0;
+	uint64 & err = static_cast<uint64 &> (e1);
+	// Pass a dummy key and dummy value as method arguments.
+	rstring dummyRstring = "";
+    uint64 t1s = dpsCreateOrGetStore("Thing1_Store", dummyRstring, dummyRstring, err);
+    
+    if (t1s == 0) {
+    	cout << "TickerIdGenerator: Unable to get the store id for Thing1_Store." << endl;
+    	SPL::Functions::Utility::abort("TickerIdGenerator_cpp.cgt", 66);
+    }
+    
+    // Let us create a brand new store called "Thing2_Store".
+    uint64 t2s = dpsCreateOrGetStore("Thing2_Store", dummyRstring, dummyRstring, err);
+    
+    if (t2s == 0) {
+    	cout << "TickerIdGenerator: Unable to create a new store called Thing2_Store." << endl;
+    	SPL::Functions::Utility::abort("TickerIdGenerator_cpp.cgt", 74);
+    } 
+    
+    int32 listSize = SPL::Functions::Collections::size(list1);
+    // Now loop through the stock picks list.
+	for (int32 cnt=0; cnt<listSize; cnt++) {
+    	rstring tickerSymbol = list1[cnt];
+    	rstring cn = "";
+    	rstring & companyName = static_cast<rstring &> (cn);
+    	// Look up the company name for a given ticker symbol from the "Thing1_Store".
+    	boolean res = false;
+    	res = dpsGet(t1s, tickerSymbol, companyName, err);
+    	
+    	if (res == false) {
+    		cout << "TickerIdGenerator: Unable to get the company name from Thing1_Store for ticker symbol " << tickerSymbol << "." << endl;
+    		SPL::Functions::Utility::abort("TickerIdGenerator_cpp.cgt", 89);    	
+    	}
+    	
+    	// Let us compute a unique hash code for this company name.
+    	uint64 tickerId = companyName.hashCode();
+    	// Put this away in the Thing2_Store now.
+    	res = dpsPut(t2s, tickerSymbol, tickerId, err);
+
+    	if (res == false) {
+    		cout << "TickerIdGenerator: Unable to put the tickerId " << tickerId << " for the ticker symbol " <<
+    			tickerSymbol << " in the Thing2_Store." << endl;
+    		SPL::Functions::Utility::abort("TickerIdGenerator_cpp.cgt", 100);    	
+    	}    	   	
+    }
+    
+    // We finished creating a new Thing2_Store and created/inserted "TickerSymbol => TickerId" entries in it.
+    OPort0Type otuple;
+	ValueHandle handle2 = otuple.getAttributeValue("dummy");
+	int32 & dummy = handle2;
+	// Set any value to this attribute.
+	dummy = 77;
+	// Send this dummy tuple away to a downstream operator to indicate ticker ids were generated successfully.
+    submit(otuple, 0); // submit to output port 0
+}
+
+// Tuple processing for non-mutating ports
+void MY_OPERATOR::process(Tuple const & tuple, uint32_t port)
+{
+    // Sample submit code
+    /* 
+      OPort0Type otuple;
+      submit(otuple, 0); // submit to output port 0
+    */
+}
+
+// Punctuation processing
+void MY_OPERATOR::process(Punctuation const & punct, uint32_t port)
+{
+    /*
+      if(punct==Punctuation::WindowMarker) {
+        // ...;
+      } else if(punct==Punctuation::FinalMarker) {
+        // ...;
+      }
+    */
+}
+
+<%SPL::CodeGen::implementationEpilogue($model);%>
+
