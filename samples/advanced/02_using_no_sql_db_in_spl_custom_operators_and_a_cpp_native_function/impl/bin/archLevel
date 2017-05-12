@@ -3,10 +3,17 @@
 
 # Output appropriate libPath information for toolkits  
 # that support multiple platforms.
+dpsToolkitDir=""
+
+if [ -z "$STREAMS_SPLPATH" ]; then
+   dpsToolkitDir=${STREAMS_INSTALL}/toolkits/com.ibm.streamsx.dps
+else
+   dpsToolkitDir=${STREAMS_SPLPATH}
+fi
 
 if [ "$1" == "libPath" ]; then
 
-  here=$( cd ${0%/*} ; pwd )
+  here=$( cd $dpsToolkitDir/impl/bin ; pwd )
   OS=`uname -s`
   MACH=`uname -i`
   if [ "${MACH}" = "i386" ] ; then
@@ -60,7 +67,7 @@ if [ "$1" == "libPath" ]; then
 
 elif [ "$1" == "includePath" ]; then
   # echo any computed include paths here, if needed
-  here=$( cd ${0%/*} ; pwd )
+  here=$( cd $dpsToolkitDir/impl/bin ; pwd )
   echo $here/../include
   echo $here/../ext/lib
 
