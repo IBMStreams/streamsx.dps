@@ -6,8 +6,7 @@
 
 if [ "$1" == "libPath" ]; then
 
-  ##### 
-  here=$( cd ${STREAMS_INSTALL}/toolkits/com.ibm.streamsx.dps/impl/bin ; pwd )
+  here=$( cd ${0%/*} ; pwd )
   OS=`uname -s`
   MACH=`uname -i`
   if [ "${MACH}" = "i386" ] ; then
@@ -61,7 +60,7 @@ if [ "$1" == "libPath" ]; then
 
 elif [ "$1" == "includePath" ]; then
   # echo any computed include paths here, if needed
-  here=$( cd ${STREAMS_INSTALL}/toolkits/com.ibm.streamsx.dps/impl/bin ; pwd )
+  here=$( cd ${0%/*} ; pwd )
   echo $here/../include
   echo $here/../ext/lib
 
@@ -74,28 +73,18 @@ elif [ "$1" == "lib" ]; then
 	  do
 	     if [ "$line" = "redis" ]
 	     then
-	     	echo "hiredis"
-	     	echo "DPSRedis"
-	     	echo "uv"
-	     else 
-	     	if [ "$line" = "redis-cluster" ]
-	     	then
-	     		echo "hiredis"
-	     		echo "DPSRedisCluster"
-	     		echo "uv"
-	     	fi
-	     fi
-	     if [ "$line" =  "hsa" ]
+	     	:
+			# do not output any libraries here, because the libs are loaded at runtime via dlopen()
+	     	# See DistributedProcessStore.cpp for the list of libs loaded at runtime
+	     	# This is the original list for reference : 
+	     	#echo "hiredis"
+	     	#echo "DPSRedis"
+	     	#echo "uv"
+	     elif [ "$line" = "redis-cluster" ]
 	     then
-	       	echo "DPSHSA"
-			echo "hsa-catalog-client"
-			echo "hsa-client"
-			echo "hsa-hyperstate"
-			echo "hsa-interface"
-			echo "hsa-kit"
-			echo "hsa-lfhm"
-			echo "crypto"
-			echo "ssl"			
+	     	echo "hiredis"
+	     	echo "DPSRedisCluster"
+	     	echo "uv"
 	     elif [ "$line" =  "hbase" ]
 	     then
 	     	echo "DPSHBase"

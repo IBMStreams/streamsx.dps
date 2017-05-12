@@ -2029,7 +2029,7 @@ composite RunNativeDataStoreCommands() {
 					rstring dbProductName = dpsGetNoSqlDbProductName();
 									
 					if (dbProductName == "memcached" || dbProductName == "mongo" ||
-						dbProductName == "couchbase" || dbProductName == "aerospike" || dbProductName == "eden") {
+						dbProductName == "couchbase" || dbProductName == "aerospike") {
 						printStringLn("Native data store command execution is not supported when " +
 						dbProductName + 
 						" is configured as the back-end data store.");

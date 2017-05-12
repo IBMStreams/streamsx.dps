@@ -147,7 +147,9 @@ a user created store present in the back-end DB infrastructure. If this rule is 
 @param key the key with which to associate the given value (In this API, key can be configured to be base64 encoded or not.)
 @param item the value to associate with the key
 @param ttl the amount of time, in seconds, this pair will be kept in the global store before it is automatically removed. A value of '0' means that this pair will be in the store indefinitely until manually removed via `dpsRemoveTTL`.
-@param err will be set to '0' if the operation was successful, and a non-zero value otherwise.   
+@param err will be set to '0' if the operation was successful, and a non-zero value otherwise.
+@param encodeKey set to true if the key shall be base64 encoded, set to false otherwise
+@param encodeValue set to true if the value shall be base64 encoded, set to false otherwise
 @return true if the operation is successful, false otherwise.
         
         mutable rstring myKey = &quot;&quot;, myValue = &quot;&quot;;
@@ -210,7 +212,9 @@ it does safety checks and is therefore slower.</description>
         <description>Get an item that was stored with a TTL (Time To Live in seconds) value.
 @param key the key to look up (In this API, you can specify whether the key is base64 encoded or not.)
 @param item will receive the saved value for the given key.
-@param err will receive the error code if an error occurs, or will be set to '0' otherwise.  
+@param err will receive the error code if an error occurs, or will be set to '0' otherwise.
+@param encodeKey set to true if the key shall be base64 encoded, set to false otherwise.
+@param encodeValue set to true if the value shall be base64 encoded, set to false otherwise.
 @return true if the global TTL store did contain an item with the given key and a matching type, false otherwise or if an error occurs.
 
 
@@ -267,6 +271,7 @@ it does safety checks and is therefore slower.</description>
         <description>Remove an item that was stored with a TTL (Time To Live in seconds) value.
 @param key the key to remove. (In this API, you can specify whether the key is base64 encoded or not.)
 @param err will receive the error code if an error occurs or will be set to '0' if the remove was successful.
+@param encodeKey set to true if the key shall be base64 encoded, set to false otherwise.
 @return true if an item with the given key was removed, false otherwise.</description>
         <prototype>&lt;any T1> public stateful boolean dpsRemoveTTL(T1 key, mutable uint64 err, boolean encodeKey)</prototype>
       </function>
@@ -307,6 +312,7 @@ it does safety checks and is therefore slower.</description>
         <description>Check if an item exists that was stored with a TTL (Time To Live in seconds) value.
 @param key the key to look up. Can be any SPL type. (In this API, you can specify whether the key is base64 encoded or not.)
 @param err mutable parameter that receives the error code for this function call. If the error code is non-zero, an error has occurred.
+@param encodeKey set to true if the key shall be base64 encoded, set to false otherwise.
 @return true if a TTL item with the given key exists, false if no such item exists or if an error occurs.
 
 
@@ -570,15 +576,18 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
       </function>
       <function>
         <description>Allows for setting a path to the configuration file. Relative paths are relative to the toolkit root directory. If not set, then 'etc/no-sql-kv-store-servers.cfg' file will be used.
-@param dpsConfigFile the path to the configuration file that should be used</description>
+@param dpsConfigFile the path to the configuration file that should be used
+@return returns always true</description>
         <prototype>public stateful boolean dpsSetConfigFile(rstring dpsConfigFile)</prototype>
       </function>
       <function>
-        <description>It allows to check the connection status of the back-end data store.</description>
+        <description>It allows to check the connection status of the back-end data store.
+@return true if the connection is established, false otherwise.</description>
         <prototype>public stateful boolean dpsIsConnected()</prototype>
       </function>
       <function>
-        <description>It allows to reconnect to the back-end data store.</description>
+        <description>It allows to reconnect to the back-end data store.
+@return true if the connection could be re-established, false otherwise.</description>        
         <prototype>public stateful boolean dpsReconnect()</prototype>
       </function>
     </functions>
