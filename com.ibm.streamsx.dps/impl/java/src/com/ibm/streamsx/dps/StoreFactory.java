@@ -136,9 +136,11 @@ try {
 	*
 	*
 	*
-	 *	 */
+	* */
+        // There are three variations of this method via overloading.
 	public <T1, T2> boolean putTTL(T1 key, T2 value, int ttl, String keySplTypeName, String valueSplTypeName) throws StoreFactoryException;
 	public <T1, T2> boolean putTTL(T1 key, T2 value, int ttl, String keySplTypeName, String valueSplTypeName, boolean encodeKey, boolean encodeValue) throws StoreFactoryException;
+	public <T1, T2> boolean putTTL(T1 key, T2 value, int ttl, String keySplTypeName, String valueSplTypeName, int[] storedKeyValueSize, boolean encodeKey, boolean encodeValue) throws StoreFactoryException;
 	/**Get a K/V pair with TTL (Time To Live in seconds) into the global area of the back-end data store.
 	@param <T1> key to lookup
 	@param keySplTypeName name of the SPL type of the key

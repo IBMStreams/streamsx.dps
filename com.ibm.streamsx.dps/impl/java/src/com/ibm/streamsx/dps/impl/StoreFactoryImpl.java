@@ -124,15 +124,16 @@ public class StoreFactoryImpl implements StoreFactory
 	// K/V pairs, we are implementing them here in the StoreFactoryImpl class instead of in the StoreImpl class.
 	//
 
-        // Overloaded method (with no encodeKey method argument)
+        // Overloaded method (with no encodeKey and encodeValue method arguments)
 	// Put a data item with TTL (Time To Live in seconds) into the global area of the back-end data store.
 	public <T1, T2> boolean putTTL(T1 key, T2 value, int ttl, String keySplTypeName, String valueSplTypeName) throws StoreFactoryException {
-           // Call the other overloaded method by passing encodeKey=true and encodeValue=true. 
-           return(putTTL(key, value, ttl, keySplTypeName, valueSplTypeName, true, true));
+           // Call the other overloaded method by passing storedKeyValueSize array, encodeKey=true and encodeValue=true. 
+           int[] storedKeyValueSize = new int[2];
+           return(putTTL(key, value, ttl, keySplTypeName, valueSplTypeName, storedKeyValueSize, true, true));
         }
 
-	// Put a data item with TTL (Time To Live in seconds) into the global area of the back-end data store.
-	public <T1, T2> boolean putTTL(T1 key, T2 value, int ttl, String keySplTypeName, String valueSplTypeName, boolean encodeKey, boolean encodeValue) throws StoreFactoryException {
+        // Overloaded method (with three additional arguments: storedKeyValueSize, encodeKey and encodeValue)
+	public <T1, T2> boolean putTTL(T1 key, T2 value, int ttl, String keySplTypeName, String valueSplTypeName, int[] storedKeyValueSize, boolean encodeKey, boolean encodeValue) throws StoreFactoryException {
 		boolean result;
 		long[] err = new long[1];
 		DpsHelper dps = null;
@@ -151,7 +152,7 @@ public class StoreFactoryImpl implements StoreFactory
 
 		try {
 			dps = DpsHelperHolder.getDpsHelper();
-			result = dps.dpsPutTTL(key, value, ttl, keySplTypeName, valueSplTypeName, err, encodeKey, encodeValue);
+			result = dps.dpsPutTTL(key, value, ttl, keySplTypeName, valueSplTypeName, err, storedKeyValueSize, encodeKey, encodeValue);
 		} catch(Exception e) {
 			// Either dps cannot be initialized or putTTL went wrong.
 			// An error code of 65535 indicates that this error occurred inside
@@ -165,6 +166,14 @@ public class StoreFactoryImpl implements StoreFactory
 		}
 		
 		return(result);
+           
+        }
+
+        // Overloaded method (with two additional arguments: 
+	// Put a data item with TTL (Time To Live in seconds) into the global area of the back-end data store.
+	public <T1, T2> boolean putTTL(T1 key, T2 value, int ttl, String keySplTypeName, String valueSplTypeName, boolean encodeKey, boolean encodeValue) throws StoreFactoryException {
+               int[] storedKeyValueSize = new int[2];
+               return(putTTL(key, value, ttl, keySplTypeName, valueSplTypeName, storedKeyValueSize, encodeKey, encodeValue));
 	}
 
         // Overloaded method (with no encodeKey method argument)

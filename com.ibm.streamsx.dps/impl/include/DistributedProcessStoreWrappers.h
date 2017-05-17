@@ -118,7 +118,25 @@ namespace distributed
   template<class T1, class T2>
   SPL::boolean dpsPutTTL(T1 const & key, T2 const & value, SPL::uint32 const & ttl, SPL::uint64 & err, SPL::boolean encodeKey=true, SPL::boolean encodeValue=true)
   {
-    return DistributedProcessStore::getGlobalStore().putTTL(key, value, ttl, err, encodeKey, encodeValue);
+    uint32_t storedKeySize = 0;
+    uint32_t storedValueSize = 0;
+    return DistributedProcessStore::getGlobalStore().putTTL(key, value, ttl, err, storedKeySize, storedValueSize, encodeKey, encodeValue);
+  }
+
+  /// Put an item with a TTL (Time To Live in seconds) value into the global area of the back-end data store.
+  /// @param key item's key
+  /// @param value item's value
+  /// @param ttl data item's Time To Live in seconds
+  /// @return true if the data item was stored successfully, false otherwise
+  /// @param err GlobalStore error code
+  /// @param storedKeySize On a successful put. this will have the actual storage size of the key in the back-end data store.
+  /// @param storedValueSize On a successful put. this will have the actual storage size of the value in the back-end data store.
+  /// @param encodeKey item's key should be encoded or not before storing in the back-end data store.
+  /// @param encodeValue item's value is encoded or not in the back-end data store.
+  template<class T1, class T2>
+  SPL::boolean dpsPutTTL(T1 const & key, T2 const & value, SPL::uint32 const & ttl, SPL::uint64 & err, SPL::uint32 & storedKeySize, SPL::uint32 & storedValueSize, SPL::boolean encodeKey=true, SPL::boolean encodeValue=true)
+  {
+    return DistributedProcessStore::getGlobalStore().putTTL(key, value, ttl, err, storedKeySize, storedValueSize, encodeKey, encodeValue);
   }
 
   /// Get an item from the given store (A better performing version with no safety checks)
