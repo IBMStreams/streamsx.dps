@@ -143,7 +143,7 @@ a user created store present in the back-end DB infrastructure. If this rule is 
         <prototype>&lt;any T1, any T2> public stateful boolean dpsPutTTL(T1 key, T2 item, uint32 ttl, mutable uint64 err)</prototype>
       </function>
       <function>
-        <description>Put an key-value pair with in a TTL (Time To Live in seconds) value into the global area of the back-end data store. The **key** and **value** can be any SPL type.
+        <description>Put a key-value pair with in a TTL (Time To Live in seconds) value into the global area of the back-end data store. The **key** and **value** can be any SPL type.
 @param key the key with which to associate the given value (In this API, key can be configured to be base64 encoded or not.)
 @param item the value to associate with the key
 @param ttl the amount of time, in seconds, this pair will be kept in the global store before it is automatically removed. A value of '0' means that this pair will be in the store indefinitely until manually removed via `dpsRemoveTTL`.
@@ -157,8 +157,9 @@ a user created store present in the back-end DB infrastructure. If this rule is 
 	myValue = &quot;Albany&quot;;
 	mutable uint64 err = 0ul;
 	// Put a key-value pair with 5 seconds of TTL.
-        // In this overloaded API, 5th argument lets you configure the key to be base64 encoded or not.)
-	boolean res = dpsPutTTL(myKey, myValue, 5u, err, false);
+        // In this overloaded API, 5th and 6th arguments let you configure the key to be base64 encoded or not as well as
+        // the value to be serialized or not before storing it in the back-end data store.)
+	boolean res = dpsPutTTL(myKey, myValue, 5u, err, false, false);
                     
 	if (res == false) {
                //handle error using dpsGetLastErrorCodeTTL() and  dpsGetLastErrorStringTTL());
@@ -166,6 +167,37 @@ a user created store present in the back-end DB infrastructure. If this rule is 
         
         </description>
         <prototype>&lt;any T1, any T2> public stateful boolean dpsPutTTL(T1 key, T2 item, uint32 ttl, mutable uint64 err, boolean encodeKey, boolean encodeValue)</prototype>
+      </function>
+      <function>
+        <description>Put a key-value pair with in a TTL (Time To Live in seconds) value into the global area of the back-end data store. The **key** and **value** can be any SPL type.
+@param key the key with which to associate the given value (In this API, key can be configured to be base64 encoded or not.)
+@param item the value to associate with the key
+@param ttl the amount of time, in seconds, this pair will be kept in the global store before it is automatically removed. A value of '0' means that this pair will be in the store indefinitely until manually removed via `dpsRemoveTTL`.
+@param err will be set to '0' if the operation was successful, and a non-zero value otherwise.
+@param storedKeySize Will be set to the actual storage size occupied by the given key in the back-end data store.
+@param storedValueSize Will be set to the actual storage size occupied by the given value in the back-end data store.
+@param encodeKey set to true if the key shall be base64 encoded, set to false otherwise
+@param encodeValue set to true if the value shall be base64 encoded, set to false otherwise
+@return true if the operation is successful, false otherwise.
+        
+        mutable rstring myKey = &quot;&quot;, myValue = &quot;&quot;;
+	myKey = &quot;New York&quot;;
+	myValue = &quot;Albany&quot;;
+	mutable uint64 err = 0ul;
+        mutable uint32 storedKeySize = 0u;
+        mutable uint32 storedValueSize = 0u;
+	// Put a key-value pair with 5 seconds of TTL.
+        // In this overloaded API, 7th and 8th arguments let you configure the key to be base64 encoded or not as well as
+        // the value to be serialized or not before storing it in the back-end data store.)
+        // When this API returns successfully, 5th and 6th arguments will have storage size for the key and the value.
+	boolean res = dpsPutTTL(myKey, myValue, 5u, err, storedKeySize, storedValueSize, false, false);
+                    
+	if (res == false) {
+               //handle error using dpsGetLastErrorCodeTTL() and  dpsGetLastErrorStringTTL());
+	}
+        
+        </description>
+        <prototype>&lt;any T1, any T2> public stateful boolean dpsPutTTL(T1 key, T2 item, uint32 ttl, mutable uint64 err, uint32 storedKeySize, uint32 storedValueSize, boolean encodeKey, boolean encodeValue)</prototype>
       </function>
       <function>
         <description>Given a key, retrieves its value from the given store. This function has better performance than `dpsGetSafe` since it doesn't carry out any safety checks.
