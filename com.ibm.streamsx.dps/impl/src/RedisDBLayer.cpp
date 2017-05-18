@@ -1073,7 +1073,7 @@ namespace distributed
 
           // Return now if there is no valid connection to the Redis server.
           if (redisPartitions[partitionIdx].rdsc == NULL) {
-             dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+             dbError.setTTL("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
              SPLAPPTRC(L_DEBUG, "Inside putTTL, it failed. There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
              return(false);
           }
@@ -1254,7 +1254,7 @@ namespace distributed
 
                 // Return now if there is no valid connection to the Redis server.
                 if (redisPartitions[partitionIdx].rdsc == NULL) {
-                   dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+                   dbError.setTTL("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
                    SPLAPPTRC(L_DEBUG, "Inside gettTTL, it failed. There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
                    return(false);
                 }
@@ -1435,7 +1435,7 @@ namespace distributed
 
                 // Return now if there is no valid connection to the Redis server.
                 if (redisPartitions[partitionIdx].rdsc == NULL) {
-                   dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+                   dbError.setTTL("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
                    SPLAPPTRC(L_DEBUG, "Inside removeTTL, it failed. There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
                    return(false);
                 }
@@ -1542,7 +1542,7 @@ namespace distributed
 
                 // Return now if there is no valid connection to the Redis server.
                 if (redisPartitions[partitionIdx].rdsc == NULL) {
-                   dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+                   dbError.setTTL("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
                    SPLAPPTRC(L_DEBUG, "Inside hasTTL, it failed. There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
                    return(false);
                 }
