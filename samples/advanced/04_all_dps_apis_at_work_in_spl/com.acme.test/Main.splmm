@@ -415,6 +415,7 @@ composite GeneralTest()
                                      if (reconnectCnt%4 == 0) {
                                         printStringLn("Calling dpsHasTTL when reconnectCnt = " + (rstring)reconnectCnt);
                                         dpsHasTTL(myNewKey, err, false);
+                                        printStringLn("Result of dpsHasTTL. err=" + (rstring)err);
                                      }
 
                                      block(5.0);
