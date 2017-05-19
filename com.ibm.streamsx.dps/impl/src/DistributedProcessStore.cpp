@@ -172,6 +172,7 @@ namespace distributed
     void* handle = NULL;
     std::string  kvLibName =  "";
     std::string toolkitDir = ProcessingElement::pe().getToolkitDirectory("com.ibm.streamsx.dps")  + "/impl/ext/lib" ;
+    std::string toolkitLibDir = ProcessingElement::pe().getToolkitDirectory("com.ibm.streamsx.dps")  + "/impl/lib" ;
     std::string streamsLibDir = SPL::Functions::Utility::getEnvironmentVariable("STREAMS_INSTALL") + "/ext/lib" ;
 	if (noSqlKvStoreProductName.compare("memcached") == 0) {
 		// reset method below is part of the C++ std::auto_ptr class.
@@ -219,8 +220,10 @@ namespace distributed
 		SPLAPPTRC(L_ERROR, error, "DistributedProcessStore");
 		throw(SPL::SPLRuntimeException("DistributedProcessStore::connectToDatabase", error));
 	}
-//	cout << "Going to load " << kvLibName << endl;
-	handle = dlopen(kvLibName.c_str(), RTLD_NOW|RTLD_GLOBAL);
+
+	std::string secondLevelLib = toolkitLibDir + "/" + kvLibName;
+    //std::cout << "load level2 lib : " << secondLevelLib << "\n";
+	handle = dlopen(secondLevelLib.c_str(), RTLD_NOW|RTLD_GLOBAL);
 	if (handle == NULL) {
 	      std::string error = "Cannot initialize libraries for chosen database " + noSqlKvStoreProductName + ", error message: ";
 	      error.append(dlerror());

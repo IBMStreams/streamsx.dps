@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# determine the location of the DPS toolkit
+# use: export DPS_TOOLKIT_HOME=/some/path
+# before compilation to point to a different location than the default, which is the toolkit included in Streams
+DPS_TOOLKIT_HOME=${DPS_TOOLKIT_HOME:-$STREAMS_INSTALL/toolkits/com.ibm.streamsx.dps}
+
+if [ "$1" == "libPath" ]; then
+	echo $DPS_TOOLKIT_HOME/impl/lib
+
+elif [ "$1" == "includePath" ]; then
+	echo $DPS_TOOLKIT_HOME/impl/include
+
+elif [ "$1" == "lib" ]; then
+	echo DistributedProcessStoreLibStatic
+
+else
+	echo "unsupported option"
+fi

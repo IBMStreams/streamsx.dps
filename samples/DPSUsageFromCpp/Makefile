@@ -24,16 +24,17 @@
 
 DPS_TOOLKIT_HOME ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.dps
 
-SPLC_FLAGS ?= -a -z -t $(DPS_TOOLKIT_HOME)
+SPLC_FLAGS ?= -a -t $(DPS_TOOLKIT_HOME)
 SPLC = $(STREAMS_INSTALL)/bin/sc
 SPL_CMD_ARGS ?= --data-directory=./data 
 SPL_MAIN_COMPOSITE = com.ibm.streamsx.dps.demo::Main
+OUTPUT_DIRECTORY = ./output/Main/Distributed
 
 all: distributed
 
 distributed:
-	$(SPLC) $(SPLC_FLAGS) -M $(SPL_MAIN_COMPOSITE) $(SPL_CMD_ARGS) --output-directory=./output/Main/Distributed
+	$(SPLC) $(SPLC_FLAGS) -M $(SPL_MAIN_COMPOSITE) $(SPL_CMD_ARGS) --output-directory=$(OUTPUT_DIRECTORY)
 
 clean: 
-	$(SPLC) $(SPLC_FLAGS) -C -M $(SPL_MAIN_COMPOSITE)
+	$(SPLC) $(SPLC_FLAGS) -C -M $(SPL_MAIN_COMPOSITE) --output-directory=$(OUTPUT_DIRECTORY)
 

@@ -49,6 +49,7 @@ HELPER_LIBS += $(AERO_LIB)
 endif
 
 DISTRIBUTED_PROCESS_STORE_LIB = $(LIB)/libDistributedProcessStoreLib.so
+DISTRIBUTED_PROCESS_STORE_LIB_STATIC = $(LIB)/libDistributedProcessStoreLibStatic.a
 
 SPL_PKGCFG = $(STREAMS_INSTALL)/bin/dst-pe-pkg-config.sh
 SPL_PKG = dst-spl-pe-install
@@ -84,7 +85,7 @@ vpath %.cpp src
 
 export CPLUS_INCLUDE_PATH=./include:./ext/include:$JAVA_HOME/include:$JAVA_HOME/include/linux
 
-all: check-streams $(DISTRIBUTED_PROCESS_STORE_LIB) $(HELPER_LIBS)
+all: check-streams $(DISTRIBUTED_PROCESS_STORE_LIB_STATIC) $(DISTRIBUTED_PROCESS_STORE_LIB) $(HELPER_LIBS)
 
 check-streams:
 	@echo "Checking to see if STREAMS_INSTALL is set..."
@@ -93,6 +94,10 @@ check-streams:
 $(DISTRIBUTED_PROCESS_STORE_LIB): $(DISTRIBUTED_PROCESS_STORE_OBJS)
 	mkdir -p $(LIB)
 	$(CXX) $(LDFLAGS) -o $@ $^
+
+$(DISTRIBUTED_PROCESS_STORE_LIB_STATIC): $(DISTRIBUTED_PROCESS_STORE_OBJS)
+	mkdir -p $(LIB)
+	ar rcs $@ $^
 
 $(AERO_LIB): $(AERO_OBJ)
 	mkdir -p $(LIB)
