@@ -32,12 +32,12 @@ sub usage
         print "\n";        
         print "--osname             Print the operating system name (short format) of this machine.\n";
         print "                       Known supported operating system names:\n";
-        print "                       rhel  - RedHat Enterprise Linux\n";
+        print "                       rhel  - RedHat Enterprise Linux or CentOS\n";
         print "                       sles  - SUSE Linux Enterprise\n";
         print "                       fc    - Fedora Core\n";
         print "--osname_rpm_format  Print the operating system name (RPM format) of this machine.\n";
         print "                       Known supported operating system names:\n";
-        print "                       elx    - RedHat Enterprise Linux major version x\n";
+        print "                       elx    - RedHat Enterprise Linux/CentOS major version x\n";
         print "                       slesx  - SUSE Linux Enterprise major version x\n";
         print "                       fcx    - Fedora Core major version x\n";
         print "--osname_long        Print the operating system name (long format) of this machine.\n";
@@ -140,8 +140,20 @@ if ($OSNAME || $OSNAME_RPM_FORMAT || $OSNAME_LONG || $OSVER)
             $return_osname_rpm = "el6";
             $return_osver = $1;            
         }
+        elsif ($osinfo =~ /release (6\.\d)[^(]+\(Full\)/)
+        {
+            print STDERR "Probably this is a CentOS system, we treat it as el6 (proceed on your own risk)";
+            $return_osname_rpm = "el6";
+            $return_osver = $1;            
+        }
         elsif ($osinfo =~ /release (7\.\d)[^(]+\(Maipo\)/)
         {
+            $return_osname_rpm = "el7";
+            $return_osver = $1;
+        }
+        elsif ($osinfo =~ /release (7\.\d)[^(]+\(Core\)/)
+        {
+        	print STDERR "Probably this is a CentOS system, we treat it as el7 (proceed on your own risk)";
             $return_osname_rpm = "el7";
             $return_osver = $1;
         }
