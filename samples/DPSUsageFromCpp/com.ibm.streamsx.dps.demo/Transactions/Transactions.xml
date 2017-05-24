@@ -7,11 +7,14 @@
         <library>
           <cmn:description/>
           <cmn:managedLibrary>
-			<cmn:lib>DistributedProcessStoreLib</cmn:lib><!-- This library contains the DPS functions -->
-			<!-- add the path to the other dependent libraries used by the DPS toolkit -->
-            <cmn:libPath>@STREAMS_INSTALL@/toolkits/com.ibm.streamsx.dps/impl/lib</cmn:libPath>
-            <cmn:libPath>@STREAMS_INSTALL@/toolkits/com.ibm.streamsx.dps/impl/ext/lib</cmn:libPath>
-            <cmn:includePath>@STREAMS_INSTALL@/toolkits/com.ibm.streamsx.dps/impl/include/</cmn:includePath>
+			<!-- This entry needs to load the DPS top level library 'libDistributedProcessStoreLib' from location of the toolkit -->
+			
+			<!-- option 1 : copy the shared version of the lib to the local impl/lib directory, so it gets packaged with the .sab file -->
+<!--		<cmn:command>../../impl/bin/archLevel</cmn:command>		-->
+			
+			<!-- option 2 : link against the static version of the library -->
+			<cmn:command>../../impl/bin/archLevelStatic</cmn:command>
+  
           </cmn:managedLibrary>
         </library>
       </libraryDependencies>
