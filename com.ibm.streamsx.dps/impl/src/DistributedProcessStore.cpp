@@ -323,10 +323,17 @@ namespace distributed
 	if (it == stores.end()) {
 	   // This thread is coming here for the very first time to use the dps.
 	   // Allocate a dps object and cache it for future use.
-	   tr1::shared_ptr<DistributedProcessStore> dps(new DistributedProcessStore());
-	   stores[id] = dps;
-	   // Fetch the dps object pointer we created just now for this thread.
-	   res = dps.get();
+           try {
+	      tr1::shared_ptr<DistributedProcessStore> dps(new DistributedProcessStore());
+	      stores[id] = dps;
+	      // Fetch the dps object pointer we created just now for this thread.
+	      res = dps.get();
+           } catch(SPL::SPLRuntimeException ex) {
+              // Unlock the code block that was locked above.
+              pthread_mutex_unlock(&dpsMapLock);
+              // Rethrow the same exception.
+              throw(ex);
+           }
 	} else {
 	   // Fetch the dps object pointer that was already created and cached for this thread.
 	   // Iterator will give us a pair. In that pair, we want to get the second element.
