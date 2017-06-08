@@ -1,0 +1,79 @@
+namespace application;
+
+use com.ibm.streamsx.store.distributed::*;
+
+composite DpsTTLCompositesSample {
+	param 
+		expression<boolean> $keyEncoded : false;
+		expression<boolean> $valueEncoded : true; 
+		expression<float64> $period : 0.3; 
+	type
+		redisInsertType = tuple<rstring key, rstring value, uint32 ttl> ;
+		redisGetType = tuple<rstring key> ;
+		redisGetOutputType = tuple<rstring key, rstring value> ;
+		redisTupleInsertType = tuple<rstring key, tuple<rstring val1,rstring val2> value, uint32 ttl> ;
+		redisOutputType = tuple<rstring key>;
+	graph
+		stream<redisInsertType> RedisBeacon = Beacon()
+		{
+			param
+				period : $period; 
+			output RedisBeacon : key = "key" + (rstring) IterationCount()
+				, value = "val"   + (rstring) IterationCount()
+				, ttl = 300u; 
+		}
+		
+		stream<redisOutputType> DpsInsert = DpsPutTTLWithReconnect(RedisBeacon)
+		{
+			param
+				metricsIntervalLength : 60.0 * 15.0;
+				metricsUpdateRate : 1.0;
+				keyEncoded : $keyEncoded;
+				valueEncoded : $valueEncoded; 
+				reconnectionAttempts : -1; 
+				outputType : redisOutputType; 
+			config
+				placement : partitionIsolation; 
+				tracing : debug; 
+		}
+		
+		() as DpsPutSink = Custom(DpsInsert as inputStream)
+		 {
+		    logic
+		        onTuple inputStream :
+		       {
+		           printStringLn((rstring)inputStream);
+		       }
+		 }
+		
+		stream<redisGetType> RedisGetBeacon = Beacon()
+		{
+			param
+				period : $period; 
+				initDelay : 5.0; 
+			output RedisGetBeacon : key = "key" + (rstring) IterationCount();
+		}
+		
+		stream<rstring value> RedisGet = DpsGetTTLWithReconnect(RedisGetBeacon)
+		{
+			param
+				metricsIntervalLength : 60.0 * 15.0;
+				metricsUpdateRate : 1.0;
+				keyEncoded : $keyEncoded;
+				valueEncoded : $valueEncoded;
+				reconnectionAttempts : -1;
+			config
+				placement : partitionIsolation; 
+				tracing : debug;
+		}
+		
+		() as DpsGetSink = Custom(RedisGet as inputStream)
+		{
+		 	logic
+				onTuple inputStream :
+				{
+					printStringLn((rstring)inputStream);
+				}
+		}
+	
+}
