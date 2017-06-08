@@ -121,6 +121,14 @@ JNIEXPORT jobjectArray JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsGetTT
 
 /*
  * Class:     com_ibm_streamsx_dps_impl_DpsHelper
+ * Method:    dpsFreeDirectBufferMemory
+ * Signature: (Ljava/nio/ByteBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsFreeDirectBufferMemoryCpp
+  (JNIEnv *, jobject, jobject);
+
+/*
+ * Class:     com_ibm_streamsx_dps_impl_DpsHelper
  * Method:    dpsRemoveCpp
  * Signature: (JLjava/nio/ByteBuffer;I)Ljava/lang/String;
  */
@@ -242,7 +250,7 @@ JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsRunDataSto
 /*
  * Class:     com_ibm_streamsx_dps_impl_DpsHelper
  * Method:    dpsRunDataStoreCommandCpp3
- * Signature: (Ljava/util/List;)Ljava/lang/String;
+ * Signature: (Ljava/util/List;I)Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsRunDataStoreCommandCpp3
   (JNIEnv *, jobject, jobject, jint);
