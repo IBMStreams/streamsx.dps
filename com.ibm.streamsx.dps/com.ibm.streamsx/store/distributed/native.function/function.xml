@@ -622,6 +622,13 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
 @return true if the connection could be re-established, false otherwise.</description>        
         <prototype>public stateful boolean dpsReconnect()</prototype>
       </function>
+      <function>
+        <description>Allows you to initialize the connection to DPS without throwing an exception on failure.
+         The purpose of this is to allow the DPS connection to be attempted during
+		 operator initialization, and not prevent startup from completing on failure.
+         Return true if we successfully established a connection or false if not.</description>
+        <prototype>public stateful boolean initializeDpsNoException()</prototype>
+      </function>
     </functions>
     <dependencies>
       <library>

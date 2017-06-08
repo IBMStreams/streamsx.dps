@@ -39,6 +39,25 @@ namespace distributed
      return DistributedProcessStore::getGlobalStore().reconnect();
   }
 
+  // Allows you to initialize the connection to DPS without throwing an exception on failure.
+  // The purpose of this is to allow the DPS connection to be attempted during
+  // operator initialization, and not prevent startup from completing on failure.
+  // @return true if we successfully established a connection or false if not.
+  inline SPL::boolean initializeDpsNoException()
+  {
+      SPL::boolean result = false;
+      try
+      {
+     	 result = DistributedProcessStore::getGlobalStore().isConnected();
+      }
+      catch (...)
+      {
+      	SPLAPPTRC(L_ERROR, "Failed to initialize DPS Connection.", "initializeDpsNoException");
+      }
+
+      return result;
+  }
+
   /// Create a distributed process store
   /// @param name of the store
   /// @param key a dummy key to indicate the type of this store's key
