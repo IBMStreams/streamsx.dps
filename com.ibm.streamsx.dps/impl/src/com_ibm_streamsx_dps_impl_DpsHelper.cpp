@@ -216,9 +216,12 @@ JNIEXPORT jobjectArray JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsGetCp
 	   strcpy(booleanResult, "true");
 	   // We have obtained a data item value.
 	   // Let us make a Java ByteBuffer object own this block of memory so that we can insert that Java object in the result array that will be returned to the caller.
-	   // IMPORTANT: Memory for valueDataBuffer was dynamically allocated in the dps C++ DB layer. That will be freed by
-	   // the Java garbage collector at a later time when this ByteBuffer goes out of scope inside the Java caller of this JNI method.
-		dataItemValue = (jobject)env->NewDirectByteBuffer(valueDataBuffer, valueSize);
+	   // IMPORTANT: Memory for valueDataBuffer was dynamically allocated in the dps C++ DB layer. That must be freed
+	   // at a later time when this ByteBuffer goes out of scope inside the Java caller of this JNI method. At that time,
+           // that Java caller's code must invoke another JNI method below (dpsFreeDirectBufferMemoryCpp) to free the 
+           // DPS C++ layer allocated  memory block.
+           dataItemValue = (jobject)env->NewDirectByteBuffer(valueDataBuffer, valueSize);
+           // std::cout << "C++ Value Size=" << valueSize << std::endl;
 	}
 
 	// Result string format: "booleanResult,errorCode"
@@ -255,9 +258,12 @@ JNIEXPORT jobjectArray JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsGetSa
 	   strcpy(booleanResult, "true");
 	   // We have obtained a data item value.
 	   // Let us make a Java ByteBuffer object own this block of memory so that we can insert that Java object in the result array that will be returned to the caller.
-	   // IMPORTANT: Memory for valueDataBuffer was dynamically allocated in the dps C++ DB layer. That will be freed by
-	   // the Java garbage collector at a later time when this ByteBuffer goes out of scope inside the Java caller of this JNI method.
-		dataItemValue = (jobject)env->NewDirectByteBuffer(valueDataBuffer, valueSize);
+	   // IMPORTANT: Memory for valueDataBuffer was dynamically allocated in the dps C++ DB layer. That must be freed
+	   // at a later time when this ByteBuffer goes out of scope inside the Java caller of this JNI method. At that time,
+           // that Java caller's code must invoke another JNI method below (dpsFreeDirectBufferMemoryCpp) to free the 
+           // DPS C++ layer allocated  memory block.
+           dataItemValue = (jobject)env->NewDirectByteBuffer(valueDataBuffer, valueSize);
+           // std::cout << "C++ Value Size=" << valueSize << std::endl;
 	}
 
 	// Result string format: "booleanResult,errorCode"
@@ -294,9 +300,12 @@ JNIEXPORT jobjectArray JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsGetTT
 	   strcpy(booleanResult, "true");
 	   // We have obtained a data item value.
 	   // Let us make a Java ByteBuffer object own this block of memory so that we can insert that Java object in the result array that will be returned to the caller.
-	   // IMPORTANT: Memory for valueDataBuffer was dynamically allocated in the dps C++ DB layer. That will be freed by
-	   // the Java garbage collector at a later time when this ByteBuffer goes out of scope inside the Java caller of this JNI method.
-		dataItemValue = (jobject)env->NewDirectByteBuffer(valueDataBuffer, valueSize);
+	   // IMPORTANT: Memory for valueDataBuffer was dynamically allocated in the dps C++ DB layer. That must be freed
+	   // at a later time when this ByteBuffer goes out of scope inside the Java caller of this JNI method. At that time,
+           // that Java caller's code must invoke another JNI method below (dpsFreeDirectBufferMemoryCpp) to free the 
+           // DPS C++ layer allocated  memory block.
+           dataItemValue = (jobject)env->NewDirectByteBuffer(valueDataBuffer, valueSize);
+           // std::cout << "C++ Value Size=" << valueSize << std::endl;
 	}
 
 	// Result string format: "booleanResult,errorCode"
@@ -312,6 +321,37 @@ JNIEXPORT jobjectArray JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsGetTT
 	env->SetObjectArrayElement(resultArray, 0, resultStringObject);
 	env->SetObjectArrayElement(resultArray, 1, dataItemValue);
 	return(resultArray);
+}
+
+// Any memory pointer received in this JNI bridge via C++ references as originally 
+// allocated by the DPS C++ layer must be explicitly freed after the Java ByteBuffer 
+// objects created out of such C++ layer's memory blocks are no longer in use. 
+// This is mostly done in the three functions above (dpsGetCpp, dpsGetSafeCpp and dpsGetTTLCpp) via the 
+// JNI API NewDirecyByteBuffer to create a Java ByteBuffer object using the memory allocated by
+// the DPS C++ layer. After such ByteBuffer objects are no longer in use by the
+// corresponding Java functions in the DpsHelper.java (dpsGet, dpsGetSafe and dpsGetTTL), those
+// functions must call the following C++ function to free the original memory buffer on which
+// the ByteBuffer objects are wrappered around. We can't expect the Java garbage collector to
+// free it when those ByteBuffer objects go out of scope. That idea of GC doing the 
+// cleanup never worked in our tests. Hence, this new function to fix that memory leak problem.
+// (This function was added on June/07/2017.)
+JNIEXPORT void JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsFreeDirectBufferMemoryCpp
+  (JNIEnv *env, jobject obj, jobject buffer) {
+   // Caller (typically from the Java code inside DpsHelper.java that makes the JNI C++ calls) should 
+   // pass the buffer argument which is a Java ByteBuffer object originally
+   // created in this JNI bridge using the memory block allocated by the DPS C++ layer.
+   // We will properly release that memory block by calling free on it.
+   //
+   // Get the original C++ memory pointer on which this ByteBuffer sits.
+   unsigned char *ptr = (unsigned char *) env->GetDirectBufferAddress(buffer);
+
+   /*
+   jlong capacity = env->GetDirectBufferCapacity(buffer);
+   std::cout << "Direct Buffer Length=" << capacity << std::endl;
+   */
+
+   // It was allocated via malloc in the DPS C++ layer. So, we must call free to release it instead of via delete.
+   free(ptr);
 }
 
 JNIEXPORT jstring JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsRemoveCpp
@@ -448,10 +488,14 @@ JNIEXPORT jobjectArray JNICALL Java_com_ibm_streamsx_dps_impl_DpsHelper_dpsGetNe
 	   strcpy(booleanResult, "true");
 	   // We have obtained a data item key and a data item value from the store iterator.
 	   // Let us make two Java ByteBuffer objects own this block of memory so that we can insert those Java objects in the result array that will be returned to the caller.
-	   // IMPORTANT: Memory for keyDataBuffer and for valueDataBuffer was dynamically allocated in the dps C++ DB layer. That will be freed by
-	   // the Java garbage collector at a later time when these two ByteBuffer objects go out of scope inside the Java caller of this JNI method.
+	   // IMPORTANT: Memory for valueDataBuffer was dynamically allocated in the dps C++ DB layer. That must be freed
+	   // at a later time when this ByteBuffer goes out of scope inside the Java caller of this JNI method. At that time,
+           // that Java caller's code must invoke another JNI method below (dpsFreeDirectBufferMemoryCpp) to free the 
+           // DPS C++ layer allocated  memory block.
 	   dataItemKey = (jobject)env->NewDirectByteBuffer(keyDataBuffer, keySize);
 	   dataItemValue = (jobject)env->NewDirectByteBuffer(valueDataBuffer, valueSize);
+           // std::cout << "C++ Key Size=" << keySize << std::endl;
+           // std::cout << "C++ Value Size=" << valueSize << std::endl;
 	}
 
 	// Result string format: "booleanResult,errorCode"

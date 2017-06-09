@@ -63,6 +63,7 @@ public class DpsHelper {
 	private native Object[] dpsGetCpp(long store, ByteBuffer keyData, int keySize);
 	private native Object[] dpsGetSafeCpp(long store, ByteBuffer keyData, int keySize);
 	private native Object[] dpsGetTTLCpp(ByteBuffer keyData, int keySize, boolean encodeKey, boolean encodeValue);
+        private native void dpsFreeDirectBufferMemoryCpp(ByteBuffer buffer);
 	private native String dpsRemoveCpp(long store, ByteBuffer keyData, int keySize);
 	private native String dpsRemoveTTLCpp(ByteBuffer keyData, int keySize, boolean encodeKey);
 	private native String dpsHasCpp(long store, ByteBuffer keyData, int keySize);
@@ -622,7 +623,7 @@ public class DpsHelper {
 	public <T1> Object dpsGet(long store, T1 key, String keySplTypeName, String valueSplTypeName, long[] err) throws Exception {
 		Object[] byteBufferArray = nbfEncodeKeyAndValue(key, null, keySplTypeName, valueSplTypeName);
 		
-		// We need to have the key erialized properly. If not, throw an exception.
+		// We need to have the key serialized properly. If not, throw an exception.
 		if ((byteBufferArray[0] == null) || (byteBufferArray[1] == null)) {
 			// Something went seriously wrong.
 			throw new Exception("dpsGet: Unable to serialize the key.");
@@ -664,7 +665,8 @@ public class DpsHelper {
 	        // Decode the (blob) byte buffer into a tuple now.
 	        BinaryEncoding be2 = ss2.newNativeBinaryEncoding();
 	        Tuple tuple = be2.decodeTuple(byteBuffer2);
-	        byteBuffer2 = null; // Quick releasing of the memory allocated by the C++ dps code.
+                // Free the DPS C++ layer allocated memory block in which we obtained the value of the K/V entry.
+                dpsFreeDirectBufferMemoryCpp((ByteBuffer)resultArray[1]);
 	        // System.out.println("Decoded tuple=" + tuple);
 	        
 	        if (valueSplTypeName.startsWith("tuple") == true) {
@@ -691,7 +693,7 @@ public class DpsHelper {
 	public <T1> Object dpsGetSafe(long store, T1 key, String keySplTypeName, String valueSplTypeName, long[] err) throws Exception {
 		Object[] byteBufferArray = nbfEncodeKeyAndValue(key, null, keySplTypeName, valueSplTypeName);
 		
-		// We need to have the key erialized properly. If not, throw an exception.
+		// We need to have the key serialized properly. If not, throw an exception.
 		if ((byteBufferArray[0] == null) || (byteBufferArray[1] == null)) {
 			// Something went seriously wrong.
 			throw new Exception("dpsGetSafe: Unable to serialize the key.");
@@ -733,7 +735,8 @@ public class DpsHelper {
 	        // Decode the (blob) byte buffer into a tuple now.
 	        BinaryEncoding be2 = ss2.newNativeBinaryEncoding();
 	        Tuple tuple = be2.decodeTuple(byteBuffer2);
-	        byteBuffer2 = null; // Quick releasing of the memory allocated by the C++ dps code.
+                // Free the DPS C++ layer allocated memory block in which we obtained the value of the K/V entry.
+                dpsFreeDirectBufferMemoryCpp((ByteBuffer)resultArray[1]);
 	        // System.out.println("Decoded tuple=" + tuple);
 	        
 	        if (valueSplTypeName.startsWith("tuple") == true) {
@@ -762,7 +765,7 @@ public class DpsHelper {
 	public <T1> Object dpsGetTTL(T1 key, String keySplTypeName, String valueSplTypeName, long[] err, boolean encodeKey, boolean encodeValue) throws Exception {
 		Object[] byteBufferArray = nbfEncodeKeyAndValue(key, null, keySplTypeName, valueSplTypeName);
 		
-		// We need to have the key erialized properly. If not, throw an exception.
+		// We need to have the key serialized properly. If not, throw an exception.
 		if ((byteBufferArray[0] == null) || (byteBufferArray[1] == null)) {
 			// Something went seriously wrong.
 			throw new Exception("dpsGetTTL: Unable to serialize the key.");
@@ -814,7 +817,8 @@ public class DpsHelper {
 	        // Decode the (blob) byte buffer into a tuple now.
 	        BinaryEncoding be2 = ss2.newNativeBinaryEncoding();
 	        Tuple tuple = be2.decodeTuple(byteBuffer2);
-	        byteBuffer2 = null; // Quick releasing of the memory allocated by the C++ dps code.
+                // Free the DPS C++ layer allocated memory block in which we obtained the value of the K/V entry.
+                dpsFreeDirectBufferMemoryCpp((ByteBuffer)resultArray[1]);
 	        // System.out.println("Decoded tuple=" + tuple);
 	        
 	        if (valueSplTypeName.startsWith("tuple") == true) {
@@ -1002,7 +1006,8 @@ public class DpsHelper {
         // Decode the (blob) byte buffer into a tuple now.
         BinaryEncoding be1 = ss1.newNativeBinaryEncoding();
         Tuple tuple1 = be1.decodeTuple(byteBuffer1);
-        byteBuffer1 = null; // Quick releasing of the memory allocated by the C++ dps code.
+        // Free the DPS C++ layer allocated memory block in which we obtained the key of the K/V entry.
+        dpsFreeDirectBufferMemoryCpp((ByteBuffer)resultArray[1]);
         // System.out.println("Decoded key tuple=" + tuple1);
         
         if (keySplTypeName.startsWith("tuple") == true) {
@@ -1031,7 +1036,8 @@ public class DpsHelper {
         // Decode the (blob) byte buffer into a tuple now.
         BinaryEncoding be2 = ss2.newNativeBinaryEncoding();
         Tuple tuple2 = be2.decodeTuple(byteBuffer2);
-        byteBuffer2 = null; // Quick releasing of the memory allocated by the C++ dps code.
+        // Free the DPS C++ layer allocated memory block in which we obtained the value of the K/V entry.
+        dpsFreeDirectBufferMemoryCpp((ByteBuffer)resultArray[2]);
         // System.out.println("Decoded value tuple=" + tuple2);
         
         if (valueSplTypeName.startsWith("tuple") == true) {
