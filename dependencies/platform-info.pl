@@ -146,6 +146,12 @@ if ($OSNAME || $OSNAME_RPM_FORMAT || $OSNAME_LONG || $OSVER)
             $return_osname_rpm = "el6";
             $return_osver = $1;            
         }
+        elsif ($osinfo =~ /release (6\.\d)[^(]+\(Final\)/)
+        {
+            print STDERR "Probably this is a CentOS system, we treat it as el6 (proceed on your own risk)";
+            $return_osname_rpm = "el6";
+            $return_osver = $1;            
+        }
         elsif ($osinfo =~ /release (7\.\d)[^(]+\(Maipo\)/)
         {
             $return_osname_rpm = "el7";
