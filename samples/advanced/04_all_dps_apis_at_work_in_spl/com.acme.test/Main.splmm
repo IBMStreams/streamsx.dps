@@ -323,6 +323,7 @@ composite GeneralTest()
 
                                myNewKey = "Key3";
                                myNewValue = "Value3";
+                               printStringLn("Calling dpsPutTTL after the 10 seconds wait.");
                                dpsPutTTL(myNewKey, myNewValue, 60u, err, false, false);
                                printStringLn("Test3-->err-->" + (rstring)err);
                                myNewKey = "Key4";
@@ -342,8 +343,10 @@ composite GeneralTest()
                                // We can store a JSON formatted string as value with single/double quotes in it.
                                myNewKey = "Key 55";
                                myNewValue = "Value55 is a JSON: {'a': 456, 'b': 'hello world', 'c':456}";
-                               dpsPutTTL(myNewKey, myNewValue, 60u, err, false, false);
-                               printStringLn("Test5c-->err-->" + (rstring)err);
+                               mutable uint32 storedKeySize = 0u;
+                               mutable uint32 storedValueSize = 0u;
+                               dpsPutTTL(myNewKey, myNewValue, 60u, err, storedKeySize, storedValueSize, false, false);
+                               printStringLn("Test5c-->err-->" + (rstring)err + ", storedKeySize=" + (rstring)storedKeySize + ", storedValueSize=" + (rstring)storedValueSize);
                                myNewValue = "";
                                // Read the value from Redis as clear text.
                                dpsGetTTL(myNewKey, myNewValue, err, false, false);
@@ -372,8 +375,8 @@ composite GeneralTest()
 
                                mutable tuple<boolean fun, list<int32> joy> myNewComplexValue = {fun=false, joy=[1,2,3,4,5]};
                                myNewKey = "This-is-a-long-key-with-hyphens";
-                               dpsPutTTL(myNewKey, myNewComplexValue, 60u, err, false, false);
-                               printStringLn("Test10-->err-->" + (rstring)err);
+                               dpsPutTTL(myNewKey, myNewComplexValue, 60u, err, storedKeySize, storedValueSize, false, false);
+                               printStringLn("Test10-->err-->" + (rstring)err + ", storedKeySize=" + (rstring)storedKeySize + ", storedValueSize=" + (rstring)storedValueSize);
                                myFlag = dpsHasTTL(myNewKey, err, false);
                                printStringLn("Test11-->err-->" + (rstring)err);
                                printStringLn("Existence of " + myNewKey + " is " + (rstring)myFlag);
@@ -405,8 +408,16 @@ composite GeneralTest()
                                   printStringLn("DPS connection went inactive. Attempting to reconnect.");                       
                                   // DPS Connection is inative.
                                   // Loop here until the connection is made.
+                                  mutable int32 reconnectCnt = 0;
                                   while(dpsReconnect() == false) {
                                      printStringLn("DPS connection not reestablished. Trying again.");
+                                     reconnectCnt++;
+                                     if (reconnectCnt%4 == 0) {
+                                        printStringLn("Calling dpsHasTTL when reconnectCnt = " + (rstring)reconnectCnt);
+                                        dpsHasTTL(myNewKey, err, false);
+                                        printStringLn("Result of dpsHasTTL. err=" + (rstring)err);
+                                     }
+
                                      block(5.0);
                                   }
                                 
@@ -2098,7 +2109,7 @@ composite RunNativeDataStoreCommands() {
                                                 appendM(myCmdList, "This is MyValue1 with some JSON. {'name':'John', 'age':30, 'cars':['Ford', 'BMW', 'Tesla']");
                                                 myFlag = dpsRunDataStoreCommand(myCmdList, redisResult, err);
                    
-                                                if (err != 0ul) {
+                                                if (myFlag == false || err != 0ul) {
                                                    printStringLn("Redis command Test1 [SETEX]-->dpsRunDataStoreCommand rc=" + (rstring)dpsGetLastStoreErrorCode() + ", msg=" + dpsGetLastStoreErrorString());
                                                 } else {
                                                    printStringLn("Redis command Test1 [SETEX]-->dpsRunDataStoreCommand resultValue=" + (rstring)redisResult); 

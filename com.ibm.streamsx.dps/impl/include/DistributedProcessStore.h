@@ -31,7 +31,8 @@ namespace distributed
  * Pass in root to toolkit directory and the name of the library to load (e.g. "/home/dpstoolkit" and "libhiredis.so" respectively.
  * Will log an error if it fails.
  */
-	void load_dependent_lib(std::string toolkitDir, std::string lib);
+ void * load_dependent_lib(std::string toolkitDir, std::string lib);
+
   class DistributedProcessStore
   {
   public:
@@ -114,10 +115,12 @@ namespace distributed
     /// @param ttl data item expiry time in seconds
     /// @return true if the put operation is successful, false otherwise
     /// @param err store error code
+    /// @param storedKeySize On a successful put. this will have the actual storage size of the key in the back-end data store.
+    /// @param storedValueSize On a successful put. this will have the actual storage size of the value in the back-end data store.
     /// @param encodeKey item's key should be encoded or not before storing in the back-end data store.
     /// @param encodeValue item's value is encoded or not in the back-end data store.
     template<class T1, class T2>
-    SPL::boolean putTTL(T1 const & key, T2 const & value, SPL::uint32 const & ttl, SPL::uint64 & err, SPL::boolean encodeKey=true, SPL::boolean encodeValue=true);
+    SPL::boolean putTTL(T1 const & key, T2 const & value, SPL::uint32 const & ttl, SPL::uint64 & err, SPL::uint32 & storedKeySize, SPL::uint32 & storedValueSize, SPL::boolean encodeKey=true, SPL::boolean encodeValue=true);
 
     /// Get an item from the given store (A better performing version with no safety checks)
     /// @param store store id
@@ -613,7 +616,7 @@ namespace distributed
 
   // Put data item with a TTL (Time To Live in seconds) value into the global area of the back-end data store.
   template<class T1, class T2>
-  SPL::boolean DistributedProcessStore::putTTL(T1 const & key, T2 const & value, SPL::uint32 const & ttl, SPL::uint64 & err, SPL::boolean encodeKey, SPL::boolean encodeValue)
+  SPL::boolean DistributedProcessStore::putTTL(T1 const & key, T2 const & value, SPL::uint32 const & ttl, SPL::uint64 & err, SPL::uint32 & storedKeySize, SPL::uint32 & storedValueSize, SPL::boolean encodeKey, SPL::boolean encodeValue)
   {
     dbError_->resetTTL();
 
@@ -639,6 +642,37 @@ namespace distributed
     uint32_t valueSize = value_nbf.getSerializedDataSize();
     bool res = db_->putTTL(keyData, keySize, valueData, valueSize, ttl, *dbError_, encodeKey, encodeValue);
     err = dbError_->getErrorCodeTTL();
+
+    if (err == 0) {
+       if (encodeKey == true) {
+          storedKeySize = keySize;
+       } else {
+          // Stored as a plain string.
+          // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+          // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+          if ((uint8_t)keyData[0] < 0x80) {
+             // Skip the first length byte.   
+             storedKeySize = keySize-1;
+          } else {
+            // Skip the five bytes at the beginning that represent the length of the key data.
+            storedKeySize = keySize-5;
+          }
+       }
+
+       if (encodeValue == true) {
+          storedValueSize = valueSize;
+       } else {
+          // Stored as a plain string.
+          if ((uint8_t)valueData[0] < 0x80) {
+             // Skip the first length byte.   
+             storedValueSize = valueSize-1;
+          } else {
+            // Skip the five bytes at the beginning that represent the length of the key data.
+            storedValueSize = valueSize-5;
+          }
+       }       
+    }
+
     return res;
   }
 

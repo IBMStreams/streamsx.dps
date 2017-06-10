@@ -120,7 +120,9 @@ namespace distributed
 {
   RedisDBLayer::RedisDBLayer()
   {
-
+     for(int32_t cnt=0; cnt < 50; cnt++) {
+        redisPartitions[cnt].rdsc = NULL;
+     }
   }
 
   RedisDBLayer::~RedisDBLayer()
@@ -494,6 +496,14 @@ namespace distributed
  	// Additionally, in Redis, store names can have space characters in them.
  	string keyString = string(DPS_STORE_NAME_TYPE) + base64_encoded_name;
  	int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
+
+        // Return now if there is no valid connection to the Redis server.
+        if (redisPartitions[partitionIdx].rdsc == NULL) {
+           dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+           SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+           return 0;
+        }
+
 	std::string cmd = string(REDIS_EXISTS_CMD) + keyString;
 	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 
@@ -729,6 +739,14 @@ namespace distributed
 	// "0" at the beginning followed by the actual store name.  "0" + 'store name'
 	std::string storeNameKey = DPS_STORE_NAME_TYPE + base64_encoded_name;
 	int32_t partitionIdx = getRedisServerPartitionIndex(storeNameKey);
+
+        // Return now if there is no valid connection to the Redis server.
+        if (redisPartitions[partitionIdx].rdsc == NULL) {
+           dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+           SPLAPPTRC(L_DEBUG, "Inside findStore, it failed for store " << name << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+           return 0;
+        }
+
 	string cmd = string(REDIS_EXISTS_CMD) + storeNameKey;
 	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 
@@ -832,6 +850,14 @@ namespace distributed
 	// '1' + 'store id' => 'Redis Hash'  [It will always have this entry: dps_name_of_this_store ==> 'store name']
 	string storeContentsHashKey = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
 	int32_t partitionIdx = getRedisServerPartitionIndex(storeContentsHashKey);
+
+        // Return now if there is no valid connection to the Redis server.
+        if (redisPartitions[partitionIdx].rdsc == NULL) {
+           dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+           SPLAPPTRC(L_DEBUG, "Inside removeStore, it failed for store " << storeIdString << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+           return(false);
+        }
+
 	cmd = string(REDIS_DEL_CMD) + storeContentsHashKey;
 	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 	freeReplyObject(redis_reply);
@@ -845,7 +871,7 @@ namespace distributed
 
 	// Life of this store ended completely with no trace left behind.
 	releaseStoreLock(storeIdString);
-    return(true);
+        return(true);
   }
 
   // This is a lean and mean put operation into a store.
@@ -882,6 +908,14 @@ namespace distributed
 	// To support space characters in the data item key, let us base64 encode it.
 	string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
 	int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
+
+        // Return now if there is no valid connection to the Redis server.
+        if (redisPartitions[partitionIdx].rdsc == NULL) {
+           dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+           SPLAPPTRC(L_DEBUG, "Inside put, it failed for store " << storeIdString << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+           return(false);
+        }
+
 	string base64_encoded_data_item_key;
 	base64_encode(data_item_key, base64_encoded_data_item_key);
 
@@ -954,6 +988,14 @@ namespace distributed
 	// To support space characters in the data item key, let us base64 encode it.
 	string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
 	int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
+
+        // Return now if there is no valid connection to the Redis server.
+        if (redisPartitions[partitionIdx].rdsc == NULL) {
+           dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+           SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed for store " << storeIdString << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+           return(false);
+        }
+
 	string base64_encoded_data_item_key;
 	base64_encode(data_item_key, base64_encoded_data_item_key);
 
@@ -1028,6 +1070,14 @@ namespace distributed
           }
 
 	  int32_t partitionIdx = getRedisServerPartitionIndex(base64_encoded_data_item_key);
+
+          // Return now if there is no valid connection to the Redis server.
+          if (redisPartitions[partitionIdx].rdsc == NULL) {
+             dbError.setTTL("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside putTTL, it failed. There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+             return(false);
+          }
+
 	  // We are ready to either store a new data item or update an existing data item with a TTL value specified in seconds.
 	  // To support space characters in the data item key, let us base64 encode it.
 	  string cmd = "";
@@ -1201,6 +1251,14 @@ namespace distributed
                 }
 
 		int32_t partitionIdx = getRedisServerPartitionIndex(base64_encoded_data_item_key);
+
+                // Return now if there is no valid connection to the Redis server.
+                if (redisPartitions[partitionIdx].rdsc == NULL) {
+                   dbError.setTTL("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+                   SPLAPPTRC(L_DEBUG, "Inside gettTTL, it failed. There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+                   return(false);
+                }
+
 		// Since this is a data item with TTL, it is stored in the global area of Redis and not inside a user created store (i.e. a Redis hash).
 		// Hence, we can't use the Redis hash get command. Rather, we will use the plain Redis get command to read this data item.
                 vector<const char *> argv;
@@ -1303,6 +1361,14 @@ namespace distributed
 	// '1' + 'store id' => 'Redis Hash'  [It will always have this entry: dps_name_of_this_store ==> 'store name']
 	string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
 	int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
+
+        // Return now if there is no valid connection to the Redis server.
+        if (redisPartitions[partitionIdx].rdsc == NULL) {
+           dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+           SPLAPPTRC(L_DEBUG, "Inside remove, it failed for store " << storeIdString << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+           return(false);
+        }
+
 	string base64_encoded_data_item_key;
 	base64_encode(data_item_key, base64_encoded_data_item_key);
 	string cmd = string(REDIS_HDEL_CMD) + keyString + " " + base64_encoded_data_item_key;
@@ -1366,6 +1432,14 @@ namespace distributed
                 }
 
 		int32_t partitionIdx = getRedisServerPartitionIndex(base64_encoded_data_item_key);
+
+                // Return now if there is no valid connection to the Redis server.
+                if (redisPartitions[partitionIdx].rdsc == NULL) {
+                   dbError.setTTL("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+                   SPLAPPTRC(L_DEBUG, "Inside removeTTL, it failed. There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+                   return(false);
+                }
+
 		// Since this data item has a TTL value, it is not stored in the Redis hash (i.e. user created store).
 		// Instead, it will be in the global area of the Redis DB. Hence, use the regular del command instead of the hash del command.
 		string cmd = string(REDIS_DEL_CMD) + base64_encoded_data_item_key;
@@ -1465,6 +1539,14 @@ namespace distributed
                 }
 
 		int32_t partitionIdx = getRedisServerPartitionIndex(base64_encoded_data_item_key);
+
+                // Return now if there is no valid connection to the Redis server.
+                if (redisPartitions[partitionIdx].rdsc == NULL) {
+                   dbError.setTTL("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+                   SPLAPPTRC(L_DEBUG, "Inside hasTTL, it failed. There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+                   return(false);
+                }
+
 		string cmd = string(REDIS_EXISTS_CMD) + base64_encoded_data_item_key;
 		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 
@@ -1539,6 +1621,14 @@ namespace distributed
 	// Delete the entire store contents hash.
 	string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
 	int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
+
+        // Return now if there is no valid connection to the Redis server.
+        if (redisPartitions[partitionIdx].rdsc == NULL) {
+           dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+           SPLAPPTRC(L_DEBUG, "Inside clear, it failed for store " << storeIdString << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+           return;
+        }
+
 	string cmd = string(REDIS_DEL_CMD) + keyString;
 	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 
@@ -1688,6 +1778,14 @@ namespace distributed
   bool RedisDBLayer::storeIdExistsOrNot(string storeIdString, PersistenceError & dbError) {
 	  string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
 	  int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
+
+        // Return now if there is no valid connection to the Redis server.
+        if (redisPartitions[partitionIdx].rdsc == NULL) {
+           dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+           SPLAPPTRC(L_DEBUG, "Inside storeIdExistsOrNot, it failed for store " << storeIdString << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+           return(false);
+        }
+
 	  string cmd = string(REDIS_EXISTS_CMD) + keyString;
 	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 
@@ -1724,6 +1822,12 @@ namespace distributed
 		// '4' + 'store id' + 'dps_lock' => 1
 		std::string storeLockKey = string(DPS_STORE_LOCK_TYPE) + storeIdString + DPS_LOCK_TOKEN;
 		int32_t partitionIdx = getRedisServerPartitionIndex(storeLockKey);
+
+                // Return now if there is no valid connection to the Redis server.
+                if (redisPartitions[partitionIdx].rdsc == NULL) {
+                   return(false);
+                }
+
 		// This is an atomic activity.
 		// If multiple threads attempt to do it at the same time, only one will succeed.
 		// Winner will hold the lock until they release it voluntarily or
@@ -1793,6 +1897,12 @@ namespace distributed
 	  // '4' + 'store id' + 'dps_lock' => 1
 	  std::string storeLockKey = DPS_STORE_LOCK_TYPE + storeIdString + DPS_LOCK_TOKEN;
 	  int32_t partitionIdx = getRedisServerPartitionIndex(storeLockKey);
+
+          // Return now if there is no valid connection to the Redis server.
+          if (redisPartitions[partitionIdx].rdsc == NULL) {
+             return;
+          }
+
 	  string cmd = string(REDIS_DEL_CMD) + storeLockKey;
 	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 	  freeReplyObject(redis_reply);
@@ -1815,6 +1925,14 @@ namespace distributed
 	  // 1) Get the store name.
 	  string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
 	  int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
+
+          // Return now if there is no valid connection to the Redis server.
+          if (redisPartitions[partitionIdx].rdsc == NULL) {
+             dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside readStoreInformation, it failed for store " << storeIdString << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+             return(false);
+          }
+
 	  string cmd = string(REDIS_HGET_CMD) + keyString +
 			  " " + string(REDIS_STORE_ID_TO_STORE_NAME_KEY);
 	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
@@ -2069,6 +2187,15 @@ namespace distributed
 	  //
 	  // We will simply take your command string and run it. So, be sure of what
 	  // command you are sending here.
+          //
+          // Return now if there is no valid connection to the Redis server.
+          if (redisPartitions[0].rdsc == NULL) {
+             dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside runDataStoreCommand, it failed. There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+             return(false);
+          }
+
+
 	  redis_reply = (redisReply*)redisCommand(redisPartitions[0].rdsc, cmd.c_str());
 
 	  if (redis_reply == NULL) {
@@ -2114,6 +2241,13 @@ namespace distributed
   /// DPS put/get/remove/has DPS APIs.]
   bool RedisDBLayer::runDataStoreCommand(std::vector<std::string> const & cmdList, std::string & resultValue, PersistenceError & dbError) {
      resultValue = "";
+
+     // Return now if there is no valid connection to the Redis server.
+     if (redisPartitions[0].rdsc == NULL) {
+        dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+        SPLAPPTRC(L_DEBUG, "Inside runDataStoreCommand, it failed. There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+        return(false);
+     }
 
      if (cmdList.size() == 0) {
         resultValue = "Error: Empty Redis command list was given by the caller.";
@@ -2186,9 +2320,16 @@ namespace distributed
 		// Since there could be multiple data writers, we are going to get whatever is there now.
 		// It is always possible that the value for the requested item can change right after
 		// you read it due to the data write made by some other thread. Such is life in a global distributed in-memory store.
-	    string cmd = "";
-    	string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
-    	int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
+                string cmd = "";
+                string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
+                int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
+
+                // Return now if there is no valid connection to the Redis server.
+                if (redisPartitions[partitionIdx].rdsc == NULL) {
+                   dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+                   SPLAPPTRC(L_DEBUG, "Inside getDataItemFromStore, it failed for store " << storeIdString << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+                   return(false);
+                }
 
 	  	// If the caller doesn't want to perform the data existence check to save time, honor that wish here.
 	    if (skipDataItemExistenceCheck == false) {
@@ -2372,11 +2513,18 @@ namespace distributed
 		// '501' + 'entity name' + 'generic_lock' => 1
 		std::string genericLockKey = GENERAL_PURPOSE_LOCK_TYPE + entityName + GENERIC_LOCK_TOKEN;
 		int32_t partitionIdx = getRedisServerPartitionIndex(genericLockKey);
+
+                // Return now if there is no valid connection to the Redis server.
+                if (redisPartitions[partitionIdx].rdsc == NULL) {
+                   return(false);
+                }
+
 		// This is an atomic activity.
 		// If multiple threads attempt to do it at the same time, only one will succeed.
 		// Winner will hold the lock until they release it voluntarily or
 		// until the Redis back-end removes this lock entry after the DPS_AND_DL_GET_LOCK_TTL times out.
 		cmd = string(REDIS_SETNX_CMD) + genericLockKey + " " + "1";
+
 		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 
 		if (redis_reply == NULL) {
@@ -2441,6 +2589,12 @@ namespace distributed
 	  // '501' + 'entity name' + 'generic_lock' => 1
 	  std::string genericLockKey = GENERAL_PURPOSE_LOCK_TYPE + entityName + GENERIC_LOCK_TOKEN;
 	  int32_t partitionIdx = getRedisServerPartitionIndex(genericLockKey);
+
+          // Return now if there is no valid connection to the Redis server.
+          if (redisPartitions[partitionIdx].rdsc == NULL) {
+             return;
+          }
+
 	  string cmd = string(REDIS_DEL_CMD) + genericLockKey;
 	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 	  freeReplyObject(redis_reply);
@@ -2497,6 +2651,14 @@ namespace distributed
 		  this->dataItemKeys.clear();
 
 		  string cmd = string(REDIS_HKEYS_CMD) + string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
+
+                  // Return now if there is no valid connection to the Redis server.
+                  if (this->rdsc == NULL) {
+                     dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+                     SPLAPPTRC(L_DEBUG, "Inside geNext, it failed. There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+                     return(false);
+                  }
+
 		  this->redis_reply = (redisReply*)redisCommand(this->rdsc, cmd.c_str());
 
 			if (this->redis_reply == NULL) {
@@ -2646,6 +2808,14 @@ namespace distributed
 		// '5' + 'lock name' ==> 'lock id'
 		std::string lockNameKey = DL_LOCK_NAME_TYPE + base64_encoded_name;
 		int32_t partitionIdx = getRedisServerPartitionIndex(lockNameKey);
+
+                // Return now if there is no valid connection to the Redis server.
+                if (redisPartitions[partitionIdx].rdsc == NULL) {
+                   lkError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+                   SPLAPPTRC(L_DEBUG, "Inside createOrGetLock, it failed for lockNameKey " << lockNameKey << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+                   return(0);
+                }
+
 		std::string cmd = string(REDIS_EXISTS_CMD) + lockNameKey;
 		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 
@@ -2818,6 +2988,14 @@ namespace distributed
 		// '6' + 'lock id' ==> 'lock use count' + '_' + 'lock expiration time expressed as elapsed seconds since the epoch' + '_' + 'pid that owns this lock' + "_" + lock name'
 		std::string lockInfoKey = DL_LOCK_INFO_TYPE + lockIdString;
 		int32_t partitionIdx = getRedisServerPartitionIndex(lockInfoKey);
+
+                // Return now if there is no valid connection to the Redis server.
+                if (redisPartitions[partitionIdx].rdsc == NULL) {
+                   lkError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+                   SPLAPPTRC(L_DEBUG, "Inside removeLock, it failed for lockInfoKey " << lockInfoKey << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+                   return(false);
+                }
+
 		string cmd = string(REDIS_DEL_CMD) + lockInfoKey;
 		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 		freeReplyObject(redis_reply);
@@ -2865,6 +3043,14 @@ namespace distributed
 	  // '7' + 'lock id' + 'dl_lock' => 1
 	  std::string distributedLockKey = DL_LOCK_TYPE + lockIdString + DL_LOCK_TOKEN;
 	  int32_t partitionIdx = getRedisServerPartitionIndex(distributedLockKey);
+
+          // Return now if there is no valid connection to the Redis server.
+          if (redisPartitions[partitionIdx].rdsc == NULL) {
+             lkError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed for distributedLockKey " << distributedLockKey << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+             return(false);
+          }
+
 	  time_t startTime, timeNow;
 	  // Get the start time for our lock acquisition attempts.
 	  time(&startTime);
@@ -2987,6 +3173,14 @@ namespace distributed
 	  // '7' + 'lock id' + 'dl_lock' => 1
 	  std::string distributedLockKey = DL_LOCK_TYPE + lockIdString + DL_LOCK_TOKEN;
 	  int32_t partitionIdx = getRedisServerPartitionIndex(distributedLockKey);
+
+          // Return now if there is no valid connection to the Redis server.
+          if (redisPartitions[partitionIdx].rdsc == NULL) {
+             lkError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside releaseLock, it failed for distributedLockKey " << distributedLockKey << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+             return;
+          }
+
 	  string cmd = string(REDIS_DEL_CMD) + distributedLockKey;
 	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 
@@ -3019,6 +3213,14 @@ namespace distributed
 	  // '6' + 'lock id' ==> 'lock use count' + '_' + 'lock expiration time expressed as elapsed seconds since the epoch' + '_' + 'pid that owns this lock' + "_" + lock name'
 	  std::string lockInfoKey = DL_LOCK_INFO_TYPE + lockIdString;
 	  int32_t partitionIdx = getRedisServerPartitionIndex(lockInfoKey);
+
+          // Return now if there is no valid connection to the Redis server.
+          if (redisPartitions[partitionIdx].rdsc == NULL) {
+             lkError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside updateLockInformation, it failed for lockInfoKey " << lockInfoKey << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+             return(false);
+          }
+
 	  ostringstream lockInfoValue;
 	  lockInfoValue << lockUsageCnt << "_" << lockExpirationTime << "_" << lockOwningPid << "_" << _lockName;
 	  string lockInfoValueString = lockInfoValue.str();
@@ -3047,6 +3249,14 @@ namespace distributed
 	  // '6' + 'lock id' ==> 'lock use count' + '_' + 'lock expiration time expressed as elapsed seconds since the epoch' + '_' + 'pid that owns this lock' + "_" + lock name'
 	  string lockInfoKey = DL_LOCK_INFO_TYPE + lockIdString;
 	  int32_t partitionIdx = getRedisServerPartitionIndex(lockInfoKey);
+
+          // Return now if there is no valid connection to the Redis server.
+          if (redisPartitions[partitionIdx].rdsc == NULL) {
+             lkError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside readLockInformation, it failed for lockInfoKey " << lockInfoKey << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+             return(false);
+          }
+
 	  cmd = string(REDIS_GET_CMD) + lockInfoKey;
 	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 
@@ -3118,6 +3328,14 @@ namespace distributed
   bool RedisDBLayer::lockIdExistsOrNot(string lockIdString, PersistenceError & lkError) {
 	  string keyString = string(DL_LOCK_INFO_TYPE) + lockIdString;
 	  int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
+
+          // Return now if there is no valid connection to the Redis server.
+          if (redisPartitions[partitionIdx].rdsc == NULL) {
+             lkError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside lockIdExistsOrNot, it failed for lockIdString " << lockIdString << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+             return(false);
+          }
+
 	  string cmd = string(REDIS_EXISTS_CMD) + keyString;
 	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 
@@ -3159,6 +3377,14 @@ namespace distributed
 	  // '5' + 'lock name' ==> 'lock id'
 	  std::string lockNameKey = DL_LOCK_NAME_TYPE + base64_encoded_name;
 	  int32_t partitionIdx = getRedisServerPartitionIndex(lockNameKey);
+
+          // Return now if there is no valid connection to the Redis server.
+          if (redisPartitions[partitionIdx].rdsc == NULL) {
+             lkError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside getPidForLock, it failed for lockNameKey " << lockNameKey << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+             return(false);
+          }
+
 	  std::string cmd = string(REDIS_EXISTS_CMD) + lockNameKey;
 	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 

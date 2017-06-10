@@ -481,10 +481,10 @@ public class TickerIdGenerator extends AbstractOperator {
                    // Final two arguments are optional. First optional one to tell whether to
                    // encode the key or not. Second optional one to tell whether to
                    // serialize the value or not.
-                   sf.putTTL(myNewKey, myNewValue, 600, "rstring", "rstring", false, false);
+                   sf.putTTL(myNewKey, myNewValue, 60, "rstring", "rstring", false, false);
                    myNewKey = new RString("Key2");
                    myNewValue = new RString("Value2");
-                   sf.putTTL(myNewKey, myNewValue, 600, "rstring", "rstring", false, false);
+                   sf.putTTL(myNewKey, myNewValue, 60, "rstring", "rstring", false, false);
 
                    // A deliberate wait during which you can go stop the Redis server.
                    // Then, you will see in the PE logs that the following section of the code
@@ -496,12 +496,12 @@ public class TickerIdGenerator extends AbstractOperator {
                    try {
                       myNewKey = new RString("Key3");
                       myNewValue = new RString("Value3");
-                      sf.putTTL(myNewKey, myNewValue, 600, "rstring", "rstring", false, false);
+                      sf.putTTL(myNewKey, myNewValue, 60, "rstring", "rstring", false, false);
                       System.out.println("Successfully put Key3:Value3");
                       myNewKey = new RString("Key5");
                       // We can have a value in clear text with spaces in it.
                       myNewValue = new RString("Value5 with a space in it.");
-                      sf.putTTL(myNewKey, myNewValue, 600, "rstring", "rstring", false, false);
+                      sf.putTTL(myNewKey, myNewValue, 60, "rstring", "rstring", false, false);
                       myNewValue = new RString("");
                       myNewValue = (RString)sf.getTTL(myNewKey, "rstring", "rstring", false, false);
                       System.out.println("Test5-->myNewValue=" + myNewValue);
@@ -509,16 +509,18 @@ public class TickerIdGenerator extends AbstractOperator {
                       // We can store a JSON formatted string as value with single/double quotes in it.
                       myNewKey = new RString("Key 55");
                       myNewValue = new RString("Value55 is a JSON: {'a': 456, 'b': 'hello world', 'c':456}");
-                      sf.putTTL(myNewKey, myNewValue, 600, "rstring", "rstring", false, false);
+                      // Let us get the actual stored size of the key and value in the back-end data store.
+                      int[] storedKeyValueSize = new int[2];
+                      sf.putTTL(myNewKey, myNewValue, 60, "rstring", "rstring", storedKeyValueSize, false, false);
+                      System.out.println("storedKeySize=" + storedKeyValueSize[0] + ", storedValueSize=" + storedKeyValueSize[1]);
                       myNewValue = new RString("");
                       // Read the value from Redis as clear text.
                       myNewValue = (RString)sf.getTTL(myNewKey, "rstring", "rstring", false, false);
                       System.out.println("Test5b-->myNewValue=" + myNewValue);                      
                       break;
-                   } catch (StoreFactoryException sfe) {
-                      System.out.println("'" + myNewKey + "' with a value of '" + myNewValue + "' failed. "  + "Error code=" + sfe.getErrorCode() + ", Error msg=" + sfe.getErrorMessage());
-                      break;
                    } catch (Exception ex) {
+                      System.out.println("'" + myNewKey + "' with a value of '" + myNewValue + "' failed.");
+
                       // Check for connection failure with Redis.
                       if (sf.isConnected() == true) {
                          System.out.println("DPS connection is active. Ending the loop.");
@@ -528,8 +530,16 @@ public class TickerIdGenerator extends AbstractOperator {
 
                          // DPS connection is inactive.
                          // Loop here until the connection is made.
+                         int reconnectCnt = 0;
                          while(sf.reconnect() == false) {
                             System.out.println("DPS connection not reestablished. Trying again.");
+                            reconnectCnt++;
+                            if (reconnectCnt%4 == 0) {
+                               System.out.println("Calling dpsHasTTL when reconnectCnt = " + reconnectCnt);
+                               myNewKey = new RString("Key 55");
+                               sf.hasTTL(myNewKey, "rstring", false);
+                            }
+
                             Thread.sleep(5*1000);
                          }
                          
@@ -1557,7 +1567,7 @@ public class TickerIdGenerator extends AbstractOperator {
                 // From your Redis command, add the distinct parts into a List<RString>
                 myCmdList.add(new RString("SETEX"));
                 myCmdList.add(new RString("My Key 1"));
-                myCmdList.add(new RString("600"));
+                myCmdList.add(new RString("60"));
                 myCmdList.add(new RString("This is MyValue1 with some JSON. {'name':'John', 'age':30, 'cars':['Ford', 'BMW', 'Tesla']"));
 
                 try {
