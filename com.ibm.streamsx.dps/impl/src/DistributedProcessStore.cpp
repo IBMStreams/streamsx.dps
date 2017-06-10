@@ -182,6 +182,7 @@ namespace distributed
     bool libraryLoadingError = false;
     std::string  kvLibName =  "";
     std::string toolkitDir = ProcessingElement::pe().getToolkitDirectory("com.ibm.streamsx.dps")  + "/impl/ext/lib" ;
+    std::string toolkitLibDir = ProcessingElement::pe().getToolkitDirectory("com.ibm.streamsx.dps")  + "/impl/lib" ;
     std::string streamsLibDir = SPL::Functions::Utility::getEnvironmentVariable("STREAMS_INSTALL") + "/ext/lib" ;
 	if (noSqlKvStoreProductName.compare("memcached") == 0) {
 		// reset method below is part of the C++ std::auto_ptr class.
