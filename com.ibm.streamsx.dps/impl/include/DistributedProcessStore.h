@@ -31,7 +31,8 @@ namespace distributed
  * Pass in root to toolkit directory and the name of the library to load (e.g. "/home/dpstoolkit" and "libhiredis.so" respectively.
  * Will log an error if it fails.
  */
-	void load_dependent_lib(std::string toolkitDir, std::string lib);
+ void * load_dependent_lib(std::string toolkitDir, std::string lib);
+
   class DistributedProcessStore
   {
   public:
