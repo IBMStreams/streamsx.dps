@@ -262,8 +262,11 @@ namespace distributed
 		SPLAPPTRC(L_ERROR, error, "DistributedProcessStore");
 		throw(SPL::SPLRuntimeException("DistributedProcessStore::connectToDatabase", error));
 	}
-//	cout << "Going to load " << kvLibName << endl;
-	handle = dlopen(kvLibName.c_str(), RTLD_NOW|RTLD_GLOBAL);
+
+        std::string secondLevelLib = toolkitLibDir + "/" + kvLibName;
+        //std::cout << "load level2 lib : " << secondLevelLib << "\n";
+	handle = dlopen(secondLevelLib.c_str(), RTLD_NOW|RTLD_GLOBAL);
+
 	if (handle == NULL || libraryLoadingError == true) {
 	      std::string error = "Cannot initialize libraries for chosen database " + noSqlKvStoreProductName + ", error message: ";
 	      error.append(dlerror());
