@@ -30,6 +30,19 @@ public class DistributedStores {
 			factory = new StoreFactoryImpl();
 		}
 	}
+
+	/**
+         * This is an overloaded method that takes a fully qualified DPS configuration file name.
+         * If the user doesn't want to use the default config file (etc/no-sql-kv-store-servers.cfg), then
+         * he/she can call this initialize method with a different configuration file name (e-g: /tmp/my-dps-config.cfg).
+	 * This method must be called before <code>getStoreFactory()</code> can be used.
+	 * */
+	public static void initialize(String dpsConfigFileName) throws Exception {
+               // Call the original initialize method that appears above this method.
+               initialize();
+               // Now set the DPS file name as specified by the caller of this method.
+               DpsHelperHolder.getDpsHelper().dpsSetConfigFile(dpsConfigFileName);
+	}
 	
 	/** 
 	 * Return a store factory.  

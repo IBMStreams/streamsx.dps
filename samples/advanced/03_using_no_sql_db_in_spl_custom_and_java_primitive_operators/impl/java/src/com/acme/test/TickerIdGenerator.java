@@ -189,7 +189,12 @@ public class TickerIdGenerator extends AbstractOperator {
         // or external configuration files or a combination of the two.
         
         // We must first call this initialize method before using any other API from the DPS toolkit.
+        // We have a choice to either use the default DPS config file inside this application directory (etc/no-sql-kv-store-servers.cfg)  
+        // or a DPS config file available from a different directory (/tmp/my-dps-config-file.cfg) outside of this application's directory structure.
+        // 1) In the case of using the default DPS config file, we can  simply call initialize().
+        // 2) In the case of using a different DPS file located elsewhere, we can call initialize("/mydir/somefile.txt").
      	DistributedStores.initialize();
+        // DistributedStores.initialize("/tmp/my-dps-config.txt");
         
         // We have to get a store factory for creating/getting/finding/removing stores throughout the lifetime of this Java primitive operator.
         sf = DistributedStores.getStoreFactory();
