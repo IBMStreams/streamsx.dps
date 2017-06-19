@@ -6,6 +6,15 @@ namespace com.ibm.streamsx.store.distributed;
  * The purpose of this composite is to provide extensive error handling, a reconnection
  * policy, and a complete set of informative metrics. 
  * 
+ * By default, keys and values are not
+ * encoded in order to provide maximum ease of access via non-Streams methods. If non-String
+ * types are provided for either the key or value, they will automatically be encoded. Use the 
+ * Base64 encoding options to save space. 
+ * 
+ * Note: The following metrics are only valid once we have established an initial connection to the 
+ * DPS server. Before that connection, we will throw exceptions (without failure) and the isConnected
+ * metric will be valid. All other metrics will be unusable until first-connection is established. 
+ * 
  * **Longterm and Current Metrics:** 
  *  * **isConnected** Maintains a metric of if we think we are connected to Redis or not.
  *  * **totalGets** Maintains a metric of the number of total gets done since startup--includes gets where the key was not in the data store.
@@ -14,18 +23,16 @@ namespace com.ibm.streamsx.store.distributed;
  *  * **totalReconnections** Maintains a metric of the number of reconnections to the DPS Server since startup.
  * 
  * **Interval Metrics:** 
- * 
- * Warning: Interval metrics are unreliable when connection to the DPS store has been lost. This is due to the 
- * inability of SPL custom operators to concurrently execute two process methods.  
+ *  
  *  * **numGets** Maintains a metric of the number inserts completed in the last interval of time.
  *  * **numFailedGets** Maintains a metric of the number of failed inserts done.
  *  * **numKeyDidNotExistReturns** Maintains a metric of the number of gets over the last interval of time that returned a 108 code indicating that the key was not in the store.
  *  * **reconnectionAttptsSinceDisconnect** Maintains a metric of the number of reconnection attempts in the last interval of time.
  * 
  * 
- * @param keyEncoded Whether or not to encode the key in base64. This is only valid if the key is rstring/ustring, otherwise it defaults to true. 
- * @param valueEncoded Whether or not to encode the value in base64. This is only valid if the value is rstring/ustring, otherwise it defaults to true. 
- * @param reconnectionAttempts (default: 1) Number of reconnection attempts per incoming tuple. Use -1 for unlimited, i.e. don't ever drop tuple, keep trying to reconnect. 
+ * @param keyEncoded (default: false) Whether or not to encode the key in base64. False is only valid if the key is rstring/ustring, otherwise it automatically defaults to true. 
+ * @param valueEncoded (default: false) Whether or not to encode the value in base64. False is only valid if the value is rstring/ustring, otherwise it automatically defaults to true. 
+ * @param reconnectionAttempts (default: 1) Number of reconnection attempts per incoming tuple. Use -1 for unlimited, i.e. don't ever drop tuple, keep trying to reconnect. If set to 0, we will never reconnect upon connection loss. 
  * @param reconnectionInterval (default: 5s) Number of seconds to wait between each reconnection attempt. 
  * @param metricsIntervalLength (default: 15 * 60s) Time in seconds of the sliding window that the interval metrics are maintained over.  
  * @param metricsUpdateRate (default: 15.0s) Time in seconds between update of interval metrics. 
@@ -40,8 +47,8 @@ namespace com.ibm.streamsx.store.distributed;
 public composite DpsGetTTLWithReconnect(input In ;output Out)
 {
 	param
-		expression<boolean> $keyEncoded;// : false;
-		expression<boolean> $valueEncoded;// : true; 
+		expression<boolean> $keyEncoded : false;
+		expression<boolean> $valueEncoded : true; 
 		expression<int32> $reconnectionAttempts : 1; // -1 for unlimited 
 		expression<float64> $reconnectionInterval : 5.0 ; // 
 		type $outputType : tuple<rstring value>  ; 
@@ -58,6 +65,12 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 			logic
 				state : 
 				{
+					/*
+					 * These state variables are only created so that we can initialize our
+					 * connection to DPS and the metrics at startup, otherwise we would have
+					 * to wait until the first tuple arrives. i.e. Now we can check connection 
+					 * to DPS via isConnected metric as soon as the operator starts. 
+					 */
 					boolean initializedDps = initializeDpsConnection(); 
 					boolean initializedMetrics =  initializeGetMetrics(); 
 				}
@@ -65,17 +78,35 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 				{
 					mutable $outputType outputTuple = {}; 
 					mutable uint64 dpsErr = 0; 
-					// metrics values
+					// metrics values to be sent to the aggregate
 					mutable metricsDetails tupleMetrics = {successGet = 0, failedGet = 0
 											, reconnectionAttempts = 0 , keyDidNotExistReturn = 0}; 
 					
 					/*
+					 * Handle the case where we fail to connect to Redis on startup, but later
+					 * successfully connect. 
+					 */
+					if (initializedDps == false)
+					{
+						if (dpsReconnect() == true)
+					 	{	
+					 		setCustomMetricValue("isConnected",1l);
+					 		if(isTraceable(Trace.error))
+							{
+								appTrc(Trace.error, "Successfully reconnected.");
+							}
+					 	}
+					}
+					
+					/*
 					 * This is the most important line in the operator. 
 					 * If this execution goes fine, then nothing else really matters. 
-					 * The rest is just updating metrics. 
+					 * The rest is just updating metrics and reconnection if something goes wrong. 
 					 */
 					mutable boolean getSucceeded = dpsGetTTL(In.key, outputTuple.value, dpsErr, $keyEncoded, $valueEncoded);
 					
+					// 108ul errors are fine because it just means there wasn't a key in the database
+					// This will be observed by the "*KeyDidNotExistReturns" metrics
 					if (dpsErr != 0ul
 						&& dpsErr != 108ul)
 					{
@@ -100,6 +131,7 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 								
 							 	if (dpsReconnect() == true)
 							 	{
+							 		setCustomMetricValue("isConnected",1l);
 							 		if(isTraceable(Trace.error))
 									{
 										appTrc(Trace.error, "Successfully reconnected.");
@@ -167,15 +199,9 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 					assignFrom(outputTuple,In); 
 					submit(outputTuple, Out); 
 					submit(tupleMetrics, MetricsDetails);
-					
 				}
 				/*
 				 * Update Interval Metrics
-				 * - NOTE: If we lose connection to the DPS store, the blocking that is part 
-				 * 			of the reconnection policy causes a skew in the interval metrics. 
-				 * 			Making them unreliable while attempting to reconnect. This is the result
-				 * 			of an automatic mutex around the process methods that don't allow for concurrent
-				 * 			execution of both the input ports. Future Streams releases may fix this. 
 				 */
 				onTuple UpdatedMetrics :
 				{
@@ -208,6 +234,8 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 		 	param
 		 		aggregateIncompleteWindows : true;
 		 	output UpdatedMetrics : numGets = Sum(successGet), numFailedGets = Sum(failedGet), numKeyDidNotExistReturns = Sum(keyDidNotExistReturn); 
+		 	config
+		 		placement : partitionIsolation;
 		 }
 		 
 }

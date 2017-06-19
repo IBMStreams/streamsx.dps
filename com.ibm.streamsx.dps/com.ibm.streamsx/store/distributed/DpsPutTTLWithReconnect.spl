@@ -6,6 +6,15 @@ namespace com.ibm.streamsx.store.distributed;
  * The purpose of this composite is to provide extensive error handling, a reconnection
  * policy, and a complete set of informative metrics. 
  * 
+ * By default, keys and values are not
+ * encoded in order to provide maximum ease of access via non-Streams methods. If non-String
+ * types are provided for either the key or value, they will automatically be encoded. Use the 
+ * Base64 encoding options to save space. 
+ * 
+ * Note: The following metrics are only valid once we have established an initial connection to the 
+ * DPS server. Before that connection, we will throw exceptions (without failure) and the isConnected
+ * metric will be valid. All other metrics will be unusable until first-connection is established. 
+ * 
  * **Longterm and Current Metrics:** 
  *  * **isConnected** Maintains a metric of if we think we are connected to Redis or not.
  *  * **totalInserts** Maintains a metric of the number of total inserts done since startup.
@@ -14,7 +23,6 @@ namespace com.ibm.streamsx.store.distributed;
  * 
  * **Interval Metrics:** 
  * 
- * Warning: Interval metrics are unreliable when connection to the DPS store has been lost. This is due to the inability of SPL custom operators to concurrently execute two process methods.
  *  * **numInserts** Maintains a metric of the number inserts completed in the last interval of time.
  *  * **numFailedInserts** Maintains a metric of the number of failed inserts done.
  *  * **numUniqueKeyInserts** Maintains a metric of the number of unique keys inserted in the last interval of time.
@@ -24,9 +32,9 @@ namespace com.ibm.streamsx.store.distributed;
  *  * **maxKeyValueSizeBytes** Maintains a metric of the max key-value size in the last interval of time.  The size is the amount of space utilized after any encoding by the DPS toolkit.
  * 
  * 
- * @param keyEncoded Whether or not to encode the key in base64. This is only valid if the key is rstring/ustring, otherwise it defaults to true. 
- * @param valueEncoded Whether or not to encode the value in base64. This is only valid if the value is rstring/ustring, otherwise it defaults to true. 
- * @param reconnectionAttempts (default: 1) Number of reconnection attempts per incoming tuple. Use -1 for unlimited, i.e. don't ever drop tuple, keep trying to reconnect. 
+ * @param keyEncoded (default: false) Whether or not to encode the key in base64. False is only valid if the key is rstring/ustring, otherwise it automatically defaults to true. 
+ * @param valueEncoded (default: false) Whether or not to encode the value in base64. False is only valid if the value is rstring/ustring, otherwise it automatically defaults to true. 
+ * @param reconnectionAttempts (default: 1) Number of reconnection attempts per incoming tuple. Use -1 for unlimited, i.e. don't ever drop tuple, keep trying to reconnect. If set to 0, we will never reconnect upon connection loss.
  * @param reconnectionInterval (default: 5s) Number of seconds to wait between each reconnection attempt. 
  * @param metricsIntervalLength (default: 15 * 60s) Time in seconds of the sliding window that the interval metrics are maintained over.  
  * @param metricsUpdateRate (default: 15.0s) Time in seconds between update of interval metrics. 
@@ -41,8 +49,8 @@ namespace com.ibm.streamsx.store.distributed;
 public composite DpsPutTTLWithReconnect(input In ;output Out)
 {
 	param
-		expression<boolean> $keyEncoded;// : false;
-		expression<boolean> $valueEncoded;// : true; 
+		expression<boolean> $keyEncoded : false;
+		expression<boolean> $valueEncoded : true; 
 		expression<int32> $reconnectionAttempts : 1; // -1 for unlimited 
 		expression<float64> $reconnectionInterval : 5.0 ; // 
 		type $outputType ; 
@@ -54,23 +62,45 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 	graph
 		
 		 @catch(exception=streams, tupleTrace=true, stackTrace=false)
-		(stream<$outputType> Out; stream<metricsDetails> MetricsDetails) as DpsPutOperator = Custom(In ; UpdatedMetrics)
+		(stream<$outputType> Out; stream<metricsDetails> MetricsDetails) as DpsPutOperator = Custom(In  ; UpdatedMetrics)
 		{
 			logic
 				state : 
 				{
+					/*
+					 * These state variables are only created so that we can initialize our
+					 * connection to DPS and the metrics at startup, otherwise we would have
+					 * to wait until the first tuple arrives. i.e. Now we can check connection 
+					 * to DPS via isConnected metric as soon as the operator starts. 
+					 */
 					boolean initializedDps = initializeDpsConnection(); 
 					boolean initializedMetrics =  initializePutMetrics(); 
 				}
 				onTuple In : 
 				{
 					mutable uint64 dpsErr = 0; 
-					// metrics values
+					// metrics values to be sent to the aggregate
 					mutable metricsDetails tupleMetrics = {successInsert = 0, failedInsert = 0, uniqueKey = 0
 											, reconnectionAttempts = 0, TTL = (int64) In.ttl, keyValueSize = 0 }; 
 					mutable uint32 storedKeySize = 0;
 					mutable uint32 storedValueSize = 0; 
 
+					/*
+					 * Handle the case where we fail to connect to Redis on startup, but later
+					 * successfully connect. 
+					 */
+					if (initializedDps == false)
+					{
+						if (dpsReconnect() == true)
+					 	{	
+					 		setCustomMetricValue("isConnected",1l);
+					 		if(isTraceable(Trace.error))
+							{
+								appTrc(Trace.error, "Successfully reconnected.");
+							}
+					 	}
+					}
+					
 					/*
 					 * Check if exists in order to handle "numUniqueKeyInserts" metric
 					 */
@@ -88,7 +118,7 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 					 * If this execution goes fine, then nothing else really matters. 
 					 * The rest is just updating metrics. 
 					 */
-					mutable boolean putSucceeded = dpsPutTTL(In.key, In.value, In.ttl, dpsErr, storedKeySize, storedValueSize, $keyEncoded, $valueEncoded); //dpsPutTTLWrapper(In.key, In.value, In.ttl);
+					mutable boolean putSucceeded = dpsPutTTL(In.key, In.value, In.ttl, dpsErr, storedKeySize, storedValueSize, $keyEncoded, $valueEncoded); 
 					
 					if (putSucceeded == false)
 					{
@@ -111,7 +141,8 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 								}
 								
 							 	if (dpsReconnect() == true)
-							 	{
+							 	{	
+							 		setCustomMetricValue("isConnected",1l);
 							 		if(isTraceable(Trace.error))
 									{
 										appTrc(Trace.error, "Successfully reconnected.");
@@ -202,8 +233,6 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 					setCustomMetricValue("maxKeyValueSizeBytes",(int64)
 						UpdatedMetrics.maxKeyValueSize) ;
 				}
-			config 
-				placement : partitionIsolation; 
 		}
 		
 		/*
@@ -223,5 +252,7 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 		 	output UpdatedMetrics : numInserts = Sum(successInsert), numFailedInserts = Sum(failedInsert)
 		 							, numUniqueKeyInserts = Sum(uniqueKey)
 		 							, avgTTL = Average(TTL / 60l), avgKeyValueSize = Average(keyValueSize), maxKeyValueSize = Max(keyValueSize); 
+		 	config 
+				placement : partitionIsolation; 
 		 }
 }
