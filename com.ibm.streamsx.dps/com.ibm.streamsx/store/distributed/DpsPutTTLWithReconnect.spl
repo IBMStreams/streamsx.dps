@@ -1,0 +1,258 @@
+namespace com.ibm.streamsx.store.distributed; 
+
+/**
+ * DpsPutTTLComposite 
+ * Uses the dpsPutTTL function to write key-value pairs to Redis (of any type). 
+ * The purpose of this composite is to provide extensive error handling, a reconnection
+ * policy, and a complete set of informative metrics. 
+ * 
+ * By default, keys and values are not
+ * encoded in order to provide maximum ease of access via non-Streams methods. If non-String
+ * types are provided for either the key or value, they will automatically be encoded. Use the 
+ * Base64 encoding options to save space. 
+ * 
+ * Note: The following metrics are only valid once we have established an initial connection to the 
+ * DPS server. Before that connection, we will throw exceptions (without failure) and the isConnected
+ * metric will be valid. All other metrics will be unusable until first-connection is established. 
+ * 
+ * **Longterm and Current Metrics:** 
+ *  * **isConnected** Maintains a metric of if we think we are connected to Redis or not.
+ *  * **totalInserts** Maintains a metric of the number of total inserts done since startup.
+ *  * **totalFailedInserts** Maintains a metric of the number of failed inserts since startup.
+ *  * **totalReconnections** Maintains a metric of the number of reconnections to the DPS Server since startup.
+ * 
+ * **Interval Metrics:** 
+ * 
+ *  * **numInserts** Maintains a metric of the number inserts completed in the last interval of time.
+ *  * **numFailedInserts** Maintains a metric of the number of failed inserts done.
+ *  * **numUniqueKeyInserts** Maintains a metric of the number of unique keys inserted in the last interval of time.
+ *  * **reconnectionAttptsSinceDisconnect** Maintains a metric of the number of reconnection attempts in the last interval of time.
+ *  * **avgTTLMinutes** Maintains a metric of the average TTL in minutes over the last interval of time. 
+ *  * **avgKeyValueSizeBytes** Maintains a metric of the average key-value size in the last interval of time. The size is the amount of space utilized after any encoding by the DPS toolkit. Failed inserts contribute a value of 0 to the avgKeyValueSize, skewing the results downwards.
+ *  * **maxKeyValueSizeBytes** Maintains a metric of the max key-value size in the last interval of time.  The size is the amount of space utilized after any encoding by the DPS toolkit.
+ * 
+ * 
+ * @param keyEncoded (default: false) Whether or not to encode the key in base64. False is only valid if the key is rstring/ustring, otherwise it automatically defaults to true. 
+ * @param valueEncoded (default: false) Whether or not to encode the value in base64. False is only valid if the value is rstring/ustring, otherwise it automatically defaults to true. 
+ * @param reconnectionAttempts (default: 1) Number of reconnection attempts per incoming tuple. Use -1 for unlimited, i.e. don't ever drop tuple, keep trying to reconnect. If set to 0, we will never reconnect upon connection loss.
+ * @param reconnectionInterval (default: 5s) Number of seconds to wait between each reconnection attempt. 
+ * @param metricsIntervalLength (default: 15 * 60s) Time in seconds of the sliding window that the interval metrics are maintained over.  
+ * @param metricsUpdateRate (default: 15.0s) Time in seconds between update of interval metrics. 
+ * @param outputType The output stream can be used to forward any attributes on the input port to the output port. 
+ * 
+ * @input In Stream to be put using DPS. 
+ * @output Out Stream containing attributes that match input attributes. 
+ * 
+
+ * 
+ */
+public composite DpsPutTTLWithReconnect(input In ;output Out)
+{
+	param
+		expression<boolean> $keyEncoded : false;
+		expression<boolean> $valueEncoded : true; 
+		expression<int32> $reconnectionAttempts : 1; // -1 for unlimited 
+		expression<float64> $reconnectionInterval : 5.0 ; // 
+		type $outputType ; 
+		expression<float64> $metricsIntervalLength : 15.0 * 60.0;  
+		expression<float64> $metricsUpdateRate : 15.0; 
+	type
+		metricsDetails = tuple<int32 successInsert, int32 failedInsert, int32 uniqueKey, int64 TTL, int32 keyValueSize> ; 
+		metricsAggregates = tuple<int32 numInserts, int32 numFailedInserts, int32 numUniqueKeyInserts, int64 avgTTL, int32 avgKeyValueSize, int32 maxKeyValueSize> ; 
+	graph
+		
+		 @catch(exception=streams, tupleTrace=true, stackTrace=false)
+		(stream<$outputType> Out; stream<metricsDetails> MetricsDetails) as DpsPutOperator = Custom(In  ; UpdatedMetrics)
+		{
+			logic
+				state : 
+				{
+					/*
+					 * These state variables are only created so that we can initialize our
+					 * connection to DPS and the metrics at startup, otherwise we would have
+					 * to wait until the first tuple arrives. i.e. Now we can check connection 
+					 * to DPS via isConnected metric as soon as the operator starts. 
+					 */
+					boolean initializedDps = initializeDpsConnection(); 
+					boolean initializedMetrics =  initializePutMetrics(); 
+				}
+				onTuple In : 
+				{
+					mutable uint64 dpsErr = 0; 
+					// metrics values to be sent to the aggregate
+					mutable metricsDetails tupleMetrics = {successInsert = 0, failedInsert = 0, uniqueKey = 0
+											, reconnectionAttempts = 0, TTL = (int64) In.ttl, keyValueSize = 0 }; 
+					mutable uint32 storedKeySize = 0;
+					mutable uint32 storedValueSize = 0; 
+
+					/*
+					 * Handle the case where we fail to connect to Redis on startup, but later
+					 * successfully connect. 
+					 */
+					if (initializedDps == false)
+					{
+						if (dpsReconnect() == true)
+					 	{	
+					 		setCustomMetricValue("isConnected",1l);
+					 		if(isTraceable(Trace.error))
+							{
+								appTrc(Trace.error, "Successfully reconnected.");
+							}
+					 	}
+					}
+					
+					/*
+					 * Check if exists in order to handle "numUniqueKeyInserts" metric
+					 */
+					if (dpsHasTTL(In.key, dpsErr, $keyEncoded) == false)
+					{
+						// we are adding a unique key
+						if (dpsErr == 0ul)
+						{
+							tupleMetrics.uniqueKey = 1;
+						}
+					}
+					
+					/*
+					 * This is the most important line in the operator. 
+					 * If this execution goes fine, then nothing else really matters. 
+					 * The rest is just updating metrics. 
+					 */
+					mutable boolean putSucceeded = dpsPutTTL(In.key, In.value, In.ttl, dpsErr, storedKeySize, storedValueSize, $keyEncoded, $valueEncoded); 
+					
+					if (putSucceeded == false)
+					{
+						if(isTraceable(Trace.error))
+						{
+							appTrc(Trace.error, "DPS Error: " + (rstring) dpsErr + " IsConnected: " + (rstring) dpsIsConnected());
+						} 
+						if (dpsIsConnected() == false){
+							setCustomMetricValue("isConnected" , 0l); 
+							/*
+							 * Reconnection Attempts
+							 */
+							 mutable int32 reconnectionAttempts = 0; 
+							 while (($reconnectionAttempts == -1 || reconnectionAttempts < $reconnectionAttempts)
+							 		&& dpsIsConnected() == false)
+							 {
+							 	if(isTraceable(Trace.info))
+								{
+									appTrc(Trace.info, "Trying to reconnect after " + (rstring) ($reconnectionInterval * (float64) (reconnectionAttempts - 1)) + " seconds.");
+								}
+								
+							 	if (dpsReconnect() == true)
+							 	{	
+							 		setCustomMetricValue("isConnected",1l);
+							 		if(isTraceable(Trace.error))
+									{
+										appTrc(Trace.error, "Successfully reconnected.");
+									}
+							 	} 
+							 	else 
+							 	{
+								 	block($reconnectionInterval /* (float64)(reconnectionAttempts)*/ );
+							 	}
+							 	reconnectionAttempts++; 
+							 	// We update as we're going here to give a live view of reconnection attempts (don't wait for aggregate)
+							 	// Aggregate will then reset to the sliding window value expected. 
+							 	incrementCustomMetric("reconnectionAttptsSinceDisconnect");
+							 }
+							 
+							 /*
+							  * Resubmit Attempts 
+							  */
+							  if (dpsIsConnected() == true)
+							  {
+							  	incrementCustomMetric("totalReconnections");
+							  	setCustomMetricValue("isConnected" , 1l); 
+							  	setCustomMetricValue("reconnectionAttptsSinceDisconnect" , 0l); 
+							  	// try again
+							  	putSucceeded = dpsPutTTL(In.key, In.value, In.ttl, dpsErr, storedKeySize, storedValueSize, $keyEncoded, $valueEncoded);
+							  }
+						} 
+					} 
+					
+					// Check again after reconnection attempts
+					if(putSucceeded == true)
+					{
+						// update metrics that come with success	
+						tupleMetrics.successInsert = 1 ;
+						incrementCustomMetric("totalInserts");
+						tupleMetrics.keyValueSize = (int32) (storedKeySize + storedValueSize);
+						if(isTraceable(Trace.trace))
+						{
+							appTrc(Trace.trace, "Key size: " + (rstring) storedKeySize + " Val size: " + (rstring) storedValueSize);
+						}
+					} 
+					else
+					{
+						// metrics in case of failure
+						tupleMetrics.failedInsert = 1 ;
+						incrementCustomMetric("totalFailedInserts");
+						if(isTraceable(Trace.error))
+						{
+							appTrc(Trace.error, "DPS Error: " + (rstring) dpsErr); 
+						}
+						// unique key and successInsert are still 0, no need to update					
+
+					}
+					
+					if(isTraceable(Trace.trace))
+					{
+						appTrc(Trace.trace, "tupleMetrics: " + (rstring) tupleMetrics);
+					}
+					mutable $outputType outputTuple = {}; 
+					assignFrom(outputTuple,In); 
+					submit(outputTuple, Out); 
+					submit(tupleMetrics, MetricsDetails);
+					
+				}
+				onTuple UpdatedMetrics :
+				{
+					/*
+					 * Update Interval Metrics
+					 * - NOTE: If we lose connection to the DPS store, the blocking that is part 
+					 * 			of the reconnection policy causes a skew in the interval metrics. 
+					 * 			Making them unreliable while attempting to reconnect. This is the result
+					 * 			of an automatic mutex around the process methods that don't allow for concurrent
+					 * 			execution of both the input ports. Future Streams releases may fix this. 
+					 */
+					if(isTraceable(Trace.trace))
+					{
+						appTrc(Trace.trace, "Updating metrics: " +(rstring) UpdatedMetrics) ;
+					}
+
+					setCustomMetricValue("numInserts",(int64) UpdatedMetrics.numInserts) ;
+					setCustomMetricValue("numFailedInserts",(int64)
+						UpdatedMetrics.numFailedInserts) ;
+					setCustomMetricValue("numUniqueKeyInserts",(int64)
+						UpdatedMetrics.numUniqueKeyInserts) ;
+					setCustomMetricValue("avgTTLMinutes",(int64) UpdatedMetrics.avgTTL) ;
+					setCustomMetricValue("avgKeyValueSizeBytes",(int64)
+						UpdatedMetrics.avgKeyValueSize) ;
+					setCustomMetricValue("maxKeyValueSizeBytes",(int64)
+						UpdatedMetrics.maxKeyValueSize) ;
+				}
+		}
+		
+		/*
+		 * Aggregate to help maintain the following metrics
+			- uniqueKeys
+		    - avgInsertSize
+		    - maxInsertSize
+		    - inserts
+		    - failedInserts
+		 */
+		 stream<metricsAggregates> UpdatedMetrics = Aggregate (MetricsDetails)
+		 {
+		 	window 
+		 		MetricsDetails : sliding, time($metricsIntervalLength), time($metricsUpdateRate); 
+		 	param
+		 		aggregateIncompleteWindows : true;
+		 	output UpdatedMetrics : numInserts = Sum(successInsert), numFailedInserts = Sum(failedInsert)
+		 							, numUniqueKeyInserts = Sum(uniqueKey)
+		 							, avgTTL = Average(TTL / 60l), avgKeyValueSize = Average(keyValueSize), maxKeyValueSize = Max(keyValueSize); 
+		 	config 
+				placement : partitionIsolation; 
+		 }
+}

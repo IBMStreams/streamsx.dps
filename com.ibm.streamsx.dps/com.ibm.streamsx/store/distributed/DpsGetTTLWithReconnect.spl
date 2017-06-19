@@ -1,0 +1,241 @@
+namespace com.ibm.streamsx.store.distributed;
+
+/**
+ * DpsGetTTLComposite 
+ * Uses the dpsGetTTL function to read key-value pairs from DPS (of any type). 
+ * The purpose of this composite is to provide extensive error handling, a reconnection
+ * policy, and a complete set of informative metrics. 
+ * 
+ * By default, keys and values are not
+ * encoded in order to provide maximum ease of access via non-Streams methods. If non-String
+ * types are provided for either the key or value, they will automatically be encoded. Use the 
+ * Base64 encoding options to save space. 
+ * 
+ * Note: The following metrics are only valid once we have established an initial connection to the 
+ * DPS server. Before that connection, we will throw exceptions (without failure) and the isConnected
+ * metric will be valid. All other metrics will be unusable until first-connection is established. 
+ * 
+ * **Longterm and Current Metrics:** 
+ *  * **isConnected** Maintains a metric of if we think we are connected to Redis or not.
+ *  * **totalGets** Maintains a metric of the number of total gets done since startup--includes gets where the key was not in the data store.
+ *  * **totalKeyDidNotExistReturns** Maintains a metric of the number of gets since operator startup that returned a 108 code indicating that the key was not in the store. 
+ *  * **totalFailedGets** Maintains a metric of the number of failed gets since startup--does not include gets where the key did not exist.
+ *  * **totalReconnections** Maintains a metric of the number of reconnections to the DPS Server since startup.
+ * 
+ * **Interval Metrics:** 
+ *  
+ *  * **numGets** Maintains a metric of the number inserts completed in the last interval of time.
+ *  * **numFailedGets** Maintains a metric of the number of failed inserts done.
+ *  * **numKeyDidNotExistReturns** Maintains a metric of the number of gets over the last interval of time that returned a 108 code indicating that the key was not in the store.
+ *  * **reconnectionAttptsSinceDisconnect** Maintains a metric of the number of reconnection attempts in the last interval of time.
+ * 
+ * 
+ * @param keyEncoded (default: false) Whether or not to encode the key in base64. False is only valid if the key is rstring/ustring, otherwise it automatically defaults to true. 
+ * @param valueEncoded (default: false) Whether or not to encode the value in base64. False is only valid if the value is rstring/ustring, otherwise it automatically defaults to true. 
+ * @param reconnectionAttempts (default: 1) Number of reconnection attempts per incoming tuple. Use -1 for unlimited, i.e. don't ever drop tuple, keep trying to reconnect. If set to 0, we will never reconnect upon connection loss. 
+ * @param reconnectionInterval (default: 5s) Number of seconds to wait between each reconnection attempt. 
+ * @param metricsIntervalLength (default: 15 * 60s) Time in seconds of the sliding window that the interval metrics are maintained over.  
+ * @param metricsUpdateRate (default: 15.0s) Time in seconds between update of interval metrics. 
+ * @param outputType (default: rstring value) Output stream requires an attribute called "value" matching the type of the value being retrieved from the DPS server. 
+ * 
+ * @input In Stream specifying get for DPS. "key" attribute is required.  
+ * @output Out Stream - Attribute "value" of the type being retrieved from DPS is required. Stream contains attributes that match input attributes plus the value attribute. 
+ * 
+
+ * 
+ */
+public composite DpsGetTTLWithReconnect(input In ;output Out)
+{
+	param
+		expression<boolean> $keyEncoded : false;
+		expression<boolean> $valueEncoded : true; 
+		expression<int32> $reconnectionAttempts : 1; // -1 for unlimited 
+		expression<float64> $reconnectionInterval : 5.0 ; // 
+		type $outputType : tuple<rstring value>  ; 
+		expression<float64> $metricsIntervalLength : 15.0 * 60.0;  
+		expression<float64> $metricsUpdateRate : 15.0;  
+	type
+		metricsDetails = tuple<int32 successGet, int32 failedGet, int32 keyDidNotExistReturn> ; 
+		metricsAggregates = tuple<int32 numGets, int32 numFailedGets, int32 numKeyDidNotExistReturns> ; 
+	graph
+		
+		 @catch(exception=streams, tupleTrace=true, stackTrace=false)
+		(stream<$outputType> Out; stream<metricsDetails> MetricsDetails) as DpsGetOperator = Custom(In; UpdatedMetrics)
+		{
+			logic
+				state : 
+				{
+					/*
+					 * These state variables are only created so that we can initialize our
+					 * connection to DPS and the metrics at startup, otherwise we would have
+					 * to wait until the first tuple arrives. i.e. Now we can check connection 
+					 * to DPS via isConnected metric as soon as the operator starts. 
+					 */
+					boolean initializedDps = initializeDpsConnection(); 
+					boolean initializedMetrics =  initializeGetMetrics(); 
+				}
+				onTuple In : 
+				{
+					mutable $outputType outputTuple = {}; 
+					mutable uint64 dpsErr = 0; 
+					// metrics values to be sent to the aggregate
+					mutable metricsDetails tupleMetrics = {successGet = 0, failedGet = 0
+											, reconnectionAttempts = 0 , keyDidNotExistReturn = 0}; 
+					
+					/*
+					 * Handle the case where we fail to connect to Redis on startup, but later
+					 * successfully connect. 
+					 */
+					if (initializedDps == false)
+					{
+						if (dpsReconnect() == true)
+					 	{	
+					 		setCustomMetricValue("isConnected",1l);
+					 		if(isTraceable(Trace.error))
+							{
+								appTrc(Trace.error, "Successfully reconnected.");
+							}
+					 	}
+					}
+					
+					/*
+					 * This is the most important line in the operator. 
+					 * If this execution goes fine, then nothing else really matters. 
+					 * The rest is just updating metrics and reconnection if something goes wrong. 
+					 */
+					mutable boolean getSucceeded = dpsGetTTL(In.key, outputTuple.value, dpsErr, $keyEncoded, $valueEncoded);
+					
+					// 108ul errors are fine because it just means there wasn't a key in the database
+					// This will be observed by the "*KeyDidNotExistReturns" metrics
+					if (dpsErr != 0ul
+						&& dpsErr != 108ul)
+					{
+						if(isTraceable(Trace.error))
+						{
+							appTrc(Trace.error, "DPS Error: " + (rstring) dpsErr + " IsConnected: " + (rstring) dpsIsConnected());
+						} 
+						
+						if (dpsIsConnected() == false){
+							setCustomMetricValue("isConnected" , 0l); 
+							/*
+							 * Reconnection Attempts
+							 */
+							 mutable int32 reconnectionAttempts = 0; 
+							 while (($reconnectionAttempts == -1 || reconnectionAttempts < $reconnectionAttempts)
+							 		&& dpsIsConnected() == false)
+							 {
+							 	if(isTraceable(Trace.info))
+								{
+									appTrc(Trace.info, "Trying to reconnect after " + (rstring) ($reconnectionInterval * (float64) (reconnectionAttempts - 1)) + " seconds.");
+								}
+								
+							 	if (dpsReconnect() == true)
+							 	{
+							 		setCustomMetricValue("isConnected",1l);
+							 		if(isTraceable(Trace.error))
+									{
+										appTrc(Trace.error, "Successfully reconnected.");
+									}
+							 	} 
+							 	else 
+							 	{
+								 	block($reconnectionInterval /* (float64)(reconnectionAttempts)*/ );
+							 	}
+							 	reconnectionAttempts++; 
+							 	// We update as we're going here to give a live view of reconnection attempts (don't wait for aggregate)
+							 	// Aggregate will then reset to the sliding window value expected. 
+							 	incrementCustomMetric("reconnectionAttptsSinceDisconnect");
+							 }
+							 
+							 /*
+							  * Resubmit Attempts 
+							  */
+							  if (dpsIsConnected() == true)
+							  {
+							  	incrementCustomMetric("totalReconnections");
+							  	setCustomMetricValue("isConnected" , 1l); 
+							  	setCustomMetricValue("reconnectionAttptsSinceDisconnect" , 0l); 
+							  	// try again
+							  	getSucceeded = dpsGetTTL(In.key, outputTuple.value, dpsErr, $keyEncoded, $valueEncoded);
+							  }
+						} 
+					} 
+					
+					// Check again after reconnection attempts
+					if(getSucceeded
+						|| dpsErr == 108ul)
+					{
+						// update metrics that come with success	
+						tupleMetrics.successGet = 1 ;
+						incrementCustomMetric("totalGets");
+						if (dpsErr == 108ul)
+						{
+							// this case means we have an empty get return
+							tupleMetrics.keyDidNotExistReturn = 1; 
+							incrementCustomMetric("totalKeyDidNotExistReturns");
+							if(isTraceable(Trace.trace))
+							{
+								appTrc(Trace.trace, "DPS Error: " + (rstring) dpsErr + " indicating that the key did not exist in the store.");
+							} 
+						}
+					} 
+					else
+					{
+						// metrics in case of failure
+						tupleMetrics.failedGet = 1 ;
+						incrementCustomMetric("totalFailedGets");
+						if(isTraceable(Trace.error))
+						{
+							appTrc(Trace.error, "DPS Error: " + (rstring) dpsErr); 
+						}
+						// unique key and successGet are still 0, no need to update
+					}
+					
+					if(isTraceable(Trace.trace))
+					{
+						appTrc(Trace.trace, "tupleMetrics: " + (rstring) tupleMetrics);
+					}
+					
+					assignFrom(outputTuple,In); 
+					submit(outputTuple, Out); 
+					submit(tupleMetrics, MetricsDetails);
+				}
+				/*
+				 * Update Interval Metrics
+				 */
+				onTuple UpdatedMetrics :
+				{
+					/*
+					 * Update Interval Metrics
+					 */
+					if(isTraceable(Trace.trace))
+					{
+						appTrc(Trace.trace, "Updating metrics: " +(rstring) UpdatedMetrics) ;
+					}
+
+					setCustomMetricValue("numGets",(int64) UpdatedMetrics.numGets) ;
+					setCustomMetricValue("numFailedGets",(int64)
+						UpdatedMetrics.numFailedGets) ;
+					setCustomMetricValue("numKeyDidNotExistReturns",(int64)
+						UpdatedMetrics.numKeyDidNotExistReturns) ;
+				} 
+		}
+		
+		/*
+		 * Aggregate to help maintain the following metrics
+			- numGets
+			- numFailedGets
+			- numKeyDidNotExistReturns
+		 */
+		 stream<metricsAggregates> UpdatedMetrics = Aggregate (MetricsDetails)
+		 {
+		 	window 
+		 		MetricsDetails : sliding, time($metricsIntervalLength), time($metricsUpdateRate); 
+		 	param
+		 		aggregateIncompleteWindows : true;
+		 	output UpdatedMetrics : numGets = Sum(successGet), numFailedGets = Sum(failedGet), numKeyDidNotExistReturns = Sum(keyDidNotExistReturn); 
+		 	config
+		 		placement : partitionIsolation;
+		 }
+		 
+}

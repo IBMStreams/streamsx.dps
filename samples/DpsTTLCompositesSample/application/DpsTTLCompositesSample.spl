@@ -1,0 +1,88 @@
+namespace application;
+
+use com.ibm.streamsx.store.distributed::*;
+/*
+ * The following sample demonstrates the use of the DpsPutTTLWithReconnect
+ * and DpsGetTTLWithReconnect composites. 
+ * 
+ * The main benefit of using these composites over the corresponding
+ * dpsPutTTL and dpsGetTTL native functions, is that we provide extensive 
+ * metrics and a reconnection policy. The reconnection policy handles the logic
+ * of reestablishing a connection to the DPS server if it is lost. 
+ * 
+ * See the SPLDOC for each operator to learn more details about the metrics and
+ * the reconnection policy. 
+ */
+composite DpsTTLCompositesSample {
+	param 
+		expression<boolean> $keyEncoded : false;
+		expression<boolean> $valueEncoded : true; 
+		expression<float64> $period : 1.0; 
+		expression<float64> $metricsUpdateRate : 3.0;
+		expression<float64> $metricsInterval : 5.0 * 60.0; 
+		expression<int32> $reconnectionAttempts : 3; // -1 -> try until we succeed
+		expression<uint32> $ttl : 300u;
+	type
+		redisInsertType = tuple<rstring key, rstring value, uint32 ttl> ;
+		redisPutOutputType = tuple<rstring key>;
+		redisGetType = tuple<rstring key> ;
+		redisGetOutputType = tuple<rstring key, rstring value> ;
+	graph
+		stream<redisInsertType> RedisBeacon = Beacon()
+		{
+			param
+				period : $period; 
+			output RedisBeacon : key = "key" + (rstring) IterationCount()
+				, value = "val"   + (rstring) IterationCount()
+				, ttl = $ttl; 
+		}
+		
+		stream<redisPutOutputType> DpsInsert = DpsPutTTLWithReconnect(RedisBeacon)
+		{
+			param
+				metricsIntervalLength : $metricsInterval;
+				metricsUpdateRate : $metricsUpdateRate;
+				keyEncoded : $keyEncoded;
+				valueEncoded : $valueEncoded; 
+				reconnectionAttempts : $reconnectionAttempts; 
+				outputType : redisPutOutputType; 
+		}
+		
+		() as DpsPutSink = Custom(DpsInsert as inputStream)
+		 {
+		    logic
+		        onTuple inputStream :
+		       {
+		           printStringLn((rstring)inputStream);
+		       }
+		 }
+		
+		stream<redisGetType> RedisGetBeacon = Beacon()
+		{
+			param
+				period : $period; 
+				initDelay : 5.0; 
+			output RedisGetBeacon : key = "key" + (rstring) IterationCount();
+		}
+		
+		stream<rstring key, rstring value> RedisGet = DpsGetTTLWithReconnect(RedisGetBeacon)
+		{
+			param
+				metricsIntervalLength : $metricsInterval;
+				metricsUpdateRate : $metricsUpdateRate;
+				keyEncoded : $keyEncoded;
+				valueEncoded : $valueEncoded;
+				reconnectionAttempts : $reconnectionAttempts;
+				outputType : redisGetOutputType; 
+		}
+		
+		() as DpsGetSink = Custom(RedisGet as inputStream)
+		{
+		 	logic
+				onTuple inputStream :
+				{
+					printStringLn((rstring)inputStream);
+				}
+		}
+	
+}
