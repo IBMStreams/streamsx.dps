@@ -133,23 +133,29 @@ namespace distributed
     }
 
     if (serverCnt == 0) {
-       SPLAPPLOG(L_ERROR, DPSMSG_CANNOT_GET_PRODUCT_NAME(confFile), "DistributedProcessStore");
+       // SPLAPPLOG is causing it to get stuck in RHEL6/CentOS6 (RHEL7/CentOS7 is fine) when the @catch annotation is used in the calling SPL code.
+       // SPLAPPLOG(L_ERROR, DPSMSG_CANNOT_GET_PRODUCT_NAME(confFile), "DistributedProcessStore");
        std::string error = "Cannot get NoSQL K/V store product name and/or the server names from the configuration file '"+confFile+"'";
        SPLAPPTRC(L_ERROR, error, "DistributedProcessStore");
        throw(SPL::SPLRuntimeException("fetchDBParameters", error));
     }
   }
 
-  void load_dependent_lib(std::string toolkitDir, std::string lib){
-	  std::string libToLoad = toolkitDir + "/" + lib;
-	  void *handle = dlopen(libToLoad.c_str(), RTLD_NOW|RTLD_GLOBAL);
-	 if (handle == NULL) {
-    	std::string err = "DpsHelper: dlopen failed for " +lib;
+  void * load_dependent_lib(std::string toolkitDir, std::string lib){
+     std::string libToLoad = toolkitDir + "/" + lib;
+     void *handle = dlopen(libToLoad.c_str(), RTLD_NOW|RTLD_GLOBAL);
+
+     if (handle == NULL) {
+        std::string err = "DpsHelper: dlopen failed for " +lib;
         err.append(dlerror());
         SPLAPPTRC(L_ERROR, err, "DistributedProcessStore");
-	 	SPLAPPLOG(L_ERROR, DPSMSG_DLOPEN_FAILED(lib,dlerror()), "DistributedProcessStore");
-	 }
+        // SPLAPPLOG is causing it to get stuck in RHEL6/CentOS6 (RHEL7/CentOS7 is fine) when the @catch annotation is used in the calling SPL code.
+        // SPLAPPLOG(L_ERROR, DPSMSG_DLOPEN_FAILED(lib,dlerror()), "DistributedProcessStore");
+     }
+
+     return(handle);
   }
+
   // any errors in here are thrown during static initialization, so we
   // better log, not just throw (as SPL runtime is not around to catch it)
   void DistributedProcessStore::connectToDatabase()
@@ -170,6 +176,10 @@ namespace distributed
 	// Deallocate the current object pointed to by this auto_ptr typed db_ object and
 	// assign it to a new DBLayer instance.
     void* handle = NULL;
+    void* handle1 = NULL;
+    void* handle2 = NULL;
+    void* handle3 = NULL;
+    bool libraryLoadingError = false;
     std::string  kvLibName =  "";
     std::string toolkitDir = ProcessingElement::pe().getToolkitDirectory("com.ibm.streamsx.dps")  + "/impl/ext/lib" ;
     std::string toolkitLibDir = ProcessingElement::pe().getToolkitDirectory("com.ibm.streamsx.dps")  + "/impl/lib" ;
@@ -178,67 +188,150 @@ namespace distributed
 		// reset method below is part of the C++ std::auto_ptr class.
 		kvLibName= "libDPSMemcached.so";
 	} else if (noSqlKvStoreProductName.compare("redis") == 0) {
-		load_dependent_lib(toolkitDir, "libuv.so");
-		load_dependent_lib(toolkitDir, "libhiredis.so");
+		handle1 = load_dependent_lib(toolkitDir, "libuv.so");
+		handle2 = load_dependent_lib(toolkitDir, "libhiredis.so");
 		kvLibName= "libDPSRedis.so";
+
+		if (handle1 == NULL || handle2 == NULL) {
+		   libraryLoadingError = true;
+		}
 	} else if (noSqlKvStoreProductName.compare("cassandra") == 0) {
-		load_dependent_lib(toolkitDir, "libjson-c.so");
-		load_dependent_lib(toolkitDir, "libuv.so");
-		load_dependent_lib(toolkitDir, "libcassandra.so");
+		handle1 = load_dependent_lib(toolkitDir, "libjson-c.so");
+		handle2 = load_dependent_lib(toolkitDir, "libuv.so");
+		handle3 = load_dependent_lib(toolkitDir, "libcassandra.so");
 		kvLibName= "libDPSCassandra.so";
+
+		if (handle1 == NULL || handle2 == NULL || handle3 == NULL) {
+		   libraryLoadingError = true;
+		}
 	} else if (noSqlKvStoreProductName.compare("cloudant") == 0) {
-		load_dependent_lib(toolkitDir, "libjson-c.so");
-		load_dependent_lib(toolkitDir, "libcurl.so");
+		handle1 = load_dependent_lib(toolkitDir, "libjson-c.so");
+		handle2 = load_dependent_lib(toolkitDir, "libcurl.so");
 		kvLibName= "libDPSCloudant.so";
+
+		if (handle1 == NULL || handle2 == NULL) {
+		   libraryLoadingError = true;
+		}
 	} else if (noSqlKvStoreProductName.compare("hbase") == 0) {
-		load_dependent_lib(toolkitDir, "libjson-c.so");
-		load_dependent_lib(toolkitDir, "libcurl.so");
+		handle1 = load_dependent_lib(toolkitDir, "libjson-c.so");
+		handle2 = load_dependent_lib(toolkitDir, "libcurl.so");
 		kvLibName= "libDPSHBase.so";
+
+		if (handle1 == NULL || handle2 == NULL) {
+		   libraryLoadingError = true;
+		}
 	} else if (noSqlKvStoreProductName.compare("mongo") == 0) {
-		load_dependent_lib(toolkitDir, "libjson-c.so");
-		load_dependent_lib(toolkitDir, "libbson.so");
-		load_dependent_lib(toolkitDir, "libmongoc.so");
+		handle1 = load_dependent_lib(toolkitDir, "libjson-c.so");
+		handle2 = load_dependent_lib(toolkitDir, "libbson.so");
+		handle3 = load_dependent_lib(toolkitDir, "libmongoc.so");
 		kvLibName= "libDPSMongo.so";
+
+		if (handle1 == NULL || handle2 == NULL || handle3 == NULL) {
+		   libraryLoadingError = true;
+		}
  	} else if (noSqlKvStoreProductName.compare("couchbase") == 0) {
- 		load_dependent_lib(toolkitDir, "libjson-c.so");
- 		load_dependent_lib(toolkitDir,"libcurl.so");
- 		load_dependent_lib(toolkitDir, "libcouchbase.so");
+ 		handle1 = load_dependent_lib(toolkitDir, "libjson-c.so");
+ 		handle2 = load_dependent_lib(toolkitDir,"libcurl.so");
+ 		handle3 = load_dependent_lib(toolkitDir, "libcouchbase.so");
  		kvLibName= "libDPSCouchbase.so";
+
+		if (handle1 == NULL || handle2 == NULL || handle3 == NULL) {
+		   libraryLoadingError = true;
+		}
 #if !( defined (__PPC64__) )
  	} else if (noSqlKvStoreProductName.compare("aerospike") == 0) {
- 		load_dependent_lib(toolkitDir, "libaerospike.so");
+ 		handle1 = load_dependent_lib(toolkitDir, "libaerospike.so");
  		kvLibName= "libDPSAerospike.so";
+
+		if (handle1 == NULL) {
+		   libraryLoadingError = true;
+		}
 #endif
 	} else if (noSqlKvStoreProductName.compare("redis-cluster") == 0) {
-		load_dependent_lib(toolkitDir, "libuv.so");
-		load_dependent_lib(toolkitDir,"libhiredis.so");
+		handle1 = load_dependent_lib(toolkitDir, "libuv.so");
+		handle2 = load_dependent_lib(toolkitDir,"libhiredis.so");
 		kvLibName= "libDPSRedisCluster.so";
+
+		if (handle1 == NULL || handle2 == NULL) {
+		   libraryLoadingError = true;
+		}
 	} else {
 		// Invalid no-sql store product name configured. Abort now.
-		SPLAPPLOG(L_ERROR, DPSMSG_INVALID_PRODUCT(noSqlKvStoreProductName), "DistributedProcessStore");
+                // SPLAPPLOG is causing it to get stuck in RHEL6/CentOS6 (RHEL7/CentOS7 is fine) when the @catch annotation is used in the calling SPL code.
+		// SPLAPPLOG(L_ERROR, DPSMSG_INVALID_PRODUCT(noSqlKvStoreProductName), "DistributedProcessStore");
 		std::string error = "Invalid NoSQL store product name is specified in the configuration file: " + noSqlKvStoreProductName;
 		SPLAPPTRC(L_ERROR, error, "DistributedProcessStore");
 		throw(SPL::SPLRuntimeException("DistributedProcessStore::connectToDatabase", error));
 	}
 
-	std::string secondLevelLib = toolkitLibDir + "/" + kvLibName;
-    //std::cout << "load level2 lib : " << secondLevelLib << "\n";
+        std::string secondLevelLib = toolkitLibDir + "/" + kvLibName;
+        //std::cout << "load level2 lib : " << secondLevelLib << "\n";
 	handle = dlopen(secondLevelLib.c_str(), RTLD_NOW|RTLD_GLOBAL);
-	if (handle == NULL) {
+
+	if (handle == NULL || libraryLoadingError == true) {
 	      std::string error = "Cannot initialize libraries for chosen database " + noSqlKvStoreProductName + ", error message: ";
 	      error.append(dlerror());
 	      SPLAPPTRC(L_ERROR, error, "DistributedProcessStore");
-	      SPLAPPLOG(L_ERROR, DPSMSG_CANNOT_OPEN_LIBS(noSqlKvStoreProductName,dlerror()), "DistributedProcessStore");
+              // SPLAPPLOG is causing it to get stuck in RHEL6/CentOS6 (RHEL7/CentOS7 is fine) when the @catch annotation is used in the calling SPL code.
+	      // SPLAPPLOG(L_ERROR, DPSMSG_CANNOT_OPEN_LIBS(noSqlKvStoreProductName,dlerror()), "DistributedProcessStore");
+
+	      // Unload all the dynamically loaded libraries before throwing an exception.
+	      // If we don't do this, it will cause too many OS dl reference counts for this thread which is not optimal.
+              if (handle1 != NULL) {
+                 dlclose(handle1);
+                 handle1 = NULL;
+	      }
+
+              if (handle2 != NULL) {
+                 dlclose(handle2);
+		 handle2 = NULL;
+	      }
+
+              if (handle3 != NULL) {
+                 dlclose(handle3);
+	         handle3 = NULL;
+	      }
+
+              if (handle != NULL) {
+                 dlclose(handle);
+	         handle = NULL;
+	      }
+
 	      throw(SPL::SPLRuntimeException("DistributedProcessStore::connectToDatabase", error));
 	}
+
 	DBLayer *(*objPtr)()= (DBLayer *(*)())dlsym(handle, "create");
 	DBLayer *newDb = (*objPtr)();
 	if (newDb != NULL) {
 		db_.reset(newDb);
 	} else {
-         SPLAPPLOG(L_ERROR, DPSMSG_CANNOT_INIT_LIBS(noSqlKvStoreProductName,kvLibName), "DistributedProcessStore");
+                 // SPLAPPLOG is causing it to get stuck in RHEL6/CentOS6 (RHEL7/CentOS7 is fine) when the @catch annotation is used in the calling SPL code.
+                 // SPLAPPLOG(L_ERROR, DPSMSG_CANNOT_INIT_LIBS(noSqlKvStoreProductName,kvLibName), "DistributedProcessStore");
 		 std::string error = "Cannot initialize libraries for chosen database " + noSqlKvStoreProductName + ", library " + kvLibName + " missing or corrupted";
 		 SPLAPPTRC(L_ERROR, error, "DistributedProcessStore");
+
+	         // Unload all the dynamically loaded libraries before throwing an exception.
+	         // If we don't do this, it will cause too many OS dl reference counts for this thread which is not optimal.
+                 if (handle1 != NULL) {
+                    dlclose(handle1);
+                    handle1 = NULL;
+	         }
+
+                 if (handle2 != NULL) {
+                    dlclose(handle2);
+		    handle2 = NULL;
+	         }
+
+                 if (handle3 != NULL) {
+                    dlclose(handle3);
+	            handle3 = NULL;
+	         }
+
+                 if (handle != NULL) {
+                    dlclose(handle);
+	            handle = NULL;
+	         }
+
 		 throw(SPL::SPLRuntimeException("DistributedProcessStore::connectToDatabase", error));
 	}
 
@@ -247,7 +340,36 @@ namespace distributed
       std::string error = "Cannot connect to database. ";
       error += "Details: '"+dbError_->getErrorStr()+"'.";
       SPLAPPTRC(L_ERROR, error, "DistributedProcessStore");
-      SPLAPPLOG(L_ERROR, DPSMSG_CANNOT_CONNECT(dbError_->getErrorStr()), "DistributedProcessStore");
+      // SPLAPPLOG is causing it to get stuck in RHEL6/CentOS6 (RHEL7/CentOS7 is fine) when the @catch annotation is used in the calling SPL code.
+      // SPLAPPLOG(L_ERROR, DPSMSG_CANNOT_CONNECT(dbError_->getErrorStr()), "DistributedProcessStore");
+
+      // Unload all the dynamically loaded libraries before throwing an exception.
+      // If we don't do this, it will cause too many OS dl reference counts for this thread which is not optimal.
+      if (handle1 != NULL) {
+         dlclose(handle1);
+         handle1 = NULL;
+      }
+
+      if (handle2 != NULL) {
+         dlclose(handle2);
+         handle2 = NULL;
+      }
+
+      if (handle3 != NULL) {
+         dlclose(handle3);
+         handle3 = NULL;
+      }
+
+      if (handle != NULL) {
+         dlclose(handle);
+         handle = NULL;
+      }
+
+      // Deallocate and destruct the object pointed to by our auto ptrs.
+      db_.reset();
+      dbError_.reset();
+      lkError_.reset();
+
       throw(SPL::SPLRuntimeException("DistributedProcessStore::connectToDatabase", error));
     }
   }

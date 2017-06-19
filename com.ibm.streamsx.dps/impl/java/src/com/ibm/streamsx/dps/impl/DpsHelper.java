@@ -273,6 +273,13 @@ public class DpsHelper {
 		
 		return(byteBufferObjectArray);
 	}
+
+        // Set the user specified DPS configuration file name.
+        public String dpsSetConfigFile(String dpsConfigFileName) {
+               String result = dpsSetConfigFileCpp(dpsConfigFileName);
+               return(result);
+        }
+        
 	
 	// Get the error code for the most recently performed dps activity.
 	public long dpsGetLastStoreErrorCode() {
