@@ -160,6 +160,8 @@ namespace distributed
           // an optional Redis authentication password as shown below.
           // server:port:RedisPassword
           string targetServerPassword = "";
+          string targetServerName = "";
+          int targetServerPort = 0;
 
 	  // We need only one server in the Redis cluster to do the cluster based Redis HA operations.
 	  for (std::set<std::string>::iterator it=dbServers.begin(); it!=dbServers.end(); ++it) {
@@ -174,9 +176,9 @@ namespace distributed
 			  return;
 		  } else {
 			  // Redis server name must have a port number specified along with it --> MyHost:2345
-			  string targetServerName = "";
-			  int targetServerPort = 0;
 			  char serverNameBuf[300];
+                          targetServerName = "";
+                          targetServerPort = 0;
 			  strcpy(serverNameBuf, serverName.c_str());
 			  char *ptr = strtok(serverNameBuf, ":");
 
@@ -224,9 +226,6 @@ namespace distributed
 				return;
 			  }
 
-			  char msg[128];
-			  sprintf(msg, "%d", targetServerPort);
-			  SPLAPPTRC(L_ERROR, "Connecting to a Redis cluster node " << targetServerName << " on port " << string(msg), "RedisClusterDBLayer");
                           // Senthil added this cautionary comment on May/03/2017.
                           // CAUTION: Current redis cluster version as of May/03/2017 is 2.3.8.
                           // In that version, if we enable the requirepass configuration for the redis cluster machines,
@@ -269,11 +268,14 @@ namespace distributed
 
 		  // Check if there was any connection error.
 		  if (redisClusterConnectionErrorMsg != "") {
+                          cout << "Unable to connect to the Redis cluster node " << targetServerName << " on port " << targetServerPort << endl;
 			  dbError.set(redisClusterConnectionErrorMsg, DPS_INITIALIZE_ERROR);
 			  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" <<
 				  redisClusterConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisClusterDBLayer");
 			  return;
 		  }
+
+                  cout << "Successfully connected to the Redis cluster node " << targetServerName << " on port " << targetServerPort << endl;
 	  }
 
 	  // We have now made connection to one server in a redis-cluster.
