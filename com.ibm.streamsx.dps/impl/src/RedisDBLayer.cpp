@@ -171,6 +171,8 @@ namespace distributed
           // an optional Redis authentication password as shown below.
           // server:port:RedisPassword
           string targetServerPassword = "";
+	  string targetServerName = "";
+	  int targetServerPort = 0;
 
 	  // When the Redis cluster releases with support for the hiredis client, then change this logic to
 	  // take advantage of the Redis cluster features.
@@ -192,8 +194,6 @@ namespace distributed
 			  } else {
 				  struct timeval timeout = { 1, 500000 }; // 1.5 seconds {tv_sec, tv_microsecs}
 	              // Redis server name can have port number specified along with it --> MyHost:2345
-	              string targetServerName = "";
-	              int targetServerPort = 0;
 	              char serverNameBuf[300];
 	              strcpy(serverNameBuf, serverName.c_str());
 	              char *ptr = strtok(serverNameBuf, ":");
@@ -235,9 +235,6 @@ namespace distributed
 	                targetServerPort = REDIS_SERVER_PORT;
 	              }
 
-	              char msg[128];
-	              sprintf(msg, "%d", targetServerPort);
-	              SPLAPPTRC(L_ERROR, "Connecting to the Redis server " << targetServerName << " on port " << string(msg), "RedisDBLayer");
 	              redisPartitions[0].rdsc = redisConnectWithTimeout(targetServerName.c_str(), targetServerPort, timeout);
 			  }
 
@@ -245,6 +242,8 @@ namespace distributed
 				  if (redisPartitions[0].rdsc) {
 					  redisConnectionErrorMsg += " Connection error: " + string(redisPartitions[0].rdsc->errstr);
 				  }
+
+                                  cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
 			  } else {
 				  // We connected to at least one redis server. That is enough for our needs.
                                   // If the user configured it with a Redis auth password, then we must authenticate now.
@@ -258,12 +257,14 @@ namespace distributed
 	                             // If we get a NULL reply, then it indicates a redis server connection error.
 	                             if (redis_reply == NULL) {
 		                        // When this error occurs, we can't reuse that redis context for further server commands. This is a serious error.
+                                        cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
 		                        dbError.set("Unable to authenticate to the redis server(s). Possible connection breakage. " + std::string(redisPartitions[0].rdsc->errstr), DPS_CONNECTION_ERROR);
 		                        SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication with an error " << string("Possible connection breakage. ") << DPS_CONNECTION_ERROR, "RedisDBLayer");
 		                        return;
 	                             }
 
 	                             if (redis_reply->type == REDIS_REPLY_ERROR) {
+                                        cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
 		                        dbError.set("Unable to authenticate to the Redis server. Error msg=" + std::string(redis_reply->str), DPS_AUTHENTICATION_ERROR);
 		                        SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication. error=" << redis_reply->str << ", rc=" << DPS_AUTHENTICATION_ERROR, "RedisDBLayer");
 		                        freeReplyObject(redis_reply);
@@ -275,6 +276,7 @@ namespace distributed
 
 				  // Reset the error string.
 				  redisConnectionErrorMsg = "";
+                                  cout << "Successfully connected to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
 				  break;
 			  }
 		  }
@@ -311,9 +313,9 @@ namespace distributed
 			  idx++;
 
               // Redis server name can have port number and password specified along with it --> MyHost:2345:MyPassword
+              targetServerName = "";
+              targetServerPort = 0;
               targetServerPassword = "";
-              string targetServerName = "";
-              int targetServerPort = 0;
               char serverNameBuf[300];
               strcpy(serverNameBuf, serverName.c_str());
               char *ptr = strtok(serverNameBuf, ":");
@@ -355,9 +357,6 @@ namespace distributed
                 targetServerPort = REDIS_SERVER_PORT;
               }
 
-              char msg[128];
-              sprintf(msg, "%d", targetServerPort);
-              SPLAPPTRC(L_ERROR, "Connecting to the Redis server " << targetServerName << " on port " << string(msg), "RedisDBLayer");
 			  redisPartitions[idx].rdsc = redisConnectWithTimeout(targetServerName.c_str(), targetServerPort, timeout);
 
 			  if (redisPartitions[idx].rdsc == NULL || redisPartitions[idx].rdsc->err) {
@@ -376,6 +375,7 @@ namespace distributed
 					  }
 				  }
 
+                                  cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
 				  dbError.set(redisConnectionErrorMsg, DPS_INITIALIZE_ERROR);
 				  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" << redisConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisDBLayer");
 				  return;
@@ -389,6 +389,7 @@ namespace distributed
 	                     // If we get a NULL reply, then it indicates a redis server connection error.
 	                     if (redis_reply == NULL) {
 		                // When this error occurs, we can't reuse that redis context for further server commands. This is a serious error.
+                                cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
 		                dbError.set("Unable to authenticate to the redis server(s). Possible connection breakage. " + std::string(redisPartitions[idx].rdsc->errstr), DPS_CONNECTION_ERROR);
 		                SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication with an error " << string("Possible connection breakage. ") << DPS_CONNECTION_ERROR, "RedisDBLayer");
 
@@ -405,6 +406,7 @@ namespace distributed
 	                     }
 
 	                     if (redis_reply->type == REDIS_REPLY_ERROR) {
+                                cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
 		                dbError.set("Unable to authenticate to the Redis server. Error msg=" + std::string(redis_reply->str), DPS_AUTHENTICATION_ERROR);
 		                SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication. error=" << redis_reply->str << ", rc=" << DPS_AUTHENTICATION_ERROR, "RedisDBLayer");
 
@@ -425,6 +427,7 @@ namespace distributed
                              freeReplyObject(redis_reply);
                           } // End of Redis authentication.
 
+                          cout << "Successfully connected to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
 		  } // End of for loop.
 	  }
 
