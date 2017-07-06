@@ -1,3 +1,5 @@
+## Overview ##
+
 The IBMStreams/streamsx.dps GitHub repository is home to the Streams toolkit named
 DPS (Distributed Process Store). This Streams toolkit allows a simple way for the
 SPL, C++ and Java operators belonging to a single or multiple applications to share
@@ -27,7 +29,7 @@ for getting a good start in using this toolkit.
 Things to consider when working with this toolkit:
 * [The messages and the NLS for toolkits](https://github.com/IBMStreams/administration/wiki/Messages-and-National-Language-Support-for-toolkits)
 
-To learn more about Streams:
+## Learn more about Streams ##
 * [IBM Streams on Github](http://ibmstreams.github.io)
 * [Introduction to Streams Quick Start Edition](http://ibmstreams.github.io/streamsx.documentation/docs/4.1/qse-intro/)
 * [Streams Getting Started Guide](http://ibmstreams.github.io/streamsx.documentation/docs/4.1/qse-getting-started/)
