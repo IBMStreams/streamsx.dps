@@ -24,7 +24,11 @@
 
 DPS_TOOLKIT_HOME ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.dps
 
-SPLC_FLAGS ?= -a -z -t $(DPS_TOOLKIT_HOME)
+# the dps-helper is copied from the toolkit to the impl/lib direcrory of the application
+# to ensure it is included in the SAB file
+DPS_HELPER_JAR = $(DPS_TOOLKIT_HOME)/impl/java/lib/dps-helper.jar
+
+SPLC_FLAGS ?= -a -t $(DPS_TOOLKIT_HOME)
 SPLC = $(STREAMS_INSTALL)/bin/sc
 SPL_CMD_ARGS ?= --data-directory=./data 
 SPL_MAIN_COMPOSITE = application::JavaDPSDemo
@@ -35,10 +39,14 @@ all: distributed
 distributed: java
 	$(SPLC) $(SPLC_FLAGS) -M $(SPL_MAIN_COMPOSITE) $(SPL_CMD_ARGS) --output-directory=./output/JavaDPSDemo/Distributed
 
-java: $(JAVA_CLASS_FILES)  
+java: $(JAVA_CLASS_FILES)
+	mkdir -p impl/lib
+	cp $(DPS_HELPER_JAR) impl/lib
 	JAVA_HOME=$(STREAMS_INSTALL)/java ant
 
 clean: 
 	ant clean
 	$(SPLC) $(SPLC_FLAGS) -C -M $(SPL_MAIN_COMPOSITE)
 	rm -rf output/JavaDPSDemo/Distributed
+	rm -f impl/lib/dps-helper.jar
+
