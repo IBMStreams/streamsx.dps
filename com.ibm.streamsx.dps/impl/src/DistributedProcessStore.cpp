@@ -949,7 +949,10 @@ namespace distributed
             myVector.push_back(*it);
          }
 
-    	 SPL::boolean result = db_->runDataStoreCommand(myVector, resultValue, *dbError_);
+         // if we pass a non-const SPL::rstring as std::string the code will not compile on PPC architecture, so we convert manually
+         std::string tmpResultValue = "";
+    	 SPL::boolean result = db_->runDataStoreCommand(myVector, tmpResultValue, *dbError_);
+    	 resultValue = static_cast<SPL::rstring>(tmpResultValue);
     	 err = dbError_->getErrorCode();
     	 return result;
      }

@@ -5,7 +5,7 @@
 namespace com.ibm.streamsx.store.distributed; 
 
 /**
- * DpsPutTTLComposite 
+ * DpsPutTTLWithReconnect
  * Uses the dpsPutTTL function to write key-value pairs to Redis (of any type). 
  * The purpose of this composite is to provide extensive error handling, a reconnection
  * policy, and a complete set of informative metrics. 

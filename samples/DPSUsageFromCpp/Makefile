@@ -32,9 +32,12 @@ OUTPUT_DIRECTORY = ./output/Main/Distributed
 
 all: distributed
 
-distributed:
+distributed: checkperms
 	$(SPLC) $(SPLC_FLAGS) -M $(SPL_MAIN_COMPOSITE) $(SPL_CMD_ARGS) --output-directory=$(OUTPUT_DIRECTORY)
 
 clean: 
 	$(SPLC) $(SPLC_FLAGS) -C -M $(SPL_MAIN_COMPOSITE) --output-directory=$(OUTPUT_DIRECTORY)
+
+checkperms:
+	chmod +x impl/bin/*
 

@@ -5,7 +5,7 @@
 namespace com.ibm.streamsx.store.distributed;
 
 /**
- * DpsGetTTLComposite 
+ * DpsGetTTLWithReconnect 
  * Uses the dpsGetTTL function to read key-value pairs from DPS (of any type). 
  * The purpose of this composite is to provide extensive error handling, a reconnection
  * policy, and a complete set of informative metrics. 
