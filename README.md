@@ -22,11 +22,13 @@ DPS toolkit for the purpose of sharing application state in a distributed manner
 <li>Redis-Cluster   [New cluster feature is available in Redis version 3 and above]</li>
 </ol>
 
-There are plenty of details available about the installation, configuration, API description,
-built-in example etc. Please refer to the com.ibm.streamsx.dps/doc/dps-usage-tips.txt file
-for getting a good start in using this toolkit.  
+## Documentation ##
 
-Things to consider when working with this toolkit:
+For an API description see the [GitHub pages](http://ibmstreams.github.io/streamsx.dps) for this toolkit.
+The documentation is also available locally in the doc folder, after building the toolkit.
+For configuration hints and other information, see the [Wiki pages](https://github.com/IBMStreams/streamsx.dps/wiki)
+
+Other things to consider when working with this toolkit:
 * [The messages and the NLS for toolkits](https://github.com/IBMStreams/administration/wiki/Messages-and-National-Language-Support-for-toolkits)
 
 ## Learn more about Streams ##
