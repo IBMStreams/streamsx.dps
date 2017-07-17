@@ -188,6 +188,7 @@ composite JavaDPSDemo {
 		
 		() as Sink = FileSink(RetrievedIds){
 			param
-				file: "TickersAndIds.txt";
+				file: "/tmp/TickersAndIds.txt";
+				flush : 1u ;
 		}
 }

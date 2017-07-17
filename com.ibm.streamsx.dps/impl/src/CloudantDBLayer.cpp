@@ -940,7 +940,7 @@ namespace distributed
   // Put a data item with a TTL (Time To Live in seconds) value into the global area of the Cloudant DB.
   bool CloudantDBLayer::putTTL(char const * keyData, uint32_t keySize,
 		  	  	  	  	    unsigned char const * valueData, uint32_t valueSize,
-							uint32_t ttl, PersistenceError & dbError)
+							uint32_t ttl, PersistenceError & dbError, bool encodeKey, bool encodeValue)
   {
 	  SPLAPPTRC(L_DEBUG, "Inside putTTL.", "CloudantDBLayer");
 	  // This API can only be supported in NoSQL data stores such as Memcached, Redis, Cassandra, etc.
@@ -1032,7 +1032,7 @@ namespace distributed
 
   // Get a TTL based data item that is stored in the global area of the Cloudant DB.
    bool CloudantDBLayer::getTTL(char const * keyData, uint32_t keySize,
-                              unsigned char * & valueData, uint32_t & valueSize, PersistenceError & dbError)
+                              unsigned char * & valueData, uint32_t & valueSize, PersistenceError & dbError, bool encodeKey)
    {
 		SPLAPPTRC(L_DEBUG, "Inside getTTL.", "CloudantDBLayer");
 
@@ -1104,7 +1104,7 @@ namespace distributed
 
   // Remove a TTL based data item that is stored in the global area of the Cloudant DB.
   bool CloudantDBLayer::removeTTL(char const * keyData, uint32_t keySize,
-                                PersistenceError & dbError)
+                                PersistenceError & dbError, bool encodeKey)
   {
 		SPLAPPTRC(L_DEBUG, "Inside removeTTL.", "CloudantDBLayer");
 
@@ -1157,7 +1157,7 @@ namespace distributed
 
   // Check for the existence of a TTL based data item that is stored in the global area of the Cloudant DB.
   bool CloudantDBLayer::hasTTL(char const * keyData, uint32_t keySize,
-                             PersistenceError & dbError)
+                             PersistenceError & dbError, bool encodeKey)
   {
 		SPLAPPTRC(L_DEBUG, "Inside hasTTL.", "CloudantDBLayer");
 
@@ -2015,6 +2015,14 @@ namespace distributed
 		// user provided return variable.
 		jsonResponse = string(curlBuffer);
 		return(true);
+  }
+
+  bool CloudantDBLayer::runDataStoreCommand(std::vector<std::string> const & cmdList, std::string & resultValue, PersistenceError & dbError) {
+		// This API can only be supported in Redis.
+		// Cloudant doesn't have a way to do this.
+		dbError.set("From Cloudant data store: This API to run native data store commands is not supported in cloudant.", DPS_RUN_DATA_STORE_COMMAND_ERROR);
+		SPLAPPTRC(L_DEBUG, "From Cloudant data store: This API to run native data store commands is not supported in cloudant. " << DPS_RUN_DATA_STORE_COMMAND_ERROR, "CloudantDBLayer");
+		return(false);
   }
 
   // This method will get the data item from the store for a given key.
@@ -3861,6 +3869,16 @@ namespace distributed
 	  return(cloudantResult);
   }
 
+  // This method will return the status of the connection to the back-end data store.
+  bool CloudantDBLayer::isConnected() {
+          // Not implemented at this time.
+          return(true);
+  }
+
+  bool CloudantDBLayer::reconnect(std::set<std::string> & dbServers, PersistenceError & dbError) {
+          // Not implemented at this time.
+          return(true);
+  }
 
 } } } } }
 using namespace com::ibm::streamsx::store;

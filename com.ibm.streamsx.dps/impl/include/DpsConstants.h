@@ -76,6 +76,7 @@ interface with many different back-end in-memory stores.
 #define REDIS_HDEL_CMD												"hdel "
 #define REDIS_HLEN_CMD												"hlen "
 #define REDIS_HKEYS_CMD												"hkeys "
+#define REDIS_AUTH_CMD                                                                                          "auth "
 #define CASSANDRA_DPS_KEYSPACE										"com_ibm_streamsx_dps"
 #define CASSANDRA_DPS_MAIN_TABLE									"t1"
 #define HBASE_DPS_MAIN_TABLE										"dps_t1"
@@ -209,6 +210,7 @@ interface with many different back-end in-memory stores.
 #define DPS_MAKE_DURABLE_ERROR										155
 #define DPS_STORE_FATAL_ERROR										156
 #define DPS_STORE_UNKNOWN_STATE_ERROR								157
+#define DPS_AUTHENTICATION_ERROR                                                                158
 
 #define DL_CONNECTION_ERROR											501
 #define DL_GET_LOCK_ID_ERROR										502

@@ -898,7 +898,7 @@ namespace distributed
   // Put a data item with a TTL (Time To Live in seconds) value into the global area of the Cassandra DB.
   bool CassandraDBLayer::putTTL(char const * keyData, uint32_t keySize,
 		  	  	  	  	    unsigned char const * valueData, uint32_t valueSize,
-							uint32_t ttl, PersistenceError & dbError)
+							uint32_t ttl, PersistenceError & dbError, bool encodeKey, bool encodeValue)
   {
 	  SPLAPPTRC(L_DEBUG, "Inside putTTL.", "CassandraDBLayer");
 
@@ -907,7 +907,23 @@ namespace distributed
 
 	  // In our Cassandra dps implementation, data item keys can have space characters.
 	  string base64_encoded_data_item_key;
-	  base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+
+          if (encodeKey == true) {
+	     base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+          } else {
+             // Since the key data sent here will always be in the network byte buffer format (NBF), 
+             // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+             // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+             // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+             if ((uint8_t)keyData[0] < 0x80) {
+                // Skip the first length byte. 
+                base64_encoded_data_item_key = string(&keyData[1], keySize-1);  
+             } else {
+                // Skip the five bytes at the beginning that represent the length of the key data.
+                base64_encoded_data_item_key = string(&keyData[5], keySize-5);
+             }
+          }
+
 	  // We are ready to either store a new data item or update an existing data item with a TTL value specified in seconds.
 	  string storeRowName = string(DPS_TTL_STORE_TOKEN);
 	  string statementString = "";
@@ -1031,13 +1047,28 @@ namespace distributed
 
   // Get a TTL based data item that is stored in the global area of the Cassandra DB.
   bool CassandraDBLayer::getTTL(char const * keyData, uint32_t keySize,
-                              unsigned char * & valueData, uint32_t & valueSize, PersistenceError & dbError)
+                              unsigned char * & valueData, uint32_t & valueSize, PersistenceError & dbError, bool encodeKey)
   {
 	  SPLAPPTRC(L_DEBUG, "Inside getTTL.", "CassandraDBLayer");
 
 	  // In our Cassandra dps implementation, data item keys can have space characters.
 	  string base64_encoded_data_item_key;
-	  base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+
+          if (encodeKey == true) {
+	     base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+          } else {
+             // Since the key data sent here will always be in the network byte buffer format (NBF), 
+             // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+             // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+             // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+             if ((uint8_t)keyData[0] < 0x80) {
+                // Skip the first length byte. 
+                base64_encoded_data_item_key = string(&keyData[1], keySize-1);  
+             } else {
+                // Skip the five bytes at the beginning that represent the length of the key data.
+                base64_encoded_data_item_key = string(&keyData[5], keySize-5);
+             }
+          }
 
 	  // Since this is a data item with TTL, it is stored in the global area of Cassandra and not inside a user created store.
 	  string storeRowName = string(DPS_TTL_STORE_TOKEN);
@@ -1181,13 +1212,29 @@ namespace distributed
 
   // Remove a TTL based data item that is stored in the global area of the Cassandra DB.
   bool CassandraDBLayer::removeTTL(char const * keyData, uint32_t keySize,
-                                PersistenceError & dbError)
+                                PersistenceError & dbError, bool encodeKey)
   {
 		SPLAPPTRC(L_DEBUG, "Inside removeTTL.", "CassandraDBLayer");
 
 		// In our Cassandra dps implementation, data item keys can have space characters.
 		string base64_encoded_data_item_key;
-		base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+
+                if (encodeKey == true) {
+	           base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+                } else {
+                   // Since the key data sent here will always be in the network byte buffer format (NBF), 
+                   // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+                   // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+                   // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+                   if ((uint8_t)keyData[0] < 0x80) {
+                      // Skip the first length byte. 
+                      base64_encoded_data_item_key = string(&keyData[1], keySize-1);  
+                   } else {
+                      // Skip the five bytes at the beginning that represent the length of the key data.
+                      base64_encoded_data_item_key = string(&keyData[5], keySize-5);
+                   }
+                }
+
 		string storeRowName = string(DPS_TTL_STORE_TOKEN);
 		string errorMsg = "";
 		// Delete the data item now.
@@ -1250,13 +1297,28 @@ namespace distributed
 
   // Check for the existence of a TTL based data item that is stored in the global area of the Cassandra DB.
   bool CassandraDBLayer::hasTTL(char const * keyData, uint32_t keySize,
-                             PersistenceError & dbError)
+                             PersistenceError & dbError, bool encodeKey)
   {
 		SPLAPPTRC(L_DEBUG, "Inside hasTTL.", "CassandraDBLayer");
 
 		// In our Cassandra dps implementation, data item keys can have space characters.
 		string base64_encoded_data_item_key;
-		base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+
+                if (encodeKey == true) {
+	           base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+                } else {
+                   // Since the key data sent here will always be in the network byte buffer format (NBF), 
+                   // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+                   // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+                   // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+                   if ((uint8_t)keyData[0] < 0x80) {
+                      // Skip the first length byte. 
+                      base64_encoded_data_item_key = string(&keyData[1], keySize-1);  
+                   } else {
+                      // Skip the five bytes at the beginning that represent the length of the key data.
+                      base64_encoded_data_item_key = string(&keyData[5], keySize-5);
+                   }
+                }
 
 		// Since this is a data item with TTL, it is stored in the global area of Cassandra and not inside a user created store.
 		string storeRowName = string(DPS_TTL_STORE_TOKEN);
@@ -2034,6 +2096,14 @@ namespace distributed
 		std::string const & baseUrl, std::string const & apiEndpoint, std::string const & queryParams,
 		std::string const & jsonRequest, std::string & jsonResponse, PersistenceError & dbError) {
 		// This API can only be supported in NoSQL data stores such as Cloudant etc.
+		// Cassandra doesn't have a way to do this.
+		dbError.set("From Cassandra data store: This API to run native data store commands is not supported in Cassandra.", DPS_RUN_DATA_STORE_COMMAND_ERROR);
+		SPLAPPTRC(L_DEBUG, "From Cassandra data store: This API to run native data store commands is not supported in Cassandra. " << DPS_RUN_DATA_STORE_COMMAND_ERROR, "CassandraDBLayer");
+		return(false);
+  }
+
+  bool CassandraDBLayer::runDataStoreCommand(std::vector<std::string> const & cmdList, std::string & resultValue, PersistenceError & dbError) {
+		// This API can only be supported in Redis.
 		// Cassandra doesn't have a way to do this.
 		dbError.set("From Cassandra data store: This API to run native data store commands is not supported in Cassandra.", DPS_RUN_DATA_STORE_COMMAND_ERROR);
 		SPLAPPTRC(L_DEBUG, "From Cassandra data store: This API to run native data store commands is not supported in Cassandra. " << DPS_RUN_DATA_STORE_COMMAND_ERROR, "CassandraDBLayer");
@@ -3159,6 +3229,17 @@ namespace distributed
 	  } else {
 		  return(_lockOwningPid);
 	  }
+  }
+
+  // This method will return the status of the connection to the back-end data store.
+  bool CassandraDBLayer::isConnected() {
+          // Not implemented at this time.
+          return(true);
+  }
+
+  bool CassandraDBLayer::reconnect(std::set<std::string> & dbServers, PersistenceError & dbError) {
+          // Not implemented at this time.
+          return(true);
   }
 
 } } } } }

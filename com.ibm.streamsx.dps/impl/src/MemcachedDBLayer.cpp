@@ -970,7 +970,7 @@ namespace distributed
   // Put a data item with a TTL (Time To Live in seconds) value into the global area of the memcached DB.
   bool MemcachedDBLayer::putTTL(char const * keyData, uint32_t keySize,
                              unsigned char const * valueData, uint32_t valueSize,
-                             uint32_t ttl, PersistenceError & dbError)
+                             uint32_t ttl, PersistenceError & dbError, bool encodeKey, bool encodeValue)
   {
 	SPLAPPTRC(L_DEBUG, "Inside putTTL.", "MemcachedDBLayer");
 
@@ -980,7 +980,22 @@ namespace distributed
 	// In memcached, data item keys can't have space characters.
 	// Hence, we have to base64 encode them.
 	string base64_encoded_data_item_key;
-	base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+
+        if (encodeKey == true) {
+	   base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+        } else {
+            // Since the key data sent here will always be in the network byte buffer format (NBF), 
+            // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+            // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+            // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+            if ((uint8_t)keyData[0] < 0x80) {
+               // Skip the first length byte. 
+               base64_encoded_data_item_key = string(&keyData[1], keySize-1);  
+            } else {
+               // Skip the five bytes at the beginning that represent the length of the key data.
+               base64_encoded_data_item_key = string(&keyData[5], keySize-5);
+            }
+        }
 
 	// Set the TTL expiration value for this data item.
 	time_t ttlValue = time(NULL);
@@ -1093,7 +1108,7 @@ namespace distributed
 
   // Get a TTL based data item that is stored in the global area of the memcached DB.
   bool MemcachedDBLayer::getTTL(char const * keyData, uint32_t keySize,
-                             unsigned char * & valueData, uint32_t & valueSize, PersistenceError & dbError)
+                             unsigned char * & valueData, uint32_t & valueSize, PersistenceError & dbError, bool encodeKey)
   {
 	SPLAPPTRC(L_DEBUG, "Inside getTTL.", "MemcachedDBLayer");
 
@@ -1101,7 +1116,22 @@ namespace distributed
 	memcached_return_t rc;
 	size_t return_value_length;
 	string base64_encoded_data_item_key;
-	base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+
+        if (encodeKey == true) {
+	   base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+        } else {
+            // Since the key data sent here will always be in the network byte buffer format (NBF), 
+            // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+            // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+            // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+            if ((uint8_t)keyData[0] < 0x80) {
+               // Skip the first length byte. 
+               base64_encoded_data_item_key = string(&keyData[1], keySize-1);  
+            } else {
+               // Skip the five bytes at the beginning that represent the length of the key data.
+               base64_encoded_data_item_key = string(&keyData[5], keySize-5);
+            }
+        }
 
 	char *response  = memcached_get(memc,
 		base64_encoded_data_item_key.c_str(),
@@ -1369,14 +1399,30 @@ namespace distributed
 
   // Remove a TTL based data item that is stored in the global area of the memcached DB.
   bool MemcachedDBLayer::removeTTL(char const * keyData, uint32_t keySize,
-                                PersistenceError & dbError)
+                                PersistenceError & dbError, bool encodeKey)
   {
 	SPLAPPTRC(L_DEBUG, "Inside removeTTL.", "MemcachedDBLayer");
 
 	// In memcached, data item keys can't have space characters.
 	// Hence, we have to base64 encode them.
 	string base64_encoded_data_item_key;
-	base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+
+        if (encodeKey == true) {
+	   base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+        } else {
+            // Since the key data sent here will always be in the network byte buffer format (NBF), 
+            // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+            // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+            // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+            if ((uint8_t)keyData[0] < 0x80) {
+               // Skip the first length byte. 
+               base64_encoded_data_item_key = string(&keyData[1], keySize-1);  
+            } else {
+               // Skip the five bytes at the beginning that represent the length of the key data.
+               base64_encoded_data_item_key = string(&keyData[5], keySize-5);
+            }
+        }
+
 	memcached_return_t rc;
 	rc = memcached_delete(memc, base64_encoded_data_item_key.c_str(), base64_encoded_data_item_key.length(), (time_t)0);
 
@@ -1438,14 +1484,30 @@ namespace distributed
 
   // Check for the existence of a TTL based data item that is stored in the global area of the memcached DB.
   bool MemcachedDBLayer::hasTTL(char const * keyData, uint32_t keySize,
-                             PersistenceError & dbError)
+                             PersistenceError & dbError, bool encodeKey)
   {
 	SPLAPPTRC(L_DEBUG, "Inside hasTTL.", "MemcachedDBLayer");
 
 	memcached_return_t rc;
 	std::string keyDataString;
 	// Let us base64 encode the data item's key.
-	base64_encode(std::string(keyData, keySize), keyDataString);
+
+        if (encodeKey == true) {
+	   base64_encode(string(keyData, keySize), keyDataString);
+        } else {
+            // Since the key data sent here will always be in the network byte buffer format (NBF), 
+            // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+            // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+            // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+            if ((uint8_t)keyData[0] < 0x80) {
+               // Skip the first length byte. 
+               keyDataString = string(&keyData[1], keySize-1);  
+            } else {
+               // Skip the five bytes at the beginning that represent the length of the key data.
+               keyDataString = string(&keyData[5], keySize-5);
+            }
+        }
+
 	rc = memcached_exist(memc, keyDataString.c_str(), keyDataString.length());
 
 	if ((rc != MEMCACHED_SUCCESS) && (rc != MEMCACHED_NOTFOUND)) {
@@ -1973,6 +2035,15 @@ namespace distributed
 		SPLAPPTRC(L_DEBUG, "From Memcached data store: This API to run native data store commands is not supported in memcached. " << DPS_RUN_DATA_STORE_COMMAND_ERROR, "MemcachedDBLayer");
 		return(false);
   }
+
+  bool MemcachedDBLayer::runDataStoreCommand(std::vector<std::string> const & cmdList, std::string & resultValue, PersistenceError & dbError) {
+		// This API can only be supported in Redis.
+		// Memcached doesn't have a way to do this.
+		dbError.set("From Memcached data store: This API to run native data store commands is not supported in memcached.", DPS_RUN_DATA_STORE_COMMAND_ERROR);
+		SPLAPPTRC(L_DEBUG, "From Memcached data store: This API to run native data store commands is not supported in memcached. " << DPS_RUN_DATA_STORE_COMMAND_ERROR, "MemcachedDBLayer");
+		return(false);
+  }
+
 
   // This method will get either the catalog segment index or the data item or both.
   // Caller of this method can indicate their preference.
@@ -2877,6 +2948,16 @@ namespace distributed
 	  }
   }
 
+  // This method will return the status of the connection to the back-end data store.
+  bool MemcachedDBLayer::isConnected() {
+          // Not implemented at this time.
+          return(true);
+  }
+
+  bool MemcachedDBLayer::reconnect(std::set<std::string> & dbServers, PersistenceError & dbError) {
+          // Not implemented at this time.
+          return(true);
+  }
 
 } } } } }
 using namespace com::ibm::streamsx::store;

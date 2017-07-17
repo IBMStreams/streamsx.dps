@@ -10,6 +10,8 @@
 // find an existing store or remove an existing store.
 package com.ibm.streamsx.dps.impl;
 
+import com.ibm.streams.operator.types.*;
+
 import com.ibm.streamsx.dps.Store;
 import com.ibm.streamsx.dps.StoreFactory;
 import com.ibm.streamsx.dps.StoreFactoryException;
@@ -121,15 +123,36 @@ public class StoreFactoryImpl implements StoreFactory
 	// Since these functions don't need a store object to perform put, get, has, and remove of the TTL based
 	// K/V pairs, we are implementing them here in the StoreFactoryImpl class instead of in the StoreImpl class.
 	//
+
+        // Overloaded method (with no encodeKey and encodeValue method arguments)
 	// Put a data item with TTL (Time To Live in seconds) into the global area of the back-end data store.
 	public <T1, T2> boolean putTTL(T1 key, T2 value, int ttl, String keySplTypeName, String valueSplTypeName) throws StoreFactoryException {
+           // Call the other overloaded method by passing storedKeyValueSize array, encodeKey=true and encodeValue=true. 
+           int[] storedKeyValueSize = new int[2];
+           return(putTTL(key, value, ttl, keySplTypeName, valueSplTypeName, storedKeyValueSize, true, true));
+        }
+
+        // Overloaded method (with three additional arguments: storedKeyValueSize, encodeKey and encodeValue)
+	public <T1, T2> boolean putTTL(T1 key, T2 value, int ttl, String keySplTypeName, String valueSplTypeName, int[] storedKeyValueSize, boolean encodeKey, boolean encodeValue) throws StoreFactoryException {
 		boolean result;
 		long[] err = new long[1];
 		DpsHelper dps = null;
-		
+
+                // Validate that the caller can ask us not to encode the key only for rstring data type.
+                if (encodeKey == false && keySplTypeName != "rstring") {
+                   // It is non-rstring data type. We must base64 encode the data.
+                   encodeKey = true;
+                }
+
+                // Validate that the caller can ask us not to encode the value only for rstring data type.
+                if (encodeValue == false && valueSplTypeName != "rstring") {
+                   // It is non-rstring data type. We must base64 encode the data.
+                   encodeValue = true;
+                }
+
 		try {
 			dps = DpsHelperHolder.getDpsHelper();
-			result = dps.dpsPutTTL(key, value, ttl, keySplTypeName, valueSplTypeName, err);
+			result = dps.dpsPutTTL(key, value, ttl, keySplTypeName, valueSplTypeName, err, storedKeyValueSize, encodeKey, encodeValue);
 		} catch(Exception e) {
 			// Either dps cannot be initialized or putTTL went wrong.
 			// An error code of 65535 indicates that this error occurred inside
@@ -143,17 +166,44 @@ public class StoreFactoryImpl implements StoreFactory
 		}
 		
 		return(result);
+           
+        }
+
+        // Overloaded method (with two additional arguments: 
+	// Put a data item with TTL (Time To Live in seconds) into the global area of the back-end data store.
+	public <T1, T2> boolean putTTL(T1 key, T2 value, int ttl, String keySplTypeName, String valueSplTypeName, boolean encodeKey, boolean encodeValue) throws StoreFactoryException {
+               int[] storedKeyValueSize = new int[2];
+               return(putTTL(key, value, ttl, keySplTypeName, valueSplTypeName, storedKeyValueSize, encodeKey, encodeValue));
 	}
-	
+
+        // Overloaded method (with no encodeKey method argument)
 	// Get a TTL based K/V pair stored in the global area of the back-end data store.
 	public <T1> Object getTTL(T1 key, String keySplTypeName, String valueSplTypeName) throws StoreFactoryException {
+           // Call the other overloaded method by passing encodeKey=true and encodeValue=true. 
+           return(getTTL(key, keySplTypeName, valueSplTypeName, true, true));
+        }
+	
+	// Get a TTL based K/V pair stored in the global area of the back-end data store.
+	public <T1> Object getTTL(T1 key, String keySplTypeName, String valueSplTypeName, boolean encodeKey, boolean encodeValue) throws StoreFactoryException {
 		Object result = null;
 		long[] err = new long[1];
 		DpsHelper dps = null;
 		
+                // Validate that the caller can ask us not to encode the key only for rstring data type.
+                if (encodeKey == false && keySplTypeName != "rstring") {
+                   // It is non-rstring data type. We must base64 encode the data.
+                   encodeKey = true;
+                }
+
+                // Validate that the caller can ask us not to encode the value only for rstring data type.
+                if (encodeValue == false && valueSplTypeName != "rstring") {
+                   // It is non-rstring data type. We must encode the value data by serializing it.
+                   encodeValue = true;
+                }
+
 		try {
 			dps = DpsHelperHolder.getDpsHelper();
-			result = dps.dpsGetTTL(key, keySplTypeName, valueSplTypeName, err);
+			result = dps.dpsGetTTL(key, keySplTypeName, valueSplTypeName, err, encodeKey, encodeValue);
 		} catch(Exception e) {
 			// Either dps cannot be initialized or getTTL went wrong.
 			throw new StoreFactoryException(65535, e.getMessage());
@@ -166,16 +216,29 @@ public class StoreFactoryImpl implements StoreFactory
 		
 		return(result);		
 	}	
-	
+
+        // Overloaded method (with no encodeKey method argument)
 	// Remove a TTL based K/V pair stored in the global area of the back-end data store.
 	public <T1> boolean removeTTL(T1 key, String keySplTypeName) throws StoreFactoryException {
+           // Call the other overloaded method by passing encodeKey=true.
+           return(removeTTL(key, keySplTypeName, true));
+        }
+	
+	// Remove a TTL based K/V pair stored in the global area of the back-end data store.
+	public <T1> boolean removeTTL(T1 key, String keySplTypeName, boolean encodeKey) throws StoreFactoryException {
 		boolean result;
 		long[] err = new long[1];
 		DpsHelper dps = null;
+
+                // Validate that the caller can ask us not to encode the key only for rstring data type.
+                if (encodeKey == false && keySplTypeName != "rstring") {
+                   // It is non-rstring data type. We must base64 encode the data.
+                   encodeKey = true;
+                }
 		
 		try {
 			dps = DpsHelperHolder.getDpsHelper();
-			result = dps.dpsRemoveTTL(key, keySplTypeName, "", err);
+			result = dps.dpsRemoveTTL(key, keySplTypeName, "", err, encodeKey);
 		} catch(Exception e) {
 			// Either dps cannot be initialized or removeTTL went wrong.
 			throw new StoreFactoryException(65535, e.getMessage());
@@ -189,15 +252,28 @@ public class StoreFactoryImpl implements StoreFactory
 		return(result);			
 	}
 
+        // Overloaded method (with no encodeKey method argument)
 	// Check if a TTL based K/V pair for a given key exists in the global area of the back-end data store.
 	public <T1> boolean hasTTL(T1 key, String keySplTypeName) throws StoreFactoryException {
+           // Call the other overloaded method by passing encodeKey=true.
+           return(hasTTL(key, keySplTypeName, true));
+        }
+
+	// Check if a TTL based K/V pair for a given key exists in the global area of the back-end data store.
+	public <T1> boolean hasTTL(T1 key, String keySplTypeName, boolean encodeKey) throws StoreFactoryException {
 		boolean result;
 		long[] err = new long[1];
 		DpsHelper dps = null;
+
+                // Validate that the caller can ask us not to encode the key only for rstring data type.
+                if (encodeKey == false && keySplTypeName != "rstring") {
+                   // It is non-rstring data type. We must base64 encode the data.
+                   encodeKey = true;
+                }
 		
 		try {
 			dps = DpsHelperHolder.getDpsHelper();
-			result = dps.dpsHasTTL(key, keySplTypeName, "", err);
+			result = dps.dpsHasTTL(key, keySplTypeName, "", err, encodeKey);
 		} catch(Exception e) {
 			// Either dps cannot be initialized or hasTTL went wrong.
 			throw new StoreFactoryException(65535, e.getMessage());
@@ -324,6 +400,41 @@ public class StoreFactoryImpl implements StoreFactory
 		return(jsonResponse[0]);			
 	}
 
+
+        /// If users want to send any valid Redis command to the Redis server made up as individual parts,
+        /// this API can be used. This will work only with Redis. Users simply have to split their
+        /// valid Redis command into individual parts that appear between spaces and pass them in 
+        /// exacly in that order via a list<rstring>. DPS back-end code will put them together 
+        /// correctly before executing the command on a configured Redis server. This API will also
+        /// return the resulting value from executing any given Redis command as a string. It is upto
+        /// the caller to interpret the Redis returned value and make sense out of it.
+        /// In essence, it is a two way Redis command which is very diffferent from the other plain
+        /// API that is explained above. [NOTE: If you have to deal with storing or fetching 
+        /// non-string complex Streams data types, you can't use this API. Instead, use the other
+        /// DPS put/get/remove/has DPS APIs.]
+        public String runDataStoreCommand(java.util.List<RString> cmdList) throws StoreFactoryException {
+		boolean result;
+		String[] resultString = new String[1];
+		DpsHelper dps = null;
+		
+		try {
+			dps = DpsHelperHolder.getDpsHelper();
+			result = dps.dpsRunDataStoreCommand(cmdList, resultString);
+		} catch(Exception e) {
+			// Either dps cannot be initialized or put went wrong.
+			// An error code of 65535 indicates that this error occurred inside
+			// the dps JNI glue layer and not inside the actual store functions.
+			throw new StoreFactoryException(65535, e.getMessage());
+		}
+
+		if (result == false) {
+			throw new StoreFactoryException(dps.dpsGetLastStoreErrorCode(), 
+				dps.dpsGetLastStoreErrorString());
+		}
+		
+		return(resultString[0]);
+        }
+
 	// Base64 encode the given string.
 	public String base64Encode(String str) throws StoreFactoryException {
 		DpsHelper dps = null;
@@ -359,5 +470,37 @@ public class StoreFactoryImpl implements StoreFactory
 		
 		return(decodedResultString);		
 	}
+
+	// Check if there is an active connection to the back-end data store.
+	public boolean isConnected() throws StoreFactoryException {
+		boolean result;
+		DpsHelper dps = null;
+		
+		try {
+			dps = DpsHelperHolder.getDpsHelper();
+			result = dps.dpsIsConnected();
+		} catch(Exception e) {
+			// Either dps cannot be initialized or isConnected went wrong.
+			throw new StoreFactoryException(65535, e.getMessage());
+		}
+		
+		return(result);		
+	}	
+
+	// Reconnect with the back-end data store.
+	public boolean reconnect() throws StoreFactoryException {
+		boolean result;
+		DpsHelper dps = null;
+		
+		try {
+			dps = DpsHelperHolder.getDpsHelper();
+			result = dps.dpsReconnect();
+		} catch(Exception e) {
+			// Either dps cannot be initialized or reconnect went wrong.
+			throw new StoreFactoryException(65535, e.getMessage());
+		}
+		
+		return(result);		
+	}	
 	
 }

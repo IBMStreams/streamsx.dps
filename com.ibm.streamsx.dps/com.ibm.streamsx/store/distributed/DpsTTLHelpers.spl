@@ -1,0 +1,123 @@
+/*
+# Licensed Materials - Property of IBM
+# Copyright IBM Corp. 2017
+*/
+namespace com.ibm.streamsx.store.distributed;
+
+use spl.time::* ;
+/*
+ * Creates custom metrics:
+ * 	isConnected - 
+ * 	totalReconnections - 
+ * 	
+ */
+stateful boolean initializeDpsConnection()
+{
+	mutable boolean connected = false ;
+	rstring isConnectedMetric = "isConnected" ;
+	if(!hasCustomMetric(isConnectedMetric)){
+		createCustomMetric(isConnectedMetric,
+			"Maintains a metric of if we think we are connected to Redis or not.",
+			Sys.Gauge, 0l) ;
+	}
+	
+	/*
+	 * Setup Redis connection
+	 */
+	//mutable uint64 err = 0ul ;
+	connected = initializeDpsNoException();//dpsPutTTL("testkey", "testval", 100u, err) ;
+	setCustomMetricValue(isConnectedMetric,(connected ? 1l : 0l)) ;
+	return connected ;
+}
+
+stateful boolean initializePutMetrics()
+{
+	// Create interval metrics
+	createCustomMetric("numInserts",
+		"Maintains a metric of the number inserts completed in the last interval of time.", Sys.Counter,
+		0l) ;
+	createCustomMetric("numFailedInserts",
+		"Maintains a metric of the number of failed inserts done.", Sys.Counter,
+		0l) ;
+	createCustomMetric("numUniqueKeyInserts",
+		"Maintains a metric of the number of unique keys inserted in the last interval of time.", Sys.Counter,
+		0l) ;
+	createCustomMetric("reconnectionAttptsSinceDisconnect",
+		"Maintains a metric of the number of reconnection attempts in the last interval of time.", Sys.Counter,
+		0l) ;
+	createCustomMetric("avgTTLMinutes",
+		"Maintains a metric of the average TTL in minutes over the last interval of time.", Sys.Counter,
+		0l) ;
+	createCustomMetric("avgKeyValueSizeBytes",
+		"Maintains a metric of the average key-value size in the last interval of time." 
+		+ " The size is the amount of space utilized after any encoding by the DPS toolkit." 
+		+ "Failed inserts contribute a value of 0 to the avgKeyValueSize, skewing the results downwards." , Sys.Counter,
+		0l) ;
+	createCustomMetric("maxKeyValueSizeBytes",
+		"Maintains a metric of the max key-value size in the last interval of time." 
+		+ " The size is the amount of space utilized after any encoding by the DPS toolkit." , Sys.Counter,
+		0l) ;
+	
+	
+	// Create longterm metrics
+	createCustomMetric("totalInserts",
+		"Maintains a metric of the number of total inserts done since startup.", Sys.Counter,
+		0l) ;
+	createCustomMetric("totalFailedInserts",
+		"Maintains a metric of the number of failed inserts since startup.", Sys.Counter,
+		0l) ;
+	createCustomMetric("totalReconnections",
+		"Maintains a metric of the number of reconnections to the DPS Server since startup.", Sys.Counter,
+		0l) ;
+	return true; 
+}
+
+stateful boolean initializeGetMetrics()
+{
+	// Create interval metrics
+	createCustomMetric("numGets",
+		"Maintains a metric of the number gets completed in the last interval of time.", Sys.Counter,
+		0l) ;
+	createCustomMetric("numFailedGets",
+		"Maintains a metric of the number of failed gets done.", Sys.Counter,
+		0l) ;
+	createCustomMetric("numKeyDidNotExistReturns",
+		"Maintains a metric of the number of gets where the key didn't exist over the last interval of time.", Sys.Counter,
+		0l) ;
+	createCustomMetric("reconnectionAttptsSinceDisconnect",
+		"Maintains a metric of the number of reconnection attempts in the last interval of time.", Sys.Counter,
+		0l) ;
+	
+	// Create longterm metrics
+	createCustomMetric("totalGets",
+		"Maintains a metric of the number of total gets done since startup.", Sys.Counter,
+		0l) ;
+	createCustomMetric("totalFailedGets",
+		"Maintains a metric of the number of failed gets since startup.", Sys.Counter,
+		0l) ;
+	createCustomMetric("totalKeyDidNotExistReturns",
+		"Maintains a metric of the number of gets where the key didn't exist since startup.", Sys.Counter,
+		0l) ;
+	createCustomMetric("totalReconnections",
+		"Maintains a metric of the number of reconnections to the DPS Server since startup.", Sys.Counter,
+		0l) ;
+	return true; 
+}
+
+stateful void incrementCustomMetric(rstring metricName)
+{
+	if(! hasCustomMetric(metricName))
+	{
+		rstring val = "desc" ;
+		// initialized to 1 since this is an "increment"
+		createCustomMetric(metricName, val, Sys.Counter,(int64) 1) ;
+	}
+	else
+	{
+		mutable int64 metricVal = 0 ;
+		getCustomMetricValue(metricName, metricVal) ;
+		metricVal ++ ;
+		setCustomMetricValue(metricName, metricVal) ;
+	}
+
+}

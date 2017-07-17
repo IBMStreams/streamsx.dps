@@ -31,7 +31,8 @@ namespace distributed
  * Pass in root to toolkit directory and the name of the library to load (e.g. "/home/dpstoolkit" and "libhiredis.so" respectively.
  * Will log an error if it fails.
  */
-	void load_dependent_lib(std::string toolkitDir, std::string lib);
+ void * load_dependent_lib(std::string toolkitDir, std::string lib);
+
   class DistributedProcessStore
   {
   public:
@@ -114,8 +115,12 @@ namespace distributed
     /// @param ttl data item expiry time in seconds
     /// @return true if the put operation is successful, false otherwise
     /// @param err store error code
+    /// @param storedKeySize On a successful put. this will have the actual storage size of the key in the back-end data store.
+    /// @param storedValueSize On a successful put. this will have the actual storage size of the value in the back-end data store.
+    /// @param encodeKey item's key should be encoded or not before storing in the back-end data store.
+    /// @param encodeValue item's value is encoded or not in the back-end data store.
     template<class T1, class T2>
-    SPL::boolean putTTL(T1 const & key, T2 const & value, SPL::uint32 const & ttl, SPL::uint64 & err);
+    SPL::boolean putTTL(T1 const & key, T2 const & value, SPL::uint32 const & ttl, SPL::uint64 & err, SPL::uint32 & storedKeySize, SPL::uint32 & storedValueSize, SPL::boolean encodeKey=true, SPL::boolean encodeValue=true);
 
     /// Get an item from the given store (A better performing version with no safety checks)
     /// @param store store id
@@ -143,8 +148,10 @@ namespace distributed
     /// @return true if there was a TTL based item with the given key and a matching
     /// type for its value, false otherwise
     /// @param err store error code
+    /// @param encodeKey item's key should be encoded or not before getting it from the back-end data store.
+    /// @param encodeValue item's value is encoded or not in the back-end data store.
     template<class T1, class T2>
-    SPL::boolean getTTL(T1 const & key, T2 & value, SPL::uint64 & err);
+    SPL::boolean getTTL(T1 const & key, T2 & value, SPL::uint64 & err, SPL::boolean encodeKey=true, SPL::boolean encodeValue=true);
 
     /// Remove an item from the given store
     /// @param store store id
@@ -159,8 +166,9 @@ namespace distributed
     /// @param key item's key
     /// @return true if we removed a TTL based item with the given key, false otherwise
     /// @param err store error code
+    /// @param encodeKey item's key should be encoded or not before removing from the back-end data store.
     template<class T1>
-    SPL::boolean removeTTL(T1 const & key, SPL::uint64 & err);
+    SPL::boolean removeTTL(T1 const & key, SPL::uint64 & err, SPL::boolean encodeKey=true);
 
     /// Check if an item is in the given store
     /// @param store store id
@@ -174,8 +182,9 @@ namespace distributed
     /// @param key item's key
     /// @return true if there is a TTL based item with the given key, false otherwise
     /// @param err store error code
+    /// @param encodeKey item's key should be encoded or not before checking for existence in the back-end data store.
     template<class T1>
-    SPL::boolean hasTTL(T1 const & key, SPL::uint64 & err);
+    SPL::boolean hasTTL(T1 const & key, SPL::uint64 & err, SPL::boolean encodeKey=true);
 
     /// Clear the given store 
     /// @param store store id
@@ -288,7 +297,9 @@ namespace distributed
     /// @param ttl data item's Time To Live in seconds
     /// @return true if the data item was stored successfully, false otherwise
     /// @param err GlobalStore error code
-    SPL::boolean putTTLForJava(char const *key, SPL::uint32 keySize, unsigned char const *value, SPL::uint32 valueSize, SPL::uint32 const & ttl, SPL::uint64 & err);
+    /// @param encodeKey item's key should be encoded or not before storing in the back-end data store.
+    /// @param encodeValue item's value is encoded or not in the back-end data store.
+    SPL::boolean putTTLForJava(char const *key, SPL::uint32 keySize, unsigned char const *value, SPL::uint32 valueSize, SPL::uint32 const & ttl, SPL::uint64 & err, SPL::boolean encodeKey=true, SPL::boolean encodeValue=true);
 
     /// Get an item from the given store for Java primitive operators (faster version with no safety checks).
     /// @param store store handle
@@ -320,7 +331,8 @@ namespace distributed
     /// @return true if there was a TTL based item with the given key and a matching
     /// type for its value, false otherwise
     /// @param err GlobalStore error code
-    SPL::boolean getTTLForJava(char const *key, SPL::uint32 keySize, unsigned char * & value, SPL::uint32 & valueSize, SPL::uint64 & err);
+    /// @param encodeKey item's key should be encoded or not before getting it from the back-end data store.
+    SPL::boolean getTTLForJava(char const *key, SPL::uint32 keySize, unsigned char * & value, SPL::uint32 & valueSize, SPL::uint64 & err, SPL::boolean encodeKey=true, SPL::boolean encodeValue=true);
 
     /// Remove an item from the given store for Java primitive operators.
     /// @param store store id
@@ -336,7 +348,8 @@ namespace distributed
     /// @param keySize item's key size
     /// @return true if we removed a TTL based item with the given key, false otherwise
     /// @param err GlobalStore error code
-    SPL::boolean removeTTLForJava(char const *key,  SPL::uint32 keySize, SPL::uint64 & err);
+    /// @param encodeKey item's key should be encoded or not before removing from the back-end data store.
+    SPL::boolean removeTTLForJava(char const *key,  SPL::uint32 keySize, SPL::uint64 & err, SPL::boolean encodeKey=true);
 
     /// Check if an item is in the given store for Java primitive operators.
     /// @param store store handle
@@ -351,7 +364,8 @@ namespace distributed
     /// @param keySize item's key size
     /// @return true if there is a TTL based item with the given key, false otherwise
     /// @param err GlobalStore error code
-    SPL::boolean hasTTLForJava(char const *key, SPL::uint32 keySize, SPL::uint64 & err);
+    /// @param encodeKey item's key should be encoded or not before checking for existence in the back-end data store.
+    SPL::boolean hasTTLForJava(char const *key, SPL::uint32 keySize, SPL::uint64 & err, SPL::boolean encodeKey=true);
 
     /// Get the next key and value of given types in the given store for Java primitive operators.
     /// @param store store handle
@@ -364,6 +378,13 @@ namespace distributed
     /// @param err store error code
     SPL::boolean getNextForJava(SPL::uint64 store, SPL::uint64 iterator, unsigned char * &  key, SPL::uint32 & keySize,
     	unsigned char * & value, SPL::uint32 & valueSize, SPL::uint64 & err);
+
+    // Run the Redis command as given by the Java primitive operators.
+    // @param serializedListOfRString list<rstring> cmdList in serialized form
+    // @param resultString Any result value obtained from Redis after executing the given command.
+    // @param Error code if any while executing the given Redis command.
+    // @return true if the Redis command was executed successfully. Otherwise, it returns false.
+    SPL::boolean runDataStoreCommandForJava(unsigned char *serializedListOfRString, SPL::uint32 cmdListSize, SPL::rstring & resultString, SPL::uint64 & err);
 
     /// Create a lock or get it if it already exists
     /// @param name of the lock
@@ -465,6 +486,19 @@ namespace distributed
             	SPL::rstring const & baseUrl, SPL::rstring const & apiEndpoint, SPL::rstring const & queryParams,
             	SPL::rstring const & jsonRequest, SPL::rstring & jsonResponse, SPL::uint64 & err);
 
+    /// If users want to send any valid Redis command to the Redis server made up as individual parts,
+    /// this API can be used. This will work only with Redis. Users simply have to split their
+    /// valid Redis command into individual parts that appear between spaces and pass them in 
+    /// exacly in that order via a list<rstring>. DPS back-end code will put them together 
+    /// correctly before executing the command on a configured Redis server. This API will also
+    /// return the resulting value from executing any given Redis command as a string. It is upto
+    /// the caller to interpret the Redis returned value and make sense out of it.
+    /// In essence, it is a two way Redis command which is very diffferent from the other plain
+    /// API that is explained above. [NOTE: If you have to deal with storing or fetching 
+    /// non-string complex Streams data types, you can't use this API. Instead, use the other
+    /// DPS put/get/remove/has DPS APIs.]
+    SPL::boolean runDataStoreCommand(SPL::list<SPL::rstring> const & cmdList, SPL::rstring & resultValue, SPL::uint64 & err);
+
     /// Base64 encode a given string. Encoded result will be returned in a
     /// user provided modifiable string passed as a second function argument.
     /// @param str should contain the string to be base64 encoded.
@@ -487,6 +521,14 @@ namespace distributed
     {
     	DistributedProcessStore::dpsConfigFile_ = dpsConfigFile;
     }
+
+    /// Is the connection to the back-end data store active?
+    /// @return true if connection is active or false if connection is inactive.
+    SPL::boolean isConnected();
+
+   /// Reestablish the connection to the back-end data store if needed.
+   /// @return true if connection is active or false if connection is inactive.
+   SPL::boolean reconnect();
 
   private:
     DistributedProcessStore(); // no one should do this other than us
@@ -574,9 +616,22 @@ namespace distributed
 
   // Put data item with a TTL (Time To Live in seconds) value into the global area of the back-end data store.
   template<class T1, class T2>
-  SPL::boolean DistributedProcessStore::putTTL(T1 const & key, T2 const & value, SPL::uint32 const & ttl, SPL::uint64 & err)
+  SPL::boolean DistributedProcessStore::putTTL(T1 const & key, T2 const & value, SPL::uint32 const & ttl, SPL::uint64 & err, SPL::uint32 & storedKeySize, SPL::uint32 & storedValueSize, SPL::boolean encodeKey, SPL::boolean encodeValue)
   {
     dbError_->resetTTL();
+
+    // Validate that the caller can ask us not to encode the key only for rstring data type.
+    if (encodeKey == false && getSPLTypeName(key) != "rstring") {
+       // It is non-rstring data type. We must base64 encode the data.
+       encodeKey = true;
+    }
+
+    // Validate that the caller can ask us not to encode the value only for rstring data type.
+    if (encodeValue == false && getSPLTypeName(value) != "rstring") {
+       // It is non-rstring data type. We must encode the value data by serializing it.
+       encodeValue = true;
+    }
+
     SPL::NativeByteBuffer key_nbf;
     key_nbf << key;
     char const * keyData = (char const *)key_nbf.getPtr();
@@ -585,8 +640,39 @@ namespace distributed
     value_nbf << value;
     unsigned char * valueData = value_nbf.getPtr();
     uint32_t valueSize = value_nbf.getSerializedDataSize();
-    bool res = db_->putTTL(keyData, keySize, valueData, valueSize, ttl, *dbError_);
+    bool res = db_->putTTL(keyData, keySize, valueData, valueSize, ttl, *dbError_, encodeKey, encodeValue);
     err = dbError_->getErrorCodeTTL();
+
+    if (err == 0) {
+       if (encodeKey == true) {
+          storedKeySize = keySize;
+       } else {
+          // Stored as a plain string.
+          // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+          // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+          if ((uint8_t)keyData[0] < 0x80) {
+             // Skip the first length byte.   
+             storedKeySize = keySize-1;
+          } else {
+            // Skip the five bytes at the beginning that represent the length of the key data.
+            storedKeySize = keySize-5;
+          }
+       }
+
+       if (encodeValue == true) {
+          storedValueSize = valueSize;
+       } else {
+          // Stored as a plain string.
+          if ((uint8_t)valueData[0] < 0x80) {
+             // Skip the first length byte.   
+             storedValueSize = valueSize-1;
+          } else {
+            // Skip the five bytes at the beginning that represent the length of the key data.
+            storedValueSize = valueSize-5;
+          }
+       }       
+    }
+
     return res;
   }
 
@@ -635,20 +721,48 @@ namespace distributed
 
   // Get a TTL based data item that is stored in the global area of the back-end data store.
   template<class T1, class T2>
-  SPL::boolean DistributedProcessStore::getTTL(T1 const & key, T2 & value, SPL::uint64 & err)
+  SPL::boolean DistributedProcessStore::getTTL(T1 const & key, T2 & value, SPL::uint64 & err, SPL::boolean encodeKey, SPL::boolean encodeValue)
   {
     dbError_->resetTTL();
+
+    // Validate that the caller can ask us not to encode the key only for rstring data type.
+    if (encodeKey == false && getSPLTypeName(key) != "rstring") {
+       // It is non-rstring data type. We must base64 encode the data.
+       encodeKey = true;
+    }
+
+    // Validate that the caller can ask us not to encode the value only for rstring data type.
+    if (encodeValue == false && getSPLTypeName(value) != "rstring") {
+       // It is non-rstring data type. We must encode the value data by serializing it.
+       encodeValue = true;
+    }
+
     SPL::NativeByteBuffer key_nbf;
     key_nbf << key;
     char const * keyData = (char const *)key_nbf.getPtr();
     uint32_t keySize = key_nbf.getSerializedDataSize();
     unsigned char * valueData;
     uint32_t valueSize = 0;
-    bool res = db_->getTTL(keyData, keySize, valueData, valueSize, *dbError_);
+    bool res = db_->getTTL(keyData, keySize, valueData, valueSize, *dbError_, encodeKey);
     err = dbError_->getErrorCodeTTL();
     if(err==0 && res) {
-      SPL::NativeByteBuffer value_nbf(valueData, valueSize);
-      value_nbf >> value;
+      // If it is a plain string value, we have to write a serialized SPL::rstring format in the return reference value.
+      if (encodeValue == false) {
+         SPL::rstring resultString = "";
+
+         if (valueSize >= 0) {
+            resultString = string((const char *)valueData, valueSize);
+         }         
+
+        SPL::NativeByteBuffer value_nbf2;
+        value_nbf2 << resultString;
+        unsigned char * valueData2 = value_nbf2.getPtr();
+        uint32_t valueSize2 = value_nbf2.getSerializedDataSize();
+        value_nbf2 >> value;
+      } else {
+         SPL::NativeByteBuffer value_nbf(valueData, valueSize);
+         value_nbf >> value;
+      }
     }
     if(valueSize>0)
       free(valueData);
@@ -670,14 +784,21 @@ namespace distributed
 
   // Remove a TTL based data item that is stored in the global area of the back-end data store.
   template<class T1>
-  SPL::boolean DistributedProcessStore::removeTTL(T1 const & key, SPL::uint64 & err)
+  SPL::boolean DistributedProcessStore::removeTTL(T1 const & key, SPL::uint64 & err, SPL::boolean encodeKey)
   {
     dbError_->resetTTL();
+
+    // Validate that the caller can ask us not to encode the key only for rstring data type.
+    if (encodeKey == false && getSPLTypeName(key) != "rstring") {
+       // It is non-rstring data type. We must base64 encode the data.
+       encodeKey = true;
+    }
+
     SPL::NativeByteBuffer key_nbf;
     key_nbf << key;
     char const * keyData = (char const *)key_nbf.getPtr();
     uint32_t keySize = key_nbf.getSerializedDataSize();
-    bool res = db_->removeTTL(keyData, keySize, *dbError_);
+    bool res = db_->removeTTL(keyData, keySize, *dbError_, encodeKey);
     err = dbError_->getErrorCodeTTL();
     return res;
   }
@@ -697,14 +818,21 @@ namespace distributed
 
   // Check for the existence of a TTL based data item that is stored in the global area of the back-end data store.
   template<class T1>
-  SPL::boolean DistributedProcessStore::hasTTL(T1 const & key, SPL::uint64 & err)
+  SPL::boolean DistributedProcessStore::hasTTL(T1 const & key, SPL::uint64 & err, SPL::boolean encodeKey)
   {
     dbError_->resetTTL();
+
+    // Validate that the caller can ask us not to encode the key only for rstring data type.
+    if (encodeKey == false && getSPLTypeName(key) != "rstring") {
+       // It is non-rstring data type. We must base64 encode the data.
+       encodeKey = true;
+    }
+
     SPL::NativeByteBuffer key_nbf;
     key_nbf << key;
     char const * keyData = (char const *)key_nbf.getPtr();
     uint32_t keySize = key_nbf.getSerializedDataSize();
-    bool res = db_->hasTTL(keyData, keySize, *dbError_);
+    bool res = db_->hasTTL(keyData, keySize, *dbError_, encodeKey);
     err = dbError_->getErrorCodeTTL();
     return res;
   }

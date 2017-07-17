@@ -155,6 +155,14 @@ namespace distributed
 	  }
 
 	  string redisClusterConnectionErrorMsg = "Unable to initialize the redis-cluster connection context.";
+          // Senthil added this block of code on May/02/2017.
+          // As part of the Redis configuration in the DPS config file, we now allow the user to specify
+          // an optional Redis authentication password as shown below.
+          // server:port:RedisPassword
+          string targetServerPassword = "";
+          string targetServerName = "";
+          int targetServerPort = 0;
+
 	  // We need only one server in the Redis cluster to do the cluster based Redis HA operations.
 	  for (std::set<std::string>::iterator it=dbServers.begin(); it!=dbServers.end(); ++it) {
 		  std::string serverName = *it;
@@ -168,23 +176,32 @@ namespace distributed
 			  return;
 		  } else {
 			  // Redis server name must have a port number specified along with it --> MyHost:2345
-			  string targetServerName = "";
-			  int targetServerPort = 0;
 			  char serverNameBuf[300];
+                          targetServerName = "";
+                          targetServerPort = 0;
 			  strcpy(serverNameBuf, serverName.c_str());
 			  char *ptr = strtok(serverNameBuf, ":");
 
 			  while(ptr) {
-				if (targetServerName == "") {
-				  // This must be our first token.
-				  targetServerName = string(ptr);
-				  ptr = strtok(NULL, ":");
-				} else {
-				  // This must be our second token.
-				  targetServerPort = atoi(ptr);
-				  // We are done.
-				  break;
-				}
+	                     if (targetServerName == "") {
+	                        // This must be our first token.
+	                        targetServerName = string(ptr);
+	                        ptr = strtok(NULL, ":");
+	                     } else if (targetServerPort == 0){
+	                        // This must be our second token.
+	                        targetServerPort = atoi(ptr);
+                          
+                                if (targetServerPort == 0) {
+                                   targetServerPort = REDIS_SERVER_PORT;
+                                }
+
+	                        ptr = strtok(NULL, ":");
+	                     } else if (targetServerPassword == "") {
+                                // This must be our third token.
+                                targetServerPassword = string(ptr);
+                                // We are done.
+                                break;
+                             }
 			  }
 
 			  if (targetServerName == "") {
@@ -209,9 +226,12 @@ namespace distributed
 				return;
 			  }
 
-			  char msg[128];
-			  sprintf(msg, "%d", targetServerPort);
-			  SPLAPPTRC(L_ERROR, "Connecting to a Redis cluster node " << targetServerName << " on port " << string(msg), "RedisClusterDBLayer");
+                          // Senthil added this cautionary comment on May/03/2017.
+                          // CAUTION: Current redis cluster version as of May/03/2017 is 2.3.8.
+                          // In that version, if we enable the requirepass configuration for the redis cluster machines,
+                          // the following API crashes. I created an issue in the hiredis-cluster Github about this problem.
+                          // It looks like the Redis team doesn't want anyone to use the requirepass AUTH scheme for the redis-cluster.
+                          // Read Salvatore's comment here: https://groups.google.com/forum/#!topic/redis-db/Z8lMxTfDct8 
 			  redis_cluster = HiredisCommand::createCluster(targetServerName.c_str(), targetServerPort);
 		  }
 
@@ -219,6 +239,28 @@ namespace distributed
 			  redisClusterConnectionErrorMsg += " Connection error in the createCluster API.";
 		  } else {
 			  // We connected to at least one redis-cluster server. That is enough for our needs.
+                          // If the user configured it with a Redis auth password, then we must authenticate now.
+                          if (targetServerPassword.length() > 0) {
+	                     std::string cmd = string(REDIS_AUTH_CMD) + targetServerPassword;
+                             redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, targetServerPassword, cmd.c_str()));
+
+	                     // If we get a NULL reply, then it indicates a redis server connection error.
+	                     if (redis_cluster_reply == NULL) {
+		                dbError.set("Unable to authenticate to the redis cluster server(s). Possible connection breakage.", DPS_CONNECTION_ERROR);
+		                SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication with an error " << string("Possible connection breakage. ") << DPS_CONNECTION_ERROR, "RedisDBLayer");
+		                return;
+	                     }
+
+	                     if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
+		                dbError.set("Unable to authenticate to the Redis server. Error msg=" + std::string(redis_cluster_reply->str), DPS_AUTHENTICATION_ERROR);
+		                SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication. error=" << redis_cluster_reply->str << ", rc=" << DPS_AUTHENTICATION_ERROR, "RedisDBLayer");
+		                freeReplyObject(redis_cluster_reply);
+		                return; 
+	                     }                                 
+
+                             freeReplyObject(redis_cluster_reply);
+                          } // End of Redis authentication.
+
 			  // Reset the error string.
 			  redisClusterConnectionErrorMsg = "";
 			  break;
@@ -226,11 +268,14 @@ namespace distributed
 
 		  // Check if there was any connection error.
 		  if (redisClusterConnectionErrorMsg != "") {
+                          cout << "Unable to connect to the Redis cluster node " << targetServerName << " on port " << targetServerPort << endl;
 			  dbError.set(redisClusterConnectionErrorMsg, DPS_INITIALIZE_ERROR);
 			  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" <<
 				  redisClusterConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisClusterDBLayer");
 			  return;
 		  }
+
+                  cout << "Successfully connected to the Redis cluster node " << targetServerName << " on port " << targetServerPort << endl;
 	  }
 
 	  // We have now made connection to one server in a redis-cluster.
@@ -807,7 +852,7 @@ namespace distributed
   // Put a data item with a TTL (Time To Live in seconds) value into the global area of the Redis DB.
   bool RedisClusterDBLayer::putTTL(char const * keyData, uint32_t keySize,
 		  	  	  	  	    unsigned char const * valueData, uint32_t valueSize,
-							uint32_t ttl, PersistenceError & dbError)
+							uint32_t ttl, PersistenceError & dbError, bool encodeKey, bool encodeValue)
   {
 	  SPLAPPTRC(L_DEBUG, "Inside putTTL.", "RedisClusterDBLayer");
 
@@ -816,23 +861,85 @@ namespace distributed
 
 	  // In our Redis dps implementation, data item keys can have space characters.
 	  string base64_encoded_data_item_key;
-	  base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+
+          if (encodeKey == true) {
+	     base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+          } else {
+            // Since the key data sent here will always be in the network byte buffer format (NBF), 
+            // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+            // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+            // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+            if ((uint8_t)keyData[0] < 0x80) {
+               // Skip the first length byte. 
+               base64_encoded_data_item_key = string(&keyData[1], keySize-1);  
+            } else {
+               // Skip the five bytes at the beginning that represent the length of the key data.
+               base64_encoded_data_item_key = string(&keyData[5], keySize-5);
+            }
+          }
+
+          string value_as_plain_string = "";
+          int32_t valueIdx = 0;
+          string argvStyleRedisCommand = "";
+
+          if (encodeValue == false) {
+             // Caller wants to store the value as plain string. Do the same thing we did above for the key.
+             if ((uint8_t)valueData[0] < 0x80) {
+                value_as_plain_string = string((char const *) &valueData[1], valueSize-1);
+                valueIdx = 1;
+             } else {
+                value_as_plain_string = string((char const *) &valueData[5], valueSize-5); 
+                valueIdx = 5;
+             }
+          }
+
+
 	  // We are ready to either store a new data item or update an existing data item with a TTL value specified in seconds.
 	  // To support space characters in the data item key, let us base64 encode it.
 	  string cmd = "";
 
 	  if (ttl > 0) {
 		  cmd = string(REDIS_SETX_CMD) + base64_encoded_data_item_key + " " + ttlValue.str() + " " + "%b";
+                  argvStyleRedisCommand = string(REDIS_SETX_CMD);
+                  // Strip the space at the end of the command that should not be there for the argv style Redis command.
+                  argvStyleRedisCommand = argvStyleRedisCommand.substr(0, argvStyleRedisCommand.size()-1);            
+
 	  } else {
 		  // TTL value specified by the user is 0.
 		  // User wants to use the dpsXXXXTTL APIs instead of the other store based APIs for the sake of simplicity.
 		  // In that case, we will let the user store in the global area for their K/V pair to remain forever or until it is deleted by the user.
 		  // No TTL effect needed here.
 		  cmd = string(REDIS_SET_CMD) + base64_encoded_data_item_key + " " + "%b";
+                  argvStyleRedisCommand = string(REDIS_SET_CMD);
+                  // Strip the space at the end of the command that should not be there for the argv style Redis command.
+                  argvStyleRedisCommand = argvStyleRedisCommand.substr(0, argvStyleRedisCommand.size()-1);              
 	  }
 
-	  // We want to pass the exact binary data item value as given to us by the caller of this method.
-	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, cmd.c_str(), (const char*)valueData, (size_t)valueSize));
+          if (encodeKey == true || encodeValue == true) {
+	     // We want to pass the exact binary data item value as given to us by the caller of this method.
+	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, cmd.c_str(), (const char*)(&valueData[valueIdx]), (size_t)(valueSize-valueIdx)));
+          } else {
+             // This is the case where the caller doesn't want to encode the key as well as the value.
+             // encodeKey == false and encodeValue == false.
+             // Generally applicable when the caller wants to store both the key and value as strings in clear with no encoding.
+             vector<const char *> argv;
+             vector<size_t> argvlen;
+
+             // Using the argv style Redis command will allow us to have spaces and quotes in the keys and values.
+             argv.push_back(argvStyleRedisCommand.c_str());
+             argvlen.push_back(argvStyleRedisCommand.size());
+
+             argv.push_back(base64_encoded_data_item_key.c_str());
+             argvlen.push_back(base64_encoded_data_item_key.size());
+
+             argv.push_back(ttlValue.str().c_str());
+             argvlen.push_back(ttlValue.str().size());
+
+             argv.push_back(value_as_plain_string.c_str());
+             argvlen.push_back(value_as_plain_string.size());
+             // We are using here the argv style Redis command instead of the all-in-one string based Redis command.
+             redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, argv.size(), &(argv[0]), &(argvlen[0])));
+          }
 
 	  if (redis_cluster_reply == NULL) {
 		  dbError.setTTL("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
@@ -935,7 +1042,7 @@ namespace distributed
 
   // Get a TTL based data item that is stored in the global area of the Redis DB.
    bool RedisClusterDBLayer::getTTL(char const * keyData, uint32_t keySize,
-                              unsigned char * & valueData, uint32_t & valueSize, PersistenceError & dbError)
+                              unsigned char * & valueData, uint32_t & valueSize, PersistenceError & dbError, bool encodeKey)
    {
 		SPLAPPTRC(L_DEBUG, "Inside getTTL.", "RedisClusterDBLayer");
 
@@ -946,11 +1053,41 @@ namespace distributed
 
 		// In our Redis dps implementation, data item keys can have space characters.
 		string base64_encoded_data_item_key;
-		base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+
+                if (encodeKey == true) {
+	           base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+                } else {
+                   // Since the key data sent here will always be in the network byte buffer format (NBF), 
+                   // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+                   // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+                   // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+                   if ((uint8_t)keyData[0] < 0x80) {
+                      // Skip the first length byte. 
+                      base64_encoded_data_item_key = string(&keyData[1], keySize-1);  
+                   } else {
+                      // Skip the five bytes at the beginning that represent the length of the key data.
+                      base64_encoded_data_item_key = string(&keyData[5], keySize-5);
+                   }
+                }
+
 		// Since this is a data item with TTL, it is stored in the global area of Redis and not inside a user created store (i.e. a Redis hash).
 		// Hence, we can't use the Redis hash get command. Rather, we will use the plain Redis get command to read this data item.
-		string cmd = string(REDIS_GET_CMD) + base64_encoded_data_item_key;
-		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, cmd.c_str()));
+                vector<const char *> argv;
+                vector<size_t> argvlen;
+
+                string argvStyleRedisCommand = string(REDIS_GET_CMD);
+                // Strip the space at the end of the command that should not be there for the argv style Redis command.
+                // Using the argv style Redis command will allow us to have spaces and quotes in the key.
+                argvStyleRedisCommand = argvStyleRedisCommand.substr(0, argvStyleRedisCommand.size()-1);              
+
+                argv.push_back(argvStyleRedisCommand.c_str());
+                argvlen.push_back(argvStyleRedisCommand.size());
+
+                argv.push_back(base64_encoded_data_item_key.c_str());
+                argvlen.push_back(base64_encoded_data_item_key.size());
+
+                // We are using here the argv style Redis command instead of the all-in-one string based Redis command.
+		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, argv.size(), &(argv[0]), &(argvlen[0])));
 
 		if (redis_cluster_reply == NULL) {
 			dbError.setTTL("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
@@ -1079,13 +1216,29 @@ namespace distributed
 
   // Remove a TTL based data item that is stored in the global area of the Redis DB.
   bool RedisClusterDBLayer::removeTTL(char const * keyData, uint32_t keySize,
-                                PersistenceError & dbError)
+                                PersistenceError & dbError, bool encodeKey)
   {
 		SPLAPPTRC(L_DEBUG, "Inside removeTTL.", "RedisClusterDBLayer");
 
 		// In our Redis dps implementation, data item keys can have space characters.
 		string base64_encoded_data_item_key;
-		base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+
+                if (encodeKey == true) {
+	           base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+                } else {
+                   // Since the key data sent here will always be in the network byte buffer format (NBF), 
+                   // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+                   // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+                   // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+                   if ((uint8_t)keyData[0] < 0x80) {
+                      // Skip the first length byte. 
+                      base64_encoded_data_item_key = string(&keyData[1], keySize-1);  
+                   } else {
+                      // Skip the five bytes at the beginning that represent the length of the key data.
+                      base64_encoded_data_item_key = string(&keyData[5], keySize-5);
+                   }
+                }
+
 		// Since this data item has a TTL value, it is not stored in the Redis hash (i.e. user created store).
 		// Instead, it will be in the global area of the Redis DB. Hence, use the regular del command instead of the hash del command.
 		string cmd = string(REDIS_DEL_CMD) + base64_encoded_data_item_key;
@@ -1163,13 +1316,29 @@ namespace distributed
 
   // Check for the existence of a TTL based data item that is stored in the global area of the Redis DB.
   bool RedisClusterDBLayer::hasTTL(char const * keyData, uint32_t keySize,
-                             PersistenceError & dbError)
+                             PersistenceError & dbError, bool encodeKey)
   {
 		SPLAPPTRC(L_DEBUG, "Inside hasTTL.", "RedisClusterDBLayer");
 
 		// In our Redis dps implementation, data item keys can have space characters.
 		string base64_encoded_data_item_key;
-		base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+
+                if (encodeKey == true) {
+	           base64_encode(string(keyData, keySize), base64_encoded_data_item_key);
+                } else {
+                   // Since the key data sent here will always be in the network byte buffer format (NBF), 
+                   // we can't simply use it as it is even if the user wants us to use the non-base64 encoded key data.
+                   // In the NBF format, very first byte indicates the length of the key data that follows (if the key data is less than 128 characters).
+                   // In the NBF format, 5 bytes at the beginning indicate the length of the key data that follows (for key data >= 128 characters).
+                   if ((uint8_t)keyData[0] < 0x80) {
+                      // Skip the first length byte. 
+                      base64_encoded_data_item_key = string(&keyData[1], keySize-1);  
+                   } else {
+                      // Skip the five bytes at the beginning that represent the length of the key data.
+                      base64_encoded_data_item_key = string(&keyData[5], keySize-5);
+                   }
+                }
+
 		string cmd = string(REDIS_EXISTS_CMD) + base64_encoded_data_item_key;
 		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, cmd.c_str()));
 
@@ -1834,6 +2003,91 @@ namespace distributed
 		dbError.set("From Redis data store: This API to run native data store commands is not supported in Redis.", DPS_RUN_DATA_STORE_COMMAND_ERROR);
 		SPLAPPTRC(L_DEBUG, "From Redis data store: This API to run native data store commands is not supported in Redis. " << DPS_RUN_DATA_STORE_COMMAND_ERROR, "RedisClusterDBLayer");
 		return(false);
+  }
+
+  /// If users want to send any valid Redis command to the Redis server made up as individual parts,
+  /// this API can be used. This will work only with Redis. Users simply have to split their
+  /// valid Redis command into individual parts that appear between spaces and pass them in 
+  /// exacly in that order via a list<rstring>. DPS back-end code will put them together 
+  /// correctly before executing the command on a configured Redis server. This API will also
+  /// return the resulting value from executing any given Redis command as a string. It is upto
+  /// the caller to interpret the Redis returned value and make sense out of it.
+  /// In essence, it is a two way Redis command which is very diffferent from the other plain
+  /// API that is explained above. [NOTE: If you have to deal with storing or fetching 
+  /// non-string complex Streams data types, you can't use this API. Instead, use the other
+  /// DPS put/get/remove/has DPS APIs.]
+  bool RedisClusterDBLayer::runDataStoreCommand(std::vector<std::string> const & cmdList, std::string & resultValue, PersistenceError & dbError) {
+     resultValue = "";
+     string keyString = "";
+
+     if (cmdList.size() == 0) {
+        resultValue = "Error: Empty Redis command list was given by the caller.";
+        dbError.set(resultValue, DPS_RUN_DATA_STORE_COMMAND_ERROR);
+        return(false);
+     }
+
+     // Redis Cluster API below requires a key string. Get it from the command list.
+     if (cmdList.size() > 1) {
+        // Most of the commands should have the key or the hash name at this location.
+        keyString = cmdList.at(1);
+     } else {
+        // Take the only element available as the key string.
+        keyString = cmdList.at(0);
+     }
+
+     // We are going to use the RedisCommandArgv to push different parts of the Redis command as passed by the caller.
+     vector<const char *> argv;
+     vector<size_t> argvlen;
+     
+     // Iterate over the caller provided items in the cmdList and add them to the argv array.
+     for (std::vector<std::string>::const_iterator it = cmdList.begin() ; it != cmdList.end(); ++it) {
+        argv.push_back((*it).c_str());
+        argvlen.push_back((*it).size());
+     }
+
+     // We are using here the argv style Redis command instead of the all-in-one string based Redis command.
+     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, argv.size(), &(argv[0]), &(argvlen[0])));
+
+     if (redis_cluster_reply == NULL) {
+        dbError.set("Redis_Cluster_Reply_Null error. Unable to connect to the redis server(s).", DPS_CONNECTION_ERROR);
+        SPLAPPTRC(L_DEBUG, "Redis_Cluster_Reply_Null error. Inside runDataStoreCommand using Redis cmdList, it failed for executing the user given Redis command list." << ". " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+        return(false);
+     }
+
+     if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
+        // Error in executing the user given Redis command.
+        resultValue = std::string(redis_cluster_reply->str);
+        dbError.set("Redis_Cluster_Reply_Error while executing the user given Redis command. Error=" + resultValue, DPS_RUN_DATA_STORE_COMMAND_ERROR);
+        SPLAPPTRC(L_DEBUG, "Redis_Cluster_Reply_Error. Inside runDataStoreCommand using Redis cmdList, it failed to execute the user given Redis command list. Error=" << std::string(redis_cluster_reply->str) << ". " << DPS_RUN_DATA_STORE_COMMAND_ERROR, "RedisDBLayer");
+        freeReplyObject(redis_cluster_reply);
+        return(false);
+     } else if (redis_cluster_reply->type == REDIS_REPLY_NIL) {
+        // Redis returned NIL response.
+        resultValue = "nil";
+        dbError.set("Redis_Cluster_Reply_Nil error while executing user given Redis command list. Possibly missing or invalid tokens in the Redis command.", DPS_RUN_DATA_STORE_COMMAND_ERROR);
+        SPLAPPTRC(L_DEBUG, "Redis_Cluster_Reply_Nil error. Inside runDataStoreCommand using Redis cmdList, it failed to execute the user given Redis command list. " << DPS_RUN_DATA_STORE_COMMAND_ERROR, "RedisDBLayer");
+        freeReplyObject(redis_cluster_reply);
+        return(false);
+     } else if (redis_cluster_reply->type == REDIS_REPLY_STRING) {
+        resultValue = string(redis_cluster_reply->str, redis_cluster_reply->len);
+     } else if (redis_cluster_reply->type == REDIS_REPLY_ARRAY) {
+        for (uint32_t j = 0; j < redis_cluster_reply->elements; j++) {
+           resultValue +=  string(redis_cluster_reply->element[j]->str, redis_cluster_reply->element[j]->len);
+           if (j != redis_cluster_reply->elements-1) {
+              // Add a new line for every element except for the very last element.
+              resultValue += "\n";
+           }
+        }
+     } else if (redis_cluster_reply->type == REDIS_REPLY_INTEGER) {
+        char msg[260];
+        sprintf(msg, "%d", (int)redis_cluster_reply->integer);
+        resultValue = string(msg);
+     } else if (redis_cluster_reply->type == REDIS_REPLY_STATUS) {
+        resultValue = string(redis_cluster_reply->str, redis_cluster_reply->len);
+     }
+
+     freeReplyObject(redis_cluster_reply);
+     return(true);
   }
 
   // This method will get the data item from the store for a given key.
@@ -2927,6 +3181,46 @@ namespace distributed
 	 		    SPLAPPTRC(L_ERROR, "Inside dpsPersist, should have returned an integer but returned unknown reply type", "RedisClusterDBLayer");
 	 	  }
 	 	  freeReplyObject(redis_cluster_reply);
+  }
+
+
+  // This method will return the status of the connection to the back-end data store.
+  bool RedisClusterDBLayer::isConnected() {
+         if (redis_cluster == NULL) {
+            // There is no active connection.
+            return(false);
+         }
+
+         // We will simply do a read API for a dummy key.
+         // If it results in a connection error, that will tell us the status of the connection.
+	 string cmd = string(REDIS_GET_CMD) + string("my_dummy_key");
+         redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, string("my_dummy_key"), cmd.c_str()));
+
+	 if (redis_cluster_reply == NULL) {
+            // Connection error.
+	    return(false);
+	 } else {
+            // Connection is active.
+            freeReplyObject(redis_cluster_reply);
+            return(true);
+         }
+  }
+
+  // This method will reestablish the status of the connection to the back-end data store.
+  bool RedisClusterDBLayer::reconnect(std::set<std::string> & dbServers, PersistenceError & dbError) {
+          // Delete the existing cluster connection object.
+	  delete redis_cluster;
+          redis_cluster = NULL;
+          connectToDatabase(dbServers, dbError);
+
+          if(dbError.hasError()) {
+            // Connection didn't happen.
+            // Caller can query the error code and error string using two other DPS APIs meant for that purpose.
+            return(false);
+          } else {
+           // All good.
+           return(true);
+          }          
   }
 
 } } } } }

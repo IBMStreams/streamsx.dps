@@ -26,6 +26,38 @@ namespace distributed
     return true;	// TODO do something more sensible here ?
   }
 
+  /// Is the connection to the back-end data store active?
+  /// @return true if connection is active or false if connection is inactive.
+  inline SPL::boolean dpsIsConnected()
+  {
+     return DistributedProcessStore::getGlobalStore().isConnected();
+  }
+
+  /// Reestablish the connection to the back-end data store if needed.
+  /// @return true if connection is active or false if connection is inactive.
+  inline SPL::boolean dpsReconnect() {
+     return DistributedProcessStore::getGlobalStore().reconnect();
+  }
+
+  // Allows you to initialize the connection to DPS without throwing an exception on failure.
+  // The purpose of this is to allow the DPS connection to be attempted during
+  // operator initialization, and not prevent startup from completing on failure.
+  // @return true if we successfully established a connection or false if not.
+  inline SPL::boolean initializeDpsNoException()
+  {
+      SPL::boolean result = false;
+      try
+      {
+     	 result = DistributedProcessStore::getGlobalStore().isConnected();
+      }
+      catch (...)
+      {
+      	SPLAPPTRC(L_ERROR, "Failed to initialize DPS Connection.", "initializeDpsNoException");
+      }
+
+      return result;
+  }
+
   /// Create a distributed process store
   /// @param name of the store
   /// @param key a dummy key to indicate the type of this store's key
@@ -100,10 +132,30 @@ namespace distributed
   /// @param ttl data item's Time To Live in seconds
   /// @return true if the data item was stored successfully, false otherwise
   /// @param err GlobalStore error code
+  /// @param encodeKey item's key should be encoded or not before storing in the back-end data store.
+  /// @param encodeValue item's value is encoded or not in the back-end data store.
   template<class T1, class T2>
-  SPL::boolean dpsPutTTL(T1 const & key, T2 const & value, SPL::uint32 const & ttl, SPL::uint64 & err)
+  SPL::boolean dpsPutTTL(T1 const & key, T2 const & value, SPL::uint32 const & ttl, SPL::uint64 & err, SPL::boolean encodeKey=true, SPL::boolean encodeValue=true)
   {
-    return DistributedProcessStore::getGlobalStore().putTTL(key, value, ttl, err);
+    uint32_t storedKeySize = 0;
+    uint32_t storedValueSize = 0;
+    return DistributedProcessStore::getGlobalStore().putTTL(key, value, ttl, err, storedKeySize, storedValueSize, encodeKey, encodeValue);
+  }
+
+  /// Put an item with a TTL (Time To Live in seconds) value into the global area of the back-end data store.
+  /// @param key item's key
+  /// @param value item's value
+  /// @param ttl data item's Time To Live in seconds
+  /// @return true if the data item was stored successfully, false otherwise
+  /// @param err GlobalStore error code
+  /// @param storedKeySize On a successful put. this will have the actual storage size of the key in the back-end data store.
+  /// @param storedValueSize On a successful put. this will have the actual storage size of the value in the back-end data store.
+  /// @param encodeKey item's key should be encoded or not before storing in the back-end data store.
+  /// @param encodeValue item's value is encoded or not in the back-end data store.
+  template<class T1, class T2>
+  SPL::boolean dpsPutTTL(T1 const & key, T2 const & value, SPL::uint32 const & ttl, SPL::uint64 & err, SPL::uint32 & storedKeySize, SPL::uint32 & storedValueSize, SPL::boolean encodeKey=true, SPL::boolean encodeValue=true)
+  {
+    return DistributedProcessStore::getGlobalStore().putTTL(key, value, ttl, err, storedKeySize, storedValueSize, encodeKey, encodeValue);
   }
 
   /// Get an item from the given store (A better performing version with no safety checks)
@@ -138,10 +190,12 @@ namespace distributed
   /// @return true if there was a TTL based item with the given key and a matching
   /// type for its value, false otherwise
   /// @param err GlobalStore error code
+  /// @param encodeKey item's key should be encoded or not before getting it from the back-end data store.
+  /// @param encodeValue item's value is encoded or not in the back-end data store.
   template<class T1, class T2>
-  SPL::boolean dpsGetTTL(T1 const & key, T2 & value, SPL::uint64 & err)
+  SPL::boolean dpsGetTTL(T1 const & key, T2 & value, SPL::uint64 & err, SPL::boolean encodeKey=true, SPL::boolean encodeValue=true)
   {
-    return DistributedProcessStore::getGlobalStore().getTTL(key, value, err);
+    return DistributedProcessStore::getGlobalStore().getTTL(key, value, err, encodeKey, encodeValue);
   }
 
   /// Remove an item from the given store
@@ -160,10 +214,11 @@ namespace distributed
   /// @param key item's key
   /// @return true if we removed a TTL based item with the given key, false otherwise
   /// @param err GlobalStore error code
+  /// @param encodeKey item's key should be encoded or not before removing from the back-end data store.
   template<class T1>
-  SPL::boolean dpsRemoveTTL(T1 const & key, SPL::uint64 & err)
+  SPL::boolean dpsRemoveTTL(T1 const & key, SPL::uint64 & err, SPL::boolean encodeKey=true)
   {
-    return DistributedProcessStore::getGlobalStore().removeTTL(key, err);
+    return DistributedProcessStore::getGlobalStore().removeTTL(key, err, encodeKey);
   }
 
   /// Check if an item is in the given store
@@ -181,10 +236,11 @@ namespace distributed
   /// @param key item's key
   /// @return true if there is a TTL based item with the given key, false otherwise
   /// @param err GlobalStore error code
+  /// @param encodeKey item's key should be encoded or not before checking for existence in the back-end data store.
   template<class T1>
-  SPL::boolean dpsHasTTL(T1 const & key, SPL::uint64 & err)
+  SPL::boolean dpsHasTTL(T1 const & key, SPL::uint64 & err, SPL::boolean encodeKey=true)
   {
-    return DistributedProcessStore::getGlobalStore().hasTTL(key, err);
+    return DistributedProcessStore::getGlobalStore().hasTTL(key, err, encodeKey);
   }
 
   /// Clear the given store 
@@ -367,6 +423,22 @@ namespace distributed
 	     apiEndpoint, queryParams, jsonRequest, jsonResponse, err);
   }
 
+  /// If users want to send any valid Redis command to the Redis server made up as individual parts,
+  /// this API can be used. This will work only with Redis. Users simply have to split their
+  /// valid Redis command into individual parts that appear between spaces and pass them in 
+  /// exacly in that order via a list<rstring>. DPS back-end code will put them together 
+  /// correctly before executing the command on a configured Redis server. This API will also
+  /// return the resulting value from executing any given Redis command as a string. It is upto
+  /// the caller to interpret the Redis returned value and make sense out of it.
+  /// In essence, it is a two way Redis command which is very diffferent from the other plain
+  /// API that is explained above. [NOTE: If you have to deal with storing or fetching 
+  /// non-string complex Streams data types, you can't use this API. Instead, use the other
+  /// DPS put/get/remove/has DPS APIs.]
+  inline SPL::boolean dpsRunDataStoreCommand(SPL::list<SPL::rstring> const & cmdList, SPL::rstring & resultValue, SPL::uint64 & err)
+  {
+     return DistributedProcessStore::getGlobalStore().runDataStoreCommand(cmdList, resultValue, err);
+  }
+
   /// Base64 encode a given string. Encoded result will be returned in a
   /// user provided modifiable string passed as a second function argument.
   /// @param str should contain the string to be base64 encoded.
@@ -443,9 +515,11 @@ namespace distributed
   /// @param ttl data item's Time To Live in seconds
   /// @return true if the data item was stored successfully, false otherwise
   /// @param err GlobalStore error code
-  inline SPL::boolean dpsPutTTLForJava(char const *key, SPL::uint32 keySize, unsigned char const *value, SPL::uint32 valueSize, SPL::uint32 const & ttl, SPL::uint64 & err)
+  /// @param encodeKey item's key should be encoded or not before storing in the back-end data store.
+  /// @param encodeValue item's value is encoded or not in the back-end data store.
+  inline SPL::boolean dpsPutTTLForJava(char const *key, SPL::uint32 keySize, unsigned char const *value, SPL::uint32 valueSize, SPL::uint32 const & ttl, SPL::uint64 & err, SPL::boolean encodeKey=true, SPL::boolean encodeValue=true)
   {
-    return DistributedProcessStore::getGlobalStore().putTTLForJava(key, keySize, value, valueSize, ttl, err);
+    return DistributedProcessStore::getGlobalStore().putTTLForJava(key, keySize, value, valueSize, ttl, err, encodeKey, encodeValue);
   }
 
   /// Get an item from the given store for Java primitive operators (faster version with no safety checks).
@@ -484,9 +558,11 @@ namespace distributed
   /// @return true if there was a TTL based item with the given key and a matching
   /// type for its value, false otherwise
   /// @param err GlobalStore error code
-  inline SPL::boolean dpsGetTTLForJava(char const *key, SPL::uint32 keySize, unsigned char * & value, SPL::uint32 & valueSize, SPL::uint64 & err)
+  /// @param encodeKey item's key should be encoded or note before getting it from the back-end data store.
+  /// @param encodeValue item's value is encoded or not in the back-end data store.
+  inline SPL::boolean dpsGetTTLForJava(char const *key, SPL::uint32 keySize, unsigned char * & value, SPL::uint32 & valueSize, SPL::uint64 & err, SPL::boolean encodeKey=true, SPL::boolean encodeValue=true)
   {
-     return DistributedProcessStore::getGlobalStore().getTTLForJava(key, keySize, value, valueSize, err);
+     return DistributedProcessStore::getGlobalStore().getTTLForJava(key, keySize, value, valueSize, err, encodeKey, encodeValue);
   }
 
   /// Remove an item from the given store for Java primitive operators.
@@ -506,9 +582,10 @@ namespace distributed
   /// @param keySize item's key size
   /// @return true if we removed a TTL based item with the given key, false otherwise
   /// @param err GlobalStore error code
-  inline SPL::boolean dpsRemoveTTLForJava(char const *key, SPL::uint32 keySize, SPL::uint64 & err)
+  /// @param encodeKey item's key should be encoded or not before removing from the back-end data store.
+  inline SPL::boolean dpsRemoveTTLForJava(char const *key, SPL::uint32 keySize, SPL::uint64 & err, SPL::boolean encodeKey=true)
   {
-	 return DistributedProcessStore::getGlobalStore().removeTTLForJava(key, keySize, err);
+	 return DistributedProcessStore::getGlobalStore().removeTTLForJava(key, keySize, err, encodeKey);
   }
 
   /// Check if an item is in the given store for Java primitive operators.
@@ -527,9 +604,10 @@ namespace distributed
   /// @param keySize item's key size
   /// @return true if there is a TTL based item with the given key, false otherwise
   /// @param err GlobalStore error code
-  inline SPL::boolean dpsHasTTLForJava(char const *key, SPL::uint32 keySize, SPL::uint64 & err)
+  /// @param encodeKey item's key should be encoded or not before checking for existence in the back-end data store.
+  inline SPL::boolean dpsHasTTLForJava(char const *key, SPL::uint32 keySize, SPL::uint64 & err, SPL::boolean encodeKey=true)
   {
-    return DistributedProcessStore::getGlobalStore().hasTTLForJava(key, keySize, err);
+    return DistributedProcessStore::getGlobalStore().hasTTLForJava(key, keySize, err, encodeKey);
   }
 
   /// Get the next key and value of given types in the given store for Java primitive operators.
@@ -546,6 +624,15 @@ namespace distributed
   {
     return DistributedProcessStore::getGlobalStore().getNextForJava(store, iterator, key, keySize, value, valueSize, err);
   }
+
+  // Run the Redis command as given by the Java primitive operators.
+  // @param serializedListOfRString list<rstring> cmdList in serialized form
+  // @param resultString Any result value obtained from Redis after executing the given command.
+  // @param Error code if any while executing the given Redis command.
+  // @return true if the Redis command was executed successfully. Otherwise, it returns false.
+  inline SPL::boolean dpsRunDataStoreCommandForJava(unsigned char *serializedListOfRString, SPL::uint32 cmdListSize, SPL::rstring & resultString, SPL::uint64 & err) {
+    return DistributedProcessStore::getGlobalStore().runDataStoreCommandForJava(serializedListOfRString, cmdListSize, resultString, err);
+  } 
 
 } } } } }
 

@@ -6,6 +6,9 @@
 # IBM Corp.
  */
 package com.ibm.streamsx.dps;
+
+import com.ibm.streams.operator.types.*;
+
 /**
  *This is an interface for the store factory with the available methods declared here.
  * A store factory implementation class will provide concrete logic for these methods.
@@ -133,8 +136,11 @@ try {
 	*
 	*
 	*
-	 *	 */
+	* */
+        // There are three variations of this method via overloading.
 	public <T1, T2> boolean putTTL(T1 key, T2 value, int ttl, String keySplTypeName, String valueSplTypeName) throws StoreFactoryException;
+	public <T1, T2> boolean putTTL(T1 key, T2 value, int ttl, String keySplTypeName, String valueSplTypeName, boolean encodeKey, boolean encodeValue) throws StoreFactoryException;
+	public <T1, T2> boolean putTTL(T1 key, T2 value, int ttl, String keySplTypeName, String valueSplTypeName, int[] storedKeyValueSize, boolean encodeKey, boolean encodeValue) throws StoreFactoryException;
 	/**Get a K/V pair with TTL (Time To Live in seconds) into the global area of the back-end data store.
 	@param <T1> key to lookup
 	@param keySplTypeName name of the SPL type of the key
@@ -155,6 +161,7 @@ try {
 	 * </pre>
 	 */
 	public <T1> Object getTTL(T1 key, String keySplTypeName, String valueSplTypeName) throws StoreFactoryException;
+	public <T1> Object getTTL(T1 key, String keySplTypeName, String valueSplTypeName, boolean encodeKey, boolean encodeValue) throws StoreFactoryException;
 	/** Remove a TTL based K/V pair stored in the global area of the back-end data store.
 	 * 
 	 * @param <T1> the key to remove
@@ -163,6 +170,7 @@ try {
 	 * @throws StoreFactoryException if an error occurred
 	 */
 	public <T1> boolean removeTTL(T1 key, String keySplTypeName) throws StoreFactoryException;
+	public <T1> boolean removeTTL(T1 key, String keySplTypeName, boolean encodeKey) throws StoreFactoryException;
 	/**Check if a TTL based K/V pair for a given key exists in the global area of the back-end data store.
 	 * @param <T1> an object of the type specified when creating the store.
 	 * @param key the key to look up
@@ -170,6 +178,7 @@ try {
 	 * @return whether or not the key exists
 	 * @throws StoreFactoryException if an error occurs.*/
 	public <T1> boolean hasTTL(T1 key, String keySplTypeName) throws StoreFactoryException;
+	public <T1> boolean hasTTL(T1 key, String keySplTypeName, boolean encodeKey) throws StoreFactoryException;
 
 	/**@return the name of the NoSQL DB product being used as a back-end data store.
 	 * @throws StoreFactoryException  if an error occurs
@@ -213,6 +222,26 @@ try {
 	
 	public String runDataStoreCommand(int cmdType, String httpVerb,
 			String baseUrl, String apiEndpoint, String queryParams, String jsonRequest, long[] httpResponseCode) throws StoreFactoryException;
+
+
+        /*
+        If users want to send any valid Redis command to the Redis server made up as individual parts,
+        this API can be used. This will work only with Redis. Users simply have to split their
+        valid Redis command into individual parts that appear between spaces and pass them in 
+        exacly in that order via a list<rstring>. DPS back-end code will put them together 
+        correctly before executing the command on a configured Redis server. This API will also
+        return the resulting value from executing any given Redis command as a string. It is upto
+        the caller to interpret the Redis returned value and make sense out of it.
+        In essence, it is a two way Redis command which is very diffferent from the other plain
+        API that is explained above. [NOTE: If you have to deal with storing or fetching 
+        non-string complex Streams data types, you can't use this API. Instead, use the other
+        DPS put/get/remove/has DPS APIs.]
+        @param cmdList A java.util.List of RString representing individual parts that make up the Redis command to be run.
+        @return Result string returned by Redis after executing the given command.
+        @throws StoreFactoryException if an error occurs while executing the Redis command.
+        */
+        public String runDataStoreCommand(java.util.List<RString> cmdList) throws StoreFactoryException;
+
 	/** Base64 encode the given string.
 	 * @param str string to encode
 	 * @return the encoded representation of the given string
@@ -220,9 +249,20 @@ try {
 	*/
 
 	public String base64Encode(String str) throws StoreFactoryException;
+
 	/**Decode the given base64 string.
 	 * @param str the base64 string to decode
 	 * @return decoded value
 	 * @throws StoreFactoryException if an error occurs*/
 	public String base64Decode(String str) throws StoreFactoryException;
+
+        /** Check if there is an active connection to the back-end data store.
+         *  @return current connection status.
+         *  @throws StoreFactoryException if an error occurs */
+	public boolean isConnected() throws StoreFactoryException;
+
+        /** Reconnect with the back-end data store.
+         *  @return Reconnection status.
+         *  @throws StoreFactoryException if an error occurs */
+	public boolean reconnect() throws StoreFactoryException;
 }

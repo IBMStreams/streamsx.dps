@@ -56,14 +56,14 @@ composite Main {
 		//data is read from filesource but could easily be any other adapter
 		stream<rstring id, float64 amount>  Data = FileSource(){
 			param
-				file: "transactions.txt";
+				file: getApplicationDir() + "/data/transactions.txt";
 		}		
 		
 		stream<rstring storeName>  TransactionSink = Transactions(Data) {
 		
 		}
 		
-		() as Printer = Custom(TransactionSink){
+		stream<rstring outputLine> Printer = Custom(TransactionSink){
 			logic
 				onTuple TransactionSink:{
 				
@@ -91,10 +91,12 @@ composite Main {
 						abort();
 					}
 
-					mutable int32 count = 0;
-					while(count < 10 && 	dpsGetNext(storeId, it, id, value, err)){
-						printStringLn("'"+id+"' => '"+((rstring)value)+"'");        
-						count++;                 
+					// print all transactions
+					while(dpsGetNext(storeId, it, id, value, err))
+					{
+						mutable rstring msg = "'"+id+"' => '"+((rstring)value)+"'";
+						printStringLn(msg);
+						submit({ outputLine=msg }, Printer);
 					}
 
 					dpsEndIteration(storeId, it, err);
@@ -104,4 +106,12 @@ composite Main {
 					
 				}
 		}
+		
+		() as Sink = FileSink(Printer)
+		{
+			param
+				file: "/tmp/transactionResults.txt";
+				flush : 1u ;
+		}
+		
 }

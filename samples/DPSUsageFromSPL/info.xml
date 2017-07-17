@@ -12,4 +12,7 @@
       <common:version>[2.0.0,4.0.0)</common:version>
     </info:toolkit>
   </info:dependencies>
+<info:sabFiles>
+   <info:include path="data/**"/>
+</info:sabFiles>
 </info:toolkitInfoModel>

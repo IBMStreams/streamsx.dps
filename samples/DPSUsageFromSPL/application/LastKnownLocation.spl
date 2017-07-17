@@ -18,7 +18,7 @@
 // PROFITS, BUSINESS INTERRUPTION, LOSS OF PROGRAMS OR OTHER DATA   
 // ON YOUR INFORMATION HANDLING SYSTEM OR OTHERWISE.                
 //                                                                  
-// (C) Copyright IBM Corp. 2016  All Rights reserved.         
+// (C) Copyright IBM Corp. 2017  All Rights reserved.         
 //                                                                  
 // end_generated_IBM_copyright_prolog                               
 namespace application;
@@ -31,8 +31,9 @@ use com.ibm.streamsx.lock.distributed::* ;
 /**This sample demonstrates the use of the DPS toolkit to store and retreive data.
  * The data is real taxi data from over 200 Taxis generally in and around London on December 31, 2013. 
  * The data is found in the file data/taxiLocationData within this project.
-* One part of the application receives taxi location data and saves it in a NoSQL back end  using the DPS toolkit
+ * One part of the application receives taxi location data and saves it in a NoSQL back end  using the DPS toolkit
  * Another part of the application responds to queries of taxi location by id and returns the last known data for the taxi.
+ * The results are printed in the logs and are written to the file /tmp/foundTaxis.txt
  */
 
 
@@ -48,7 +49,7 @@ type
 		stream< rstring taxi_Id, float64 latitude, float64 longitude, int64 timeStamp> RawData = FileSource()
 		{
 			param
-				file : "input/taxiLocationData.txt" ;
+				file : getApplicationDir() + "/data/input/taxiLocationData.txt" ;
 				format : csv ;
 		}
 
@@ -58,7 +59,7 @@ type
 			FileSource()
 		{
 			param
-				file : "input/taxiSearchQueries.txt" ;
+				file : getApplicationDir() + "/data/input/taxiSearchQueries.txt" ;
 				initDelay : 5.0 ;
 				format : csv ;
 		}
@@ -136,7 +137,7 @@ type
 		() as QueryAnswerWriter = FileSink(FoundTaxis)
 		{
 			param
-				file : "results/foundTaxis.txt" ;
+				file : "/tmp/foundTaxis.txt" ;
 				format : csv ;
 				flush : 1u ;
 				quoteStrings: false;

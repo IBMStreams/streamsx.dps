@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns3:applicationSet xmlns="http://www.ibm.com/xmlns/prod/streams/spl/tupleType" xmlns:ns2="http://www.ibm.com/xmlns/prod/streams/runtime/sam" xmlns:ns3="http://www.ibm.com/xmlns/prod/streams/application" xmlns:ns4="http://www.ibm.com/xmlns/prod/streams/application/augmented" xmlns:ns5="http://www.ibm.com/xmlns/prod/streams/runtime/utils" xmlns:ns6="http://www.ibm.com/xmlns/prod/streams/runtime/utils/mr" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" productVersion="3.1.0.0" name="com.acme.test::Main.appset" xsi:noNamespaceSchemaLocation="http://www.ibm.com/xmlns/prod/streams/application">
+    <ns3:description>com.acme.test::Main application set</ns3:description>
+    <ns3:application version="1.0.0" outputDirectory="/home/streamsadmin/SPL-Examples-For-Beginners/058_data_sharing_between_non_fused_spl_custom_and_cpp_primitive_operators/output/com.acme.test.Main/Distributed" name="com.acme.test::Main" dataDirectory="../../../data" checkpointDirectory="../../../data/ckpt" applicationScope="Default" applicationDirectory="../../../.">
+        <ns3:libraries/>
+        <ns3:hostpools>
+            <ns3:hostpool name="$default" membershipMode="shared" index="0"/>
+        </ns3:hostpools>
+        <ns3:tupleTypes>
+            <ns3:tupleType index="0">
+                <ns3:attribute type="int32" name="dummy"/>
+                <ns3:tuple>
+                    <attr type="int32" name="dummy"/>
+                </ns3:tuple>
+            </ns3:tupleType>
+            <ns3:tupleType index="1">
+                <ns3:attribute type="list&lt;rstring&gt;" name="tickers"/>
+                <ns3:tuple>
+                    <attr name="tickers">
+                        <list elementType="rstring"/>
+                    </attr>
+                </ns3:tuple>
+            </ns3:tupleType>
+        </ns3:tupleTypes>
+        <ns3:pes>
+            <ns3:pe restartable="false" relocatable="false" optimized="true" language="C++" index="0" class="BeJwzNAwuSSwqCc5Mz0vMiQcAJFUFAu">
+                <ns3:envVars>
+                    <ns3:envVar value="/opt/ibm/java-x86_64-60/" name="STREAMS_JAVA_HOME"/>
+                </ns3:envVars>
+                <ns3:executable dynamicLoad="true" digest="8hyKioUNgAAd07ZXgZ3PHyWQJrU=">
+                    <ns3:wrapper>none</ns3:wrapper>
+                    <ns3:executableUri>bin/com.acme.test.Main-a.dpe</ns3:executableUri>
+                    <ns3:arguments></ns3:arguments>
+                    <ns3:dependencies/>
+                </ns3:executable>
+                <ns3:operInstances>
+                    <ns3:operInstance singleThreadedOnOutputs="true" singleThreadedOnInputs="true" name="StartSignal" index="0" definitionIndex="0" class="StartSignal">
+                        <ns3:resources>
+                            <ns3:poolLocation poolIndex="0"/>
+                        </ns3:resources>
+                        <ns3:runtimeConstants>
+                            <ns3:runtimeConstant value="1" name="lit$0"/>
+                            <ns3:runtimeConstant value="5" name="lit$1"/>
+                        </ns3:runtimeConstants>
+                        <ns3:inputPorts/>
+                        <ns3:outputPorts>
+                            <ns3:outputPort viewable="true" streamName="StartSignal" tupleTypeIndex="0" name="StartSignal" isMutable="false" index="0">
+<ns3:interPeConnection operInstanceIndex="1" iportIndex="0"/>
+                            </ns3:outputPort>
+                        </ns3:outputPorts>
+                    </ns3:operInstance>
+                </ns3:operInstances>
+                <ns3:tracing level="error"/>
+                <ns3:inputPorts/>
+                <ns3:outputPorts>
+                    <ns3:outputPort tupleTypeIndex="0" transport="TCP" singleThreadedOnOutput="true" index="0" encoding="LE">
+                        <ns3:staticConnections>
+                            <ns3:staticConnection peIndex="1" iportIndex="0"/>
+                        </ns3:staticConnections>
+                        <ns3:operInstanceConnection oportIndex="0" operInstanceIndex="0"/>
+                    </ns3:outputPort>
+                </ns3:outputPorts>
+            </ns3:pe>
+            <ns3:pe restartable="false" relocatable="false" optimized="true" language="C++" index="1" class="BeJwzC8nIzEs3jAcADC8CDB">
+                <ns3:envVars>
+                    <ns3:envVar value="/opt/ibm/java-x86_64-60/" name="STREAMS_JAVA_HOME"/>
+                </ns3:envVars>
+                <ns3:executable dynamicLoad="true" digest="7KBjX3FI9cD/EMkRvB+O0YAoBX4=">
+                    <ns3:wrapper>none</ns3:wrapper>
+                    <ns3:executableUri>bin/com.acme.test.Main-b.dpe</ns3:executableUri>
+                    <ns3:arguments></ns3:arguments>
+                    <ns3:dependencies/>
+                </ns3:executable>
+                <ns3:operInstances>
+                    <ns3:operInstance singleThreadedOnOutputs="true" singleThreadedOnInputs="true" name="Thing1" index="1" definitionIndex="1" class="Thing1">
+                        <ns3:resources>
+                            <ns3:poolLocation poolIndex="0"/>
+                        </ns3:resources>
+                        <ns3:runtimeConstants>
+                            <ns3:runtimeConstant value="0" name="lit$0"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$1"/>
+                            <ns3:runtimeConstant value="&quot;Thing1_Store&quot;" name="lit$2"/>
+                            <ns3:runtimeConstant value="0" name="lit$3"/>
+                            <ns3:runtimeConstant value="&quot;Error while creating the Thing1 store.&quot;" name="lit$4"/>
+                            <ns3:runtimeConstant value="&quot;com.acme.test/Main.spl&quot;" name="lit$5"/>
+                            <ns3:runtimeConstant value="93" name="lit$6"/>
+                            <ns3:runtimeConstant value="&quot;IBM&quot;" name="lit$7"/>
+                            <ns3:runtimeConstant value="&quot;IBM Corporation&quot;" name="lit$8"/>
+                            <ns3:runtimeConstant value="&quot;F&quot;" name="lit$9"/>
+                            <ns3:runtimeConstant value="&quot;Ford Motor Company&quot;" name="lit$10"/>
+                            <ns3:runtimeConstant value="&quot;BA&quot;" name="lit$11"/>
+                            <ns3:runtimeConstant value="&quot;The Boeing Company&quot;" name="lit$12"/>
+                            <ns3:runtimeConstant value="&quot;T&quot;" name="lit$13"/>
+                            <ns3:runtimeConstant value="&quot;AT&amp;T Inc.&quot;" name="lit$14"/>
+                            <ns3:runtimeConstant value="&quot;CSCO&quot;" name="lit$15"/>
+                            <ns3:runtimeConstant value="&quot;Cisco Systems, Inc.&quot;" name="lit$16"/>
+                            <ns3:runtimeConstant value="&quot;GOOG&quot;" name="lit$17"/>
+                            <ns3:runtimeConstant value="&quot;Google Inc.&quot;" name="lit$18"/>
+                            <ns3:runtimeConstant value="&quot;INTC&quot;" name="lit$19"/>
+                            <ns3:runtimeConstant value="&quot;Intel Corporation&quot;" name="lit$20"/>
+                            <ns3:runtimeConstant value="[&quot;IBM&quot;, &quot;T&quot;, &quot;GOOG&quot;, &quot;BA&quot;]" name="lit$21"/>
+                            <ns3:runtimeConstant value="0" name="lit$22"/>
+                        </ns3:runtimeConstants>
+                        <ns3:inputPorts>
+                            <ns3:inputPort tupleTypeIndex="0" name="StartSignal" isMutable="true" index="0">
+<ns3:interPeConnection oportIndex="0" operInstanceIndex="0"/>
+                            </ns3:inputPort>
+                        </ns3:inputPorts>
+                        <ns3:outputPorts>
+                            <ns3:outputPort viewable="true" streamName="Thing1" tupleTypeIndex="1" name="Thing1" isMutable="true" index="0">
+<ns3:interPeConnection operInstanceIndex="2" iportIndex="0"/>
+                            </ns3:outputPort>
+                        </ns3:outputPorts>
+                    </ns3:operInstance>
+                </ns3:operInstances>
+                <ns3:tracing level="error"/>
+                <ns3:inputPorts>
+                    <ns3:inputPort tupleTypeIndex="0" transport="TCP" index="0" encoding="LE">
+                        <ns3:staticConnections>
+                            <ns3:staticConnection peIndex="0" oportIndex="0"/>
+                        </ns3:staticConnections>
+                        <ns3:operInstanceConnection operInstanceIndex="1" iportIndex="0"/>
+                    </ns3:inputPort>
+                </ns3:inputPorts>
+                <ns3:outputPorts>
+                    <ns3:outputPort tupleTypeIndex="1" transport="TCP" singleThreadedOnOutput="true" index="0" encoding="LE">
+                        <ns3:staticConnections>
+                            <ns3:staticConnection peIndex="2" iportIndex="0"/>
+                        </ns3:staticConnections>
+                        <ns3:operInstanceConnection oportIndex="0" operInstanceIndex="1"/>
+                    </ns3:outputPort>
+                </ns3:outputPorts>
+            </ns3:pe>
+            <ns3:pe restartable="false" relocatable="false" optimized="true" language="C++" index="2" class="BeJwzC8nIzEs3igcADDECDC">
+                <ns3:envVars>
+                    <ns3:envVar value="/opt/ibm/java-x86_64-60/" name="STREAMS_JAVA_HOME"/>
+                </ns3:envVars>
+                <ns3:executable dynamicLoad="true" digest="iLtbg2BiPE1dd+FyXBcBxZkHEUQ=">
+                    <ns3:wrapper>none</ns3:wrapper>
+                    <ns3:executableUri>bin/com.acme.test.Main-c.dpe</ns3:executableUri>
+                    <ns3:arguments></ns3:arguments>
+                    <ns3:dependencies/>
+                </ns3:executable>
+                <ns3:operInstances>
+                    <ns3:operInstance singleThreadedOnOutputs="false" singleThreadedOnInputs="true" name="Thing2" index="2" definitionIndex="2" class="Thing2">
+                        <ns3:resources>
+                            <ns3:poolLocation poolIndex="0"/>
+                        </ns3:resources>
+                        <ns3:runtimeConstants/>
+                        <ns3:inputPorts>
+                            <ns3:inputPort tupleTypeIndex="1" name="Thing1" isMutable="true" index="0">
+<ns3:interPeConnection oportIndex="0" operInstanceIndex="1"/>
+                            </ns3:inputPort>
+                        </ns3:inputPorts>
+                        <ns3:outputPorts>
+                            <ns3:outputPort viewable="true" streamName="Thing2" tupleTypeIndex="0" name="Thing2" isMutable="true" index="0">
+<ns3:interPeConnection operInstanceIndex="3" iportIndex="0"/>
+                            </ns3:outputPort>
+                        </ns3:outputPorts>
+                    </ns3:operInstance>
+                </ns3:operInstances>
+                <ns3:tracing level="error"/>
+                <ns3:inputPorts>
+                    <ns3:inputPort tupleTypeIndex="1" transport="TCP" index="0" encoding="LE">
+                        <ns3:staticConnections>
+                            <ns3:staticConnection peIndex="1" oportIndex="0"/>
+                        </ns3:staticConnections>
+                        <ns3:operInstanceConnection operInstanceIndex="2" iportIndex="0"/>
+                    </ns3:inputPort>
+                </ns3:inputPorts>
+                <ns3:outputPorts>
+                    <ns3:outputPort tupleTypeIndex="0" transport="TCP" singleThreadedOnOutput="false" index="0" encoding="LE">
+                        <ns3:staticConnections>
+                            <ns3:staticConnection peIndex="3" iportIndex="0"/>
+                        </ns3:staticConnections>
+                        <ns3:operInstanceConnection oportIndex="0" operInstanceIndex="2"/>
+                    </ns3:outputPort>
+                </ns3:outputPorts>
+            </ns3:pe>
+            <ns3:pe restartable="false" relocatable="false" optimized="true" language="C++" index="3" class="BeJwzNA5OLkpNzQsvyixJLTKMBwAvaAXS">
+                <ns3:envVars>
+                    <ns3:envVar value="/opt/ibm/java-x86_64-60/" name="STREAMS_JAVA_HOME"/>
+                </ns3:envVars>
+                <ns3:executable dynamicLoad="true" digest="yaVkDd/Fq8DSeYGLJ6qerlR8A+g=">
+                    <ns3:wrapper>none</ns3:wrapper>
+                    <ns3:executableUri>bin/com.acme.test.Main-d.dpe</ns3:executableUri>
+                    <ns3:arguments></ns3:arguments>
+                    <ns3:dependencies/>
+                </ns3:executable>
+                <ns3:operInstances>
+                    <ns3:operInstance singleThreadedOnOutputs="true" singleThreadedOnInputs="true" name="ScreenWriter1" index="3" definitionIndex="1" class="ScreenWriter1">
+                        <ns3:resources>
+                            <ns3:poolLocation poolIndex="0"/>
+                        </ns3:resources>
+                        <ns3:runtimeConstants>
+                            <ns3:runtimeConstant value="0" name="lit$0"/>
+                            <ns3:runtimeConstant value="&quot;Thing1_Store&quot;" name="lit$1"/>
+                            <ns3:runtimeConstant value="0" name="lit$2"/>
+                            <ns3:runtimeConstant value="&quot;Unable to find the Thing1_Store inside the screen writer sink.&quot;" name="lit$3"/>
+                            <ns3:runtimeConstant value="&quot;com.acme.test/Main.spl&quot;" name="lit$4"/>
+                            <ns3:runtimeConstant value="143" name="lit$5"/>
+                            <ns3:runtimeConstant value="&quot;Thing2_Store&quot;" name="lit$6"/>
+                            <ns3:runtimeConstant value="0" name="lit$7"/>
+                            <ns3:runtimeConstant value="&quot;Unable to find the Thing2_Store inside the screen writer sink.&quot;" name="lit$8"/>
+                            <ns3:runtimeConstant value="&quot;com.acme.test/Main.spl&quot;" name="lit$9"/>
+                            <ns3:runtimeConstant value="150" name="lit$10"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$11"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$12"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 1: Original name of a store with an id &quot;" name="lit$13"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$14"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$15"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 2: SPL type name for the key of a store with an id &quot;" name="lit$16"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$17"/>
+                            <ns3:runtimeConstant value="&quot; is '&quot;" name="lit$18"/>
+                            <ns3:runtimeConstant value="&quot;Metadata 3: SPL type name for the value of a store with an id &quot;" name="lit$19"/>
+                            <ns3:runtimeConstant value="&quot;================ Final Results Begin ================&quot;" name="lit$20"/>
+                            <ns3:runtimeConstant value="&quot;Thing2.dummy = &quot;" name="lit$21"/>
+                            <ns3:runtimeConstant value="&quot;\n\nContents of the Thing1_Store [TickerSymbol =&gt; CompanyName]&quot;" name="lit$22"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$23"/>
+                            <ns3:runtimeConstant value="&quot;&quot;" name="lit$24"/>
+                            <ns3:runtimeConstant value="0" name="lit$25"/>
+                            <ns3:runtimeConstant value="&quot;Unable to get an iterator for the Thing1_Store&quot;" name="lit$26"/>
+                            <ns3:runtimeConstant value="&quot;com.acme.test/Main.spl&quot;" name="lit$27"/>
+                            <ns3:runtimeConstant value="171" name="lit$28"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$29"/>
+                            <ns3:runtimeConstant value="&quot;' =&gt; '&quot;" name="lit$30"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$31"/>
+                            <ns3:runtimeConstant value="&quot;\n\nContents of the Thing2_Store [TickerSymbol =&gt; UniqueTickerId]&quot;" name="lit$32"/>
+                            <ns3:runtimeConstant value="0" name="lit$33"/>
+                            <ns3:runtimeConstant value="&quot;Unable to get an iterator for the Thing2_Store&quot;" name="lit$34"/>
+                            <ns3:runtimeConstant value="&quot;com.acme.test/Main.spl&quot;" name="lit$35"/>
+                            <ns3:runtimeConstant value="186" name="lit$36"/>
+                            <ns3:runtimeConstant value="0" name="lit$37"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$38"/>
+                            <ns3:runtimeConstant value="&quot;' =&gt; '&quot;" name="lit$39"/>
+                            <ns3:runtimeConstant value="&quot;'&quot;" name="lit$40"/>
+                            <ns3:runtimeConstant value="&quot;================ Final Results End   ================&quot;" name="lit$41"/>
+                        </ns3:runtimeConstants>
+                        <ns3:inputPorts>
+                            <ns3:inputPort tupleTypeIndex="0" name="Thing2" isMutable="false" index="0">
+<ns3:interPeConnection oportIndex="0" operInstanceIndex="2"/>
+                            </ns3:inputPort>
+                        </ns3:inputPorts>
+                        <ns3:outputPorts/>
+                    </ns3:operInstance>
+                </ns3:operInstances>
+                <ns3:tracing level="error"/>
+                <ns3:inputPorts>
+                    <ns3:inputPort tupleTypeIndex="0" transport="TCP" index="0" encoding="LE">
+                        <ns3:staticConnections>
+                            <ns3:staticConnection peIndex="2" oportIndex="0"/>
+                        </ns3:staticConnections>
+                        <ns3:operInstanceConnection operInstanceIndex="3" iportIndex="0"/>
+                    </ns3:inputPort>
+                </ns3:inputPorts>
+                <ns3:outputPorts/>
+            </ns3:pe>
+        </ns3:pes>
+        <ns3:operDefinitions>
+            <ns3:operDefinition kind="spl.utility::Beacon" index="0"/>
+            <ns3:operDefinition kind="spl.utility::Custom" index="1"/>
+            <ns3:operDefinition kind="com.acme.test::TickerIdGenerator" index="2"/>
+        </ns3:operDefinitions>
+        <ns3:composites>
+            <ns3:sourceUris>
+                <ns3:uri path="file:///home/streamsadmin/SPL-Examples-For-Beginners/058_data_sharing_between_non_fused_spl_custom_and_cpp_primitive_operators/com.acme.test/Main.spl" index="0"/>
+            </ns3:sourceUris>
+            <ns3:compositeOpers>
+                <ns3:compositeOper toolkitIndex="0" numberOfOutputPorts="0" numberOfInputPorts="0" kind="com.acme.test::Main" index="0" startLine="47" sourceIndex="0" endLine="201">
+                    <ns3:description>com.acme.test::Main Composite</ns3:description>
+                </ns3:compositeOper>
+            </ns3:compositeOpers>
+            <ns3:compositeOperInstances>
+                <ns3:compositeOperInstance name="com.acme.test::Main" index="4" compositeOperIndex="0" startLine="47" sourceIndex="0" endLine="201">
+                    <ns3:primitiveOperInstance toolkitIndex="1" name="StartSignal" kind="spl.utility::Beacon" index="0" startLine="57" sourceIndex="0" endLine="61">
+                        <ns3:outputPorts>
+                            <ns3:port index="0">
+<ns3:connections>
+    <ns3:connection portKind="input" portIndex="0" operName="Thing1" operIndex="1"/>
+</ns3:connections>
+                            </ns3:port>
+                        </ns3:outputPorts>
+                    </ns3:primitiveOperInstance>
+                    <ns3:primitiveOperInstance toolkitIndex="1" name="Thing1" kind="spl.utility::Custom" index="1" startLine="73" sourceIndex="0" endLine="113">
+                        <ns3:inputPorts>
+                            <ns3:port index="0">
+<ns3:connections>
+    <ns3:connection portKind="output" portIndex="0" operName="StartSignal" operIndex="0"/>
+</ns3:connections>
+                            </ns3:port>
+                        </ns3:inputPorts>
+                        <ns3:outputPorts>
+                            <ns3:port index="0">
+<ns3:connections>
+    <ns3:connection portKind="input" portIndex="0" operName="Thing2" operIndex="2"/>
+</ns3:connections>
+                            </ns3:port>
+                        </ns3:outputPorts>
+                    </ns3:primitiveOperInstance>
+                    <ns3:primitiveOperInstance toolkitIndex="0" name="Thing2" kind="com.acme.test::TickerIdGenerator" index="2" startLine="126" sourceIndex="0" endLine="127">
+                        <ns3:inputPorts>
+                            <ns3:port index="0">
+<ns3:connections>
+    <ns3:connection portKind="output" portIndex="0" operName="Thing1" operIndex="1"/>
+</ns3:connections>
+                            </ns3:port>
+                        </ns3:inputPorts>
+                        <ns3:outputPorts>
+                            <ns3:port index="0">
+<ns3:connections>
+    <ns3:connection portKind="input" portIndex="0" operName="ScreenWriter1" operIndex="3"/>
+</ns3:connections>
+                            </ns3:port>
+                        </ns3:outputPorts>
+                    </ns3:primitiveOperInstance>
+                    <ns3:primitiveOperInstance toolkitIndex="1" name="ScreenWriter1" kind="spl.utility::Custom" index="3" startLine="135" sourceIndex="0" endLine="200">
+                        <ns3:inputPorts>
+                            <ns3:port index="0">
+<ns3:connections>
+    <ns3:connection portKind="output" portIndex="0" operName="Thing2" operIndex="2"/>
+</ns3:connections>
+                            </ns3:port>
+                        </ns3:inputPorts>
+                    </ns3:primitiveOperInstance>
+                </ns3:compositeOperInstance>
+            </ns3:compositeOperInstances>
+        </ns3:composites>
+        <ns3:toolkits>
+            <ns3:toolkit version="1.0.0" uri="file:///home/streamsadmin/SPL-Examples-For-Beginners/058_data_sharing_between_non_fused_spl_custom_and_cpp_primitive_operators" name="058_data_sharing_between_non_fused_spl_custom_and_cpp_primitive_operators" index="0"/>
+            <ns3:toolkit version="1.1.0" uri="file:///home/streamsadmin/InfoSphereStreams/toolkits/spl" name="spl" index="1"/>
+            <ns3:toolkit version="1.0.0" uri="file:///home/streamsadmin/SPL-Examples-For-Beginners/com.ibm.streamsx.dps" name="com.ibm.streamsx.dps" index="2"/>
+        </ns3:toolkits>
+    </ns3:application>
+</ns3:applicationSet>
