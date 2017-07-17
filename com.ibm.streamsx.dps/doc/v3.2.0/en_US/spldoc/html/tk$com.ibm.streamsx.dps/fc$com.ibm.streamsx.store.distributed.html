@@ -1,0 +1,2873 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xml:lang="en-us" lang="en-us">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="copyright" content="(C) Copyright 2005"/>
+<meta name="DC.rights.owner" content="(C) Copyright 2005"/>
+<meta name="DC.Type" content="reference"/>
+<meta name="DC.Title" content="C++ Native Functions: com.ibm.streamsx.store.distributed"/>
+<meta name="DC.Format" content="XHTML"/>
+<meta name="DC.Identifier" content="spldoc_functions"/>
+<link rel="stylesheet" type="text/css" href="../../html/commonltr.css"/>
+<link rel="stylesheet" type="text/css" href="../../html/spldoc.css"/>
+<title>C++ Native Functions: com.ibm.streamsx.store.distributed</title>
+</head>
+<body id="spldoc_functions">
+
+
+<h1 class="title topictitle1">C++ Native Functions: <tt class="ph tt">com.ibm.streamsx.store.distributed</tt></h1>
+
+<div class="body refbody">
+<div class="section">
+<p class="p">
+<a class="xref" href="../toolkits/toolkits.html">Streams DPS Toolkit</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.dps.html">com.ibm.streamsx.dps 3.2.0</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.store.distributed.html">com.ibm.streamsx.store.distributed</a> &gt; C++ Native Functions</p>
+
+</div>
+
+<div class="section">
+This page documents native functions that can be invoked from SPL, including the SPL interfaces that can be used to invoke each of the native functions.
+</div>
+
+<div class="section">
+<p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/FunctionModel.html#spldoc_reference_function_model__functionset__functions">Functions</a></strong></p>
+<dl class="dl" compact="compact">
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsBase64Decode.rstring.rstring"><tt class="ph tt">      public stateful void dpsBase64Decode(rstring str, mutable rstring decodedResultStr)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Base64 decode a given string. 
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">str</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the string to decode 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">decodedResultStr</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">mutable parameter that will contain the decoded result.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+rstring base64EncodedString = "bXlEQlN0b3JlMQ==";
+mutable rstring base64DecodedString = "";
+// base64DecodedString will have a value o:f "myDBStore1"
+dpsBase64Decode(rowKey, base64DecodedString);           
+</pre>
+
+
+</div>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsBase64Encode.rstring.rstring"><tt class="ph tt">      public stateful void dpsBase64Encode(rstring str, mutable rstring encodedResultStr)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Base64 encode a given string. 
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">str</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the string to encode 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">encodedResultStr</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">mutable parameter that will contain the encoded result.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+mutable list&lt;rstring&gt;[5] cn = [];
+dpsBase64Encode("cf1:Company", cn[0]);
+dpsBase64Encode("IBM", cn[1]);
+dpsBase64Encode("Microsoft", cn[2]);
+dpsBase64Encode("Amazon", cn[3]);
+dpsBase64Encode("Google", cn[4]);
+
+//the cn array will now contain the decoded values
+</pre>
+
+
+</div>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsBeginIteration.uint64.uint64"><tt class="ph tt">      public stateful uint64 dpsBeginIteration(uint64 store, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">This function gets a store iterator that can be used to iterate over all the key-value pairs in a given store id. No other operations that can modify the state can be used until after  <a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsEndIteration.uint64.uint64.uint64">dpsEndIteration()</a> is called for this same store.   Once a store iterator is obtained, it must be released by calling <tt class="ph tt">dpsEndIteration()</tt> once the iterator is no longer needed.  See the documentation for <a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsGetNext.uint64.uint64.T1.T2.uint64">dpsGetNext()</a>  for a complete example of how to use the iterator.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">handle of the store for which an iterator is needed. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">Contains the error code describing the result of the function call.  Will be '0' if no error occurred, otherwise will have a non-zero value.  
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">an value representing an iterator that can be used with the two other store iteration functions, <a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsGetNext.uint64.uint64.T1.T2.uint64">dpsGetNext()</a> and <a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsEndIteration.uint64.uint64.uint64">dpsEndIteration()</a>.
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsClear.uint64.uint64"><tt class="ph tt">      public stateful void dpsClear(uint64 store, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Clear the given store.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the handle of the store to clear 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">Contains the error code describing the result of the operation.  Will be '0' if the store was successfully emptied, otherwise will have a non-zero value.   
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsCreateOrGetStore.rstring.T1.T2.uint64"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful uint64 dpsCreateOrGetStore(rstring name, T1 key, T2 value, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Create a new process store with a given name or simply return its handle it already exists.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">name</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the name of the store to retrieve, or to create if it doesn't already exist. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">this variable should be provided to indicate the type of the key to use in the store. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">value</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">this variable indicates the type of the values in the store. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">mutable variable provided that will contain the error code, if an error occurs. Will be set to '0' if the store was created successfully, or a non-zero value otherwise.   
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">the process store handle of the created store.  If an error occurs, the return value of this function is undefined. It is recommended that the store id is cached in your application. 
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+   mutable uint64 err = 0ul;
+   mutable uint64 s = 0ul;
+   rstring dummyRstring = "";
+   uint32 dummyUint32 = 0u;
+   s = dpsCreateOrGetStore("myDBStore1", dummyRstring, dummyUint32, err);
+
+   if (err != 0ul) {
+         uint64 rc = dpsGetLastStoreErrorCode;
+         rstring msg = dpsGetLastStoreErrorString();
+         printStringLn("Unexpected error in creating a store named myDBStore1: rc = " + (rstring)rc + ", msg = " + msg);
+   }
+</pre>
+
+
+</div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsCreateStore.rstring.T1.T2.uint64"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful uint64 dpsCreateStore(rstring name, T1 key, T2 value, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Create a new process store with a given name.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">name</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the name of the store to create 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">this variable should be provided to indicate the type of the key to use in the store. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">value</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">this variable indicates the type of the values in the store.  
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">mutable variable provided that will contain the error code, if an error occurs. Will be set to '0' if the store was created successfully, or a non-zero value otherwise.   
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">the process store handle, if created. It is advisable to cache the store id in your application.  The return value will be '0' if a process store with the same name already exists, and undefined if there is an error.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+  mutable uint64 err = 0ul;
+  mutable uint64 s = 0ul;
+  rstring dummyRstring = "";
+  uint32 dummyUint32 = 0u;
+  s = dpsCreateStore("myDBStore1", dummyRstring, dummyUint32, err);
+
+  if (err != 0ul) {
+         uint64 rc = dpsGetLastStoreErrorCode;
+         rstring msg = dpsGetLastStoreErrorString();
+         printStringLn("Unexpected error in creating a store named myDBStore1: rc = " + (rstring)rc + ", msg = " + msg);
+   }
+</pre>
+
+
+</div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsDeserialize.uint64.blob.T1.T2.uint64"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful void dpsDeserialize(uint64 store, blob data, T1 dummyKey, T2 dummyValue, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">This function deserializes a given blob containing one or more serialized key-value pairs. The specified store will be populated with the deserialized data.  This technique can be used to copy the contents of one store into another.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the handle of the store into which the deserialized data will be saved. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">data</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the data to deserialize and save into the specified store. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">dummyKey</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">variable indicating the type of the keys in the store 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">dummyValue</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">variable indicating the type of the values in the store 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">a mutable variable that will contain the error code describing the result of the deserialization.  Will be '0' if deserialization was successful, and a non-zero value otherwise.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+mutable uint64 err = 0ul;
+rstring dummyRstring = "";
+list&lt;rstring&gt; dummyRstringList = ["1", "2"];
+mutable blob sData = [];
+dpsSerialize(s1, sData, dummyRstring, dummyRstringList, err);
+
+if (err == 0ul) {
+   //now deserialize it into another store.
+   dpsDeserialize(store2, sData, dummyRstring, dummyRstringList, err);
+	
+   if (err != 0ul) {
+ 	//perform error handling using dpsGetLastStoreErrorCode() and dpsGetLastStoreErrorString()
+   }
+</pre>
+
+
+</div>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsEndIteration.uint64.uint64.uint64"><tt class="ph tt">      public stateful void dpsEndIteration(uint64 store, uint64 iterator, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">This function must be called once all iteration is complete.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the handle of the store. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">iterator</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the store iterator id obtained from <tt class="ph tt">dpsBeginIteration()</tt>. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise.  
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsFindStore.rstring.uint64"><tt class="ph tt">      public stateful uint64 dpsFindStore(rstring name, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Find a process store given its name. 
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">name</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">The name of the store to look up.         
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">This parameter will be set by the function to contain the error code if an error occurs finding the store, and '0' otherwise.         
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">The process store handle if found, 0 otherwise.
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGet.uint64.T1.T2.uint64"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful boolean dpsGet(uint64 store, T1 key, mutable T2 item, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Given a key, retrieves its value from the given store. This function has better performance than <tt class="ph tt">dpsGetSafe</tt> since it doesn't carry out any safety checks.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the handle identifying the store in question. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the key of the item to look up 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">item</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">if the key exists in the store and has a value of the same type, this parameter will be set to the key's value.          
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">contains the non-zero error code, if an error occurs, or will have a value of '0'.   
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if the if the operation was successful and the store contains an item with the given key and a matching type, and false if the key-value pair wasn't found.
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetDetailsAboutThisMachine.rstring.rstring.rstring"><tt class="ph tt">      public stateful void dpsGetDetailsAboutThisMachine(mutable rstring machineName, mutable rstring osVersion, mutable rstring cpuArchitecture)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Get details of the client machine where this operator is running.   The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be assigned to the corresponding parameters
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">machineName</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the value of this parameter will be set to the machine's name. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">osVersion</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the value of this parameter will be set to the Linux OS version. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">cpuArchitecture</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the value of this parameter will be set to the CPU architecture of the client.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+rstring dbProductName = dpsGetNoSqlDbProductName();
+// Get the details about the machine where this operator is running.
+mutable rstring machineName = "", osVersion = "", cpuArchitecture = "";
+dpsGetDetailsAboutThisMachine(machineName, osVersion, cpuArchitecture);
+// Display the NoSQL DB product name being used 
+printStringLn("=====================================================");
+printStringLn("Details about this DPS client machine:");
+printStringLn("NoSQL key-value store product name: " + dbProductName);
+printStringLn("Machine name: " + machineName);
+printStringLn("OS version: " + osVersion);
+printStringLn("CPU architecture: " + cpuArchitecture);
+printStringLn("=====================================================");
+</pre>
+
+
+</div>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetLastErrorCodeTTL"><tt class="ph tt">      public stateful uint64 dpsGetLastErrorCodeTTL()      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Get the error code of the last error occurred involving data that was stored with a Time To Live (TTL).
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">the error code, or '0' if the last TTL store operation was successful.        
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetLastErrorStringTTL"><tt class="ph tt">      public stateful rstring dpsGetLastErrorStringTTL()      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Get the description of the last error that occurred involving data stored with a Time To Live (TTL).
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">the error message, or the empty string if the last TTL store operation was successful.        
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetLastStoreErrorCode"><tt class="ph tt">      public stateful uint64 dpsGetLastStoreErrorCode()      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Get the error code of the last store error.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">the error code for the last store operation or '0' if the last operation was successful.        
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetLastStoreErrorString"><tt class="ph tt">      public stateful rstring dpsGetLastStoreErrorString()      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Get the description of the last store error.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">the error message, or the empty string if the last data store operation was successful.
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetNext.uint64.uint64.T1.T2.uint64"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful boolean dpsGetNext(uint64 store, uint64 iterator, mutable T1 key, mutable T2 value, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">This function is used to get the next key and value of given types in the given store when iterating over all the items in the store.  The <strong class="ph b">key</strong> and <strong class="ph b">value</strong> parameters must be of the same type that was used when the store was originally created using either <tt class="ph tt">dpsCreateStore()</tt> or <tt class="ph tt">dpsCreateOrGetStore()</tt>.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the store being iterated over 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">iterator</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the iterator handle, must have been created from a previous call to <tt class="ph tt">dpsBeginIteration()</tt> 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">a mutable variable to store the key for the current key-value pair in the iteration sequence 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">value</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">a mutable variable to store the value for the current key-value pair 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise.   
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if the next key-value pair was successfully returned, or if store is empty, and false if the end of the iteration was reached. If this method returns false because the store is empty or the end of the iteration was reached, the <strong class="ph b">err</strong> parameter will have a value of '0'. If an error occurs, the function will return false and the <strong class="ph b">err</strong> parameter will have a non-zero value.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+mutable uint64 err = 0ul;
+uint64 it = dpsBeginIteration(s, err); 
+mutable rstring key = "";
+mutable rstring value = "";
+					
+while (dpsGetNext(s, it, key, value, err)) {
+   printStringLn("'" + key + "' =&gt; " + value);
+}
+if (err != 0){ 
+	//an error occurred during iteration
+}
+dpsEndIteration(s, it, err);
+</pre>
+
+
+</div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetNoSqlDbProductName"><tt class="ph tt">      public stateful rstring dpsGetNoSqlDbProductName()      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Get the name of the NoSQL database product being used.
+</p>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetSafe.uint64.T1.T2.uint64"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful boolean dpsGetSafe(uint64 store, T1 key, mutable T2 item, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Given a key, retrieve its value from the given store. Returns true if the store did contain an item with the given key and a matching type, false otherwise.  This function is identical to <tt class="ph tt">dpsGet</tt>, with the exception that it does safety checks and is therefore slower.
+</p>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetSplTypeNameForKey.uint64"><tt class="ph tt">      public stateful rstring dpsGetSplTypeNameForKey(uint64 store)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Get the SPL type name for the key of a given store id.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the handle for the store in question. 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">the type for the keys in the store.        
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetSplTypeNameForValue.uint64"><tt class="ph tt">      public stateful rstring dpsGetSplTypeNameForValue(uint64 store)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Get the SPL type name for the value of a given store id.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the handle for the store in question 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">the type for the values in the store 
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetStoreName.uint64"><tt class="ph tt">      public stateful rstring dpsGetStoreName(uint64 store)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Get the store name for a given store id.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the store to look up 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">the name used to create the store, if it exists.        
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetTTL.T1.T2.uint64"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful boolean dpsGetTTL(T1 key, mutable T2 item, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Get an item that was stored with a TTL (Time To Live in seconds) value.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the key to look up 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">item</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">will receive the saved value for the given key. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">will receive the error code if an error occurs, or will be set to '0' otherwise.   
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if the global TTL store did contain an item with the given key and a matching type, false otherwise or if an error occurs.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+mutable rstring myKey = "", myValue = "";
+myKey = "New York";
+myValue = "";
+mutable uint64 err = 0ul;
+boolean res = dpsGetTTL(myKey, myValue, err);
+			    
+if (res == true) {
+   printStringLn("TTL based key-value pair is read successfully. Key=" + 
+      myKey + ", Value=" + myValue);
+} else {
+  //handle error using dpsGetLastErrorCodeTTL() and dpsGetLastErrorStringTTL())
+}
+</pre>
+
+
+</div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetTTL.T1.T2.uint64.boolean.boolean"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful boolean dpsGetTTL(T1 key, mutable T2 item, mutable uint64 err, boolean encodeKey, boolean encodeValue)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Get an item that was stored with a TTL (Time To Live in seconds) value.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the key to look up (In this API, you can specify whether the key is base64 encoded or not.) 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">item</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">will receive the saved value for the given key. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">will receive the error code if an error occurs, or will be set to '0' otherwise. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">encodeKey</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">set to true if the key shall be base64 encoded, set to false otherwise. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">encodeValue</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">set to true if the value shall be base64 encoded, set to false otherwise. 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if the global TTL store did contain an item with the given key and a matching type, false otherwise or if an error occurs.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+mutable rstring myKey = "", myValue = "";
+myKey = "New York";
+myValue = "";
+mutable uint64 err = 0ul;
+    // In this overloaded API, the final parameter can be used to specify whether the 
+    // key was originally base64 encoded or not.
+boolean res = dpsGetTTL(myKey, myValue, err, true);
+			    
+if (res == true) {
+   printStringLn("TTL based key-value pair is read successfully. Key=" + 
+      myKey + ", Value=" + myValue);
+} else {
+  //handle error using dpsGetLastErrorCodeTTL() and dpsGetLastErrorStringTTL())
+}
+</pre>
+
+
+</div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsHas.uint64.T1.uint64"><tt class="ph tt">      &lt;any T1&gt; public stateful boolean dpsHas(uint64 store, T1 key, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Check if an item exists in the given store.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the store handle representing the store to check. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the key to look up. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">contains the error code for this function call.  Will be '0' if no error occurs, otherwise will have a non-zero value. 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if the given store does contain an item with the given key, false otherwise.
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsHasTTL.T1.uint64"><tt class="ph tt">      &lt;any T1&gt; public stateful boolean dpsHasTTL(T1 key, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Check if an item exists that was stored with a TTL (Time To Live in seconds) value.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the key to look up. Can be any SPL type. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">mutable parameter that receives the error code for this function call. If the error code is non-zero, an error has occurred. 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if a TTL item with the given key exists, false if no such item exists or if an error occurs.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+mutable rstring myKey = "";
+myKey = "New York";
+mutable uint64 err = 0ul;
+boolean res = dpsHasTTL(myKey, err);
+			    
+if (res == true) {
+   printStringLn("Unexpected error: TTL based key-value pair 'New York':'Albany' is still present after the TTL expiration.");
+} else if (err == 0ul) {
+ //no error occurred and the element was not found
+   printStringLn("key-value pair 'New York':'Albany' was not found, this may be because it was removed after its TTL expiration.");
+}            
+</pre>
+
+
+</div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsHasTTL.T1.uint64.boolean"><tt class="ph tt">      &lt;any T1&gt; public stateful boolean dpsHasTTL(T1 key, mutable uint64 err, boolean encodeKey)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Check if an item exists that was stored with a TTL (Time To Live in seconds) value.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the key to look up. Can be any SPL type. (In this API, you can specify whether the key is base64 encoded or not.) 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">mutable parameter that receives the error code for this function call. If the error code is non-zero, an error has occurred. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">encodeKey</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">set to true if the key shall be base64 encoded, set to false otherwise. 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if a TTL item with the given key exists, false if no such item exists or if an error occurs.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+mutable rstring myKey = "";
+myKey = "New York";
+mutable uint64 err = 0ul;
+    // In this overloaded API, the final argument is used to specify whether the key is base64 encoded or not.
+boolean res = dpsHasTTL(myKey, err, true);
+			    
+if (res == true) {
+   printStringLn("Unexpected error: TTL based key-value pair 'New York':'Albany' is still present after the TTL expiration.");
+} else if (err == 0ul) {
+ //no error occurred and the element was not found
+   printStringLn("key-value pair 'New York':'Albany' was not found, this may be because it was removed after its TTL expiration.");
+}            
+</pre>
+
+
+</div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsIsConnected"><tt class="ph tt">      public stateful boolean dpsIsConnected()      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">It allows to check the connection status of the back-end data store.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if the connection is established, false otherwise.
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsPersist.uint64"><tt class="ph tt">      public stateful void dpsPersist(mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Persist any operations involving stores used in this application to disk.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">contains the error code for this function call.  Will be '0' if no error occurs and if  all write operations received before this function was called have been committed to storage.  It also returns '0' if the database does not support this operation.  It will be non-zero if an error occurs. 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsPut.uint64.T1.T2.uint64"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful boolean dpsPut(uint64 store, T1 key, T2 item, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Put a new key-value pair into a store.  This function has better performance than <tt class="ph tt">dpsPutSafe</tt> since no safety checks are done to ensure that there is a valid user created store present. Hence, use the <tt class="ph tt">dpsPut()</tt> function only when there is  a user created store present in the back-end DB infrastructure. If this rule is violated, the back-end infrastructure will have inconsistent data items.  The specified <strong class="ph b">key</strong> and <strong class="ph b">item</strong> must be of the same type as those used to create the store in <tt class="ph tt">dpsCreateStore</tt>  or <tt class="ph tt">dpsCreateOrGetStore</tt>, otherwise, store operations will produce undesired results.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">The handle specifying the store.         
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">The key for the new pair.         
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">item</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">The value for the new pair. Must be the same type as the <strong class="ph b">value</strong> that was provided when the store was created. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">Will be set to '0' on success, and will be non-zero otherwise.  
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">If no error occurs, returns true, and false otherwise.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+	rstring dummyRstring = "";
+	uint32 dummyUint32 = 0u;
+	mutable uint64 err = 0ul;
+	mutable uint64 dbStore_handle = 0ul;
+	dbStore_handle = dpsCreateStore("myDBStore1", dummyRstring, dummyUint32, err);
+
+	//..perform error checks	
+	
+	mutable uint64 err = 0ul;
+	mutable boolean result = true;
+	rstring key = "IBM";
+	uint32 value = 399;
+	err = 0ul;
+	result = dpsPut(dbStore_handle, key, value, err);
+	
+	if (err != 0ul) {
+		//use  dpsGetLastStoreErrorCode() and  dpsGetLastStoreErrorString() as needed
+	}		
+</pre>
+
+
+</div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsPutSafe.uint64.T1.T2.uint64"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful boolean dpsPutSafe(uint64 store, T1 key, T2 item, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Put an item into the given store. This function is identical to <tt class="ph tt">dpsPut</tt>, however, it performs additional safety checks.  As a result, this function will be slower than <tt class="ph tt">dpsPut</tt>.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">The handle specifying the store.         
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">The key for the new pair.         
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">item</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">The value for the new pair. Must be the same type as the <strong class="ph b">value</strong> that was provided when the store was created. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">Will be set to '0' on success, and will be non-zero otherwise.  
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">If no error occurs, returns true, and false otherwise. 
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsPutTTL.T1.T2.uint32.uint64"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful boolean dpsPutTTL(T1 key, T2 item, uint32 ttl, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Put an key-value pair with in a TTL (Time To Live in seconds) value into the global area of the back-end data store. The <strong class="ph b">key</strong> and <strong class="ph b">value</strong> can be any SPL type.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the key with which to associate the given value 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">item</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the value to associate with the key 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">ttl</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the amount of time, in seconds, this pair will be kept in the global store before it is automatically removed. A value of '0' means that this pair will be in the store indefinitely until manually removed via <tt class="ph tt">dpsRemoveTTL</tt>. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">will be set to '0' if the operation was successful, and a non-zero value otherwise.    
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if the operation is successful, false otherwise.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+    mutable rstring myKey = "", myValue = "";
+myKey = "New York";
+myValue = "Albany";
+mutable uint64 err = 0ul;
+// Put a key-value pair with 5 seconds of TTL.
+boolean res = dpsPutTTL(myKey, myValue, 5u, err);
+                
+if (res == false) {
+           //handle error using dpsGetLastErrorCodeTTL() and  dpsGetLastErrorStringTTL());
+}
+</pre>
+
+
+</div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsPutTTL.T1.T2.uint32.uint64.boolean.boolean"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful boolean dpsPutTTL(T1 key, T2 item, uint32 ttl, mutable uint64 err, boolean encodeKey, boolean encodeValue)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Put a key-value pair with in a TTL (Time To Live in seconds) value into the global area of the back-end data store. The <strong class="ph b">key</strong> and <strong class="ph b">value</strong> can be any SPL type.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the key with which to associate the given value (In this API, key can be configured to be base64 encoded or not.) 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">item</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the value to associate with the key 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">ttl</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the amount of time, in seconds, this pair will be kept in the global store before it is automatically removed. A value of '0' means that this pair will be in the store indefinitely until manually removed via <tt class="ph tt">dpsRemoveTTL</tt>. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">will be set to '0' if the operation was successful, and a non-zero value otherwise. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">encodeKey</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">set to true if the key shall be base64 encoded, set to false otherwise 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">encodeValue</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">set to true if the value shall be base64 encoded, set to false otherwise 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if the operation is successful, false otherwise.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+    mutable rstring myKey = "", myValue = "";
+myKey = "New York";
+myValue = "Albany";
+mutable uint64 err = 0ul;
+// Put a key-value pair with 5 seconds of TTL.
+    // In this overloaded API, 5th and 6th arguments let you configure the key to be base64 encoded or not as well as
+    // the value to be serialized or not before storing it in the back-end data store.)
+boolean res = dpsPutTTL(myKey, myValue, 5u, err, false, false);
+                
+if (res == false) {
+           //handle error using dpsGetLastErrorCodeTTL() and  dpsGetLastErrorStringTTL());
+}
+</pre>
+
+
+</div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsPutTTL.T1.T2.uint32.uint64.uint32.uint32.boolean.boolean"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful boolean dpsPutTTL(T1 key, T2 item, uint32 ttl, mutable uint64 err, uint32 storedKeySize, uint32 storedValueSize, boolean encodeKey, boolean encodeValue)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Put a key-value pair with in a TTL (Time To Live in seconds) value into the global area of the back-end data store. The <strong class="ph b">key</strong> and <strong class="ph b">value</strong> can be any SPL type.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the key with which to associate the given value (In this API, key can be configured to be base64 encoded or not.) 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">item</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the value to associate with the key 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">ttl</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the amount of time, in seconds, this pair will be kept in the global store before it is automatically removed. A value of '0' means that this pair will be in the store indefinitely until manually removed via <tt class="ph tt">dpsRemoveTTL</tt>. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">will be set to '0' if the operation was successful, and a non-zero value otherwise. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">storedKeySize</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">Will be set to the actual storage size occupied by the given key in the back-end data store. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">storedValueSize</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">Will be set to the actual storage size occupied by the given value in the back-end data store. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">encodeKey</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">set to true if the key shall be base64 encoded, set to false otherwise 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">encodeValue</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">set to true if the value shall be base64 encoded, set to false otherwise 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if the operation is successful, false otherwise.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+    mutable rstring myKey = "", myValue = "";
+myKey = "New York";
+myValue = "Albany";
+mutable uint64 err = 0ul;
+    mutable uint32 storedKeySize = 0u;
+    mutable uint32 storedValueSize = 0u;
+// Put a key-value pair with 5 seconds of TTL.
+    // In this overloaded API, 7th and 8th arguments let you configure the key to be base64 encoded or not as well as
+    // the value to be serialized or not before storing it in the back-end data store.)
+    // When this API returns successfully, 5th and 6th arguments will have storage size for the key and the value.
+boolean res = dpsPutTTL(myKey, myValue, 5u, err, storedKeySize, storedValueSize, false, false);
+                
+if (res == false) {
+           //handle error using dpsGetLastErrorCodeTTL() and  dpsGetLastErrorStringTTL());
+}
+</pre>
+
+
+</div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsReconnect"><tt class="ph tt">      public stateful boolean dpsReconnect()      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">It allows to reconnect to the back-end data store.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if the connection could be re-established, false otherwise.
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsRemove.uint64.T1.uint64"><tt class="ph tt">      &lt;any T1&gt; public stateful boolean dpsRemove(uint64 store, T1 key, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Remove an item from the given store.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">handle of the store from which the key will be removed 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the key to remove.  Can be a valid SPL type. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">contains the non-zero error code, if an error occurs, or will have a value of '0'.   
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if the store did contain an item with the given key, false otherwise.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+mutable uint64 err = 0ul;
+mutable boolean result = true;
+rstring key = "IBM";
+result = dpsRemove(store_id, key, err);
+
+    if (res==true &amp;&amp; err==0ul) {
+         // remove has succeeded 
+    } else {
+         //handle error using dpsGetLastStoreErrorCode() and  dpsGetLastStoreErrorString() 
+    }       
+</pre>
+
+
+</div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsRemoveStore.uint64.uint64"><tt class="ph tt">      public stateful boolean dpsRemoveStore(uint64 store, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Remove a process store given its handle.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">The process store handle identifying the store to remove. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">This parameter will contain the error code, if an error occurs. Or will be set '0' if the remove operation was successful.          
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if the store existed and was successfully removed.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+mutable boolean result = true;
+result = dpsRemoveStore(dbStore_handle, err);
+
+if (err != 0ul) {
+	uint64 rc = dpsGetLastStoreErrorCode();
+	printStringLn("Unexpected error in removing a store: rc = " + (rstring)rc + ", msg = " + dpsGetLastStoreErrorString());
+}	
+</pre>
+
+
+</div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsRemoveTTL.T1.uint64"><tt class="ph tt">      &lt;any T1&gt; public stateful boolean dpsRemoveTTL(T1 key, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Remove an item that was stored with a TTL (Time To Live in seconds) value.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the key to remove. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">will receive the error code if an error occurs or will be set to '0' if the remove was successful. 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if an item with the given key was removed, false otherwise.
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsRemoveTTL.T1.uint64.boolean"><tt class="ph tt">      &lt;any T1&gt; public stateful boolean dpsRemoveTTL(T1 key, mutable uint64 err, boolean encodeKey)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Remove an item that was stored with a TTL (Time To Live in seconds) value.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">key</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the key to remove. (In this API, you can specify whether the key is base64 encoded or not.) 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">will receive the error code if an error occurs or will be set to '0' if the remove was successful. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">encodeKey</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">set to true if the key shall be base64 encoded, set to false otherwise. 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if an item with the given key was removed, false otherwise.
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsRunDataStoreCommand.list:.:rstring:.:.rstring.uint64"><tt class="ph tt">      public stateful boolean dpsRunDataStoreCommand(list&lt;rstring&gt; cmdList, mutable rstring resultValue, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">This is a Redis specific API using which any aribitrary Redis command can be executed by providing the different parts of that Redis command inside a list of strings. This API is vastly better than the other native data store run API shown above. It allows the keys and values to have spaces and quotes. It allows two way command execution by returning the result of the Redis command execution. This suits well for the string based key and values where the user wants to format their own valid Redis command.
+</p>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsRunDataStoreCommand.rstring.uint64"><tt class="ph tt">      public stateful boolean dpsRunDataStoreCommand(rstring cmd, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">This function can be used to execute simple arbitrary back-end data store (fire and forget) native commands. This includes any  native commands that don't have to fetch and return key-value pairs or return size of the database, like Insert and Delete. However, key and value can only have string types. 
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">cmd</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the  command to execute. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">a mutable variable that will contain the error code in case an error occurs executing the command. Will be '0' on success and non-zero otherwise. 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">true if the one way command was successful, and false otherwise.
+</p>
+
+<div class="p">
+<pre class="pre codeblock">
+// Insert a key-value pair by using the popular Redis set command.
+cmd = "set foo bar";
+err = 0ul;
+res = dpsRunDataStoreCommand(cmd, err);
+					  
+if (res == true) {
+   printStringLn("Running a Redis native command 'set foo bar' worked correctly.");
+} else {
+   uint64 rc = dpsGetLastStoreErrorCode();
+       rstring msg = dpsGetLastStoreErrorString();
+   printStringLn("Error in running a Redis native command 'set foo bar'. Error code=" + 
+		(rstring)rc + ", msg = " + msg);
+}
+</pre>
+
+
+</div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsRunDataStoreCommand.uint32.rstring.rstring.rstring.rstring.rstring.rstring.uint64"><tt class="ph tt">      public stateful boolean dpsRunDataStoreCommand(uint32 cmdType, rstring httpVerb, rstring baseUrl, rstring apiEndpoint, rstring queryParams, rstring jsonRequest, mutable rstring jsonResponse, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">This is an advanced function that can be used to execute arbitrary back-end data store two way native commands for database technologies that work with cURL. A HTTP request is sent to the server and the response is saved in the <strong class="ph b">jsonResponse</strong> parameter. This function is not supported with Redis.  Therefore, this function can only be used with database technologies that are currently not officially supported by Streams, such as HBase. See the samples for this toolkit for a detailed example.
+</p>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsSerialize.uint64.blob.T1.T2.uint64"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful void dpsSerialize(uint64 store, mutable blob data, T1 dummyKey, T2 dummyValue, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p"> This function serializes all the key-value pairs in a given store id into a blob. The blob can be used to recreate all the key-value pairs into another store. This is a useful technique for copying an entire store into a different store.  See <tt class="ph tt">dpsDeserialize()</tt> for a detailed example on how to use the serialization functions to copy a store.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the handle of the store to serialize. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">data</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">a mutable blob that will contain all the key-value pairs in the store once the serialization is complete. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">dummyKey</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">a dummy variable to indicate the type of the key 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">dummyValue</tt></dt>
+
+             <dd class="dd">
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">a mutable variable that will contain the error code describing the result of the serialization.  Will be '0' if no error occurs, and a non-zero value otherwise.  
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsSetConfigFile.rstring"><tt class="ph tt">      public stateful boolean dpsSetConfigFile(rstring dpsConfigFile)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Allows for setting a path to the configuration file. Relative paths are relative to the toolkit root directory. If not set, then 'etc/no-sql-kv-store-servers.cfg' file will be used.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">dpsConfigFile</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the path to the configuration file that should be used 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">returns always true
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsSize.uint64.uint64"><tt class="ph tt">      public stateful uint64 dpsSize(uint64 store, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">Get the total number of key-value pairs in the given store.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">the handle of the store in question. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">contains the error code for this function call.  Will be '0' if no error occurs, otherwise will have a non-zero value.  
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+     
+       <dt class="dt dlterm">Returns</dt>
+
+       <dd class="dd">
+
+<p class="p">the size of the store. The return value of this function is undefined if an error occurs. 
+</p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__initializeDpsNoException"><tt class="ph tt">      public stateful boolean initializeDpsNoException()      </tt>   </dt>
+
+   <dd class="dd">
+<div class="p">Allows you to initialize the connection to DPS without throwing an exception on failure.
+<pre class="pre codeblock">
+     The purpose of this is to allow the DPS connection to be attempted during
+	 operator initialization, and not prevent startup from completing on failure.
+     Return true if we successfully established a connection or false if not.
+</pre>
+
+
+</div>
+
+   </dd>
+
+ 
+</dl>
+
+</div>
+
+</div>
+
+
+</body>
+</html>
