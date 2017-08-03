@@ -223,6 +223,8 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 					setCustomMetricValue("numKeyDidNotExistReturns",(int64)
 						UpdatedMetrics.numKeyDidNotExistReturns) ;
 				} 
+			config
+				threadedPort : queue(UpdatedMetrics, Sys.DropLast, 5); 
 		}
 		
 		/*
@@ -238,8 +240,6 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 		 	param
 		 		aggregateIncompleteWindows : true;
 		 	output UpdatedMetrics : numGets = Sum(successGet), numFailedGets = Sum(failedGet), numKeyDidNotExistReturns = Sum(keyDidNotExistReturn); 
-		 	config
-		 		placement : partitionIsolation;
 		 }
 		 
 }

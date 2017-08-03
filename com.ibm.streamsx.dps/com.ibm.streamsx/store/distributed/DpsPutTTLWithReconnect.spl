@@ -237,6 +237,8 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 					setCustomMetricValue("maxKeyValueSizeBytes",(int64)
 						UpdatedMetrics.maxKeyValueSize) ;
 				}
+			config
+				threadedPort : queue(UpdatedMetrics, Sys.DropLast, 5); 
 		}
 		
 		/*
@@ -256,7 +258,5 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 		 	output UpdatedMetrics : numInserts = Sum(successInsert), numFailedInserts = Sum(failedInsert)
 		 							, numUniqueKeyInserts = Sum(uniqueKey)
 		 							, avgTTL = Average(TTL / 60l), avgKeyValueSize = Average(keyValueSize), maxKeyValueSize = Max(keyValueSize); 
-		 	config 
-				placement : partitionIsolation; 
 		 }
 }
