@@ -57,7 +57,8 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 		expression<float64> $reconnectionInterval : 5.0 ; // 
 		type $outputType : tuple<rstring value>  ; 
 		expression<float64> $metricsIntervalLength : 15.0 * 60.0;  
-		expression<float64> $metricsUpdateRate : 15.0;  
+		expression<float64> $metricsUpdateRate : 15.0;   
+		expression<rstring> $configFile : "etc/no-sql-kv-store-servers.cfg"; 
 	type
 		metricsDetails = tuple<int32 successGet, int32 failedGet, int32 keyDidNotExistReturn> ; 
 		metricsAggregates = tuple<int32 numGets, int32 numFailedGets, int32 numKeyDidNotExistReturns> ; 
@@ -75,7 +76,7 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 					 * to wait until the first tuple arrives. i.e. Now we can check connection 
 					 * to DPS via isConnected metric as soon as the operator starts. 
 					 */
-					boolean initializedDps = initializeDpsConnection(); 
+					mutable boolean initializedDps = initializeDpsConnection($configFile); 
 					boolean initializedMetrics =  initializeGetMetrics(); 
 				}
 				onTuple In : 
@@ -85,6 +86,11 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 					// metrics values to be sent to the aggregate
 					mutable metricsDetails tupleMetrics = {successGet = 0, failedGet = 0
 											, reconnectionAttempts = 0 , keyDidNotExistReturn = 0}; 
+					
+					if(isTraceable(Trace.trace))
+					{
+						appTrc(Trace.trace, "Input tuple: " + (rstring) In);
+					}
 					
 					/*
 					 * Handle the case where we fail to connect to Redis on startup, but later
@@ -99,6 +105,7 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 							{
 								appTrc(Trace.error, "Successfully reconnected.");
 							}
+							initializedDps = true; 
 					 	}
 					}
 					
@@ -223,6 +230,8 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 					setCustomMetricValue("numKeyDidNotExistReturns",(int64)
 						UpdatedMetrics.numKeyDidNotExistReturns) ;
 				} 
+			config
+				threadedPort : queue(UpdatedMetrics, Sys.DropLast, 5); 
 		}
 		
 		/*
@@ -238,8 +247,6 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 		 	param
 		 		aggregateIncompleteWindows : true;
 		 	output UpdatedMetrics : numGets = Sum(successGet), numFailedGets = Sum(failedGet), numKeyDidNotExistReturns = Sum(keyDidNotExistReturn); 
-		 	config
-		 		placement : partitionIsolation;
 		 }
 		 
 }

@@ -42,7 +42,7 @@ namespace com.ibm.streamsx.store.distributed;
  * @param reconnectionInterval (default: 5s) Number of seconds to wait between each reconnection attempt. 
  * @param metricsIntervalLength (default: 15 * 60s) Time in seconds of the sliding window that the interval metrics are maintained over.  
  * @param metricsUpdateRate (default: 15.0s) Time in seconds between update of interval metrics. 
- * @param outputType The output stream can be used to forward any attributes on the input port to the output port. 
+ * @param outputType (default: rstring key, rstring value) The output stream can be used to forward any attributes on the input port to the output port. 
  * 
  * @input In Stream to be put using DPS. 
  * @output Out Stream containing attributes that match input attributes. 
@@ -57,9 +57,10 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 		expression<boolean> $valueEncoded : true; 
 		expression<int32> $reconnectionAttempts : 1; // -1 for unlimited 
 		expression<float64> $reconnectionInterval : 5.0 ; // 
-		type $outputType ; 
+		type $outputType : tuple<rstring key, rstring value>  ; 
 		expression<float64> $metricsIntervalLength : 15.0 * 60.0;  
 		expression<float64> $metricsUpdateRate : 15.0; 
+		expression<rstring> $configFile : "etc/no-sql-kv-store-servers.cfg"; 
 	type
 		metricsDetails = tuple<int32 successInsert, int32 failedInsert, int32 uniqueKey, int64 TTL, int32 keyValueSize> ; 
 		metricsAggregates = tuple<int32 numInserts, int32 numFailedInserts, int32 numUniqueKeyInserts, int64 avgTTL, int32 avgKeyValueSize, int32 maxKeyValueSize> ; 
@@ -77,7 +78,7 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 					 * to wait until the first tuple arrives. i.e. Now we can check connection 
 					 * to DPS via isConnected metric as soon as the operator starts. 
 					 */
-					boolean initializedDps = initializeDpsConnection(); 
+					mutable boolean initializedDps = initializeDpsConnection($configFile); 
 					boolean initializedMetrics =  initializePutMetrics(); 
 				}
 				onTuple In : 
@@ -88,7 +89,12 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 											, reconnectionAttempts = 0, TTL = (int64) In.ttl, keyValueSize = 0 }; 
 					mutable uint32 storedKeySize = 0;
 					mutable uint32 storedValueSize = 0; 
-
+					
+					if(isTraceable(Trace.trace))
+					{
+						appTrc(Trace.trace, "Input tuple: " + (rstring) In);
+					}
+					
 					/*
 					 * Handle the case where we fail to connect to Redis on startup, but later
 					 * successfully connect. 
@@ -102,6 +108,7 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 							{
 								appTrc(Trace.error, "Successfully reconnected.");
 							}
+							initializedDps = true; 
 					 	}
 					}
 					
@@ -123,6 +130,8 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 					 * The rest is just updating metrics. 
 					 */
 					mutable boolean putSucceeded = dpsPutTTL(In.key, In.value, In.ttl, dpsErr, storedKeySize, storedValueSize, $keyEncoded, $valueEncoded); 
+					
+
 					
 					if (putSucceeded == false)
 					{
@@ -237,6 +246,8 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 					setCustomMetricValue("maxKeyValueSizeBytes",(int64)
 						UpdatedMetrics.maxKeyValueSize) ;
 				}
+			config
+				threadedPort : queue(UpdatedMetrics, Sys.DropLast, 5); 
 		}
 		
 		/*
@@ -256,7 +267,5 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 		 	output UpdatedMetrics : numInserts = Sum(successInsert), numFailedInserts = Sum(failedInsert)
 		 							, numUniqueKeyInserts = Sum(uniqueKey)
 		 							, avgTTL = Average(TTL / 60l), avgKeyValueSize = Average(keyValueSize), maxKeyValueSize = Max(keyValueSize); 
-		 	config 
-				placement : partitionIsolation; 
 		 }
 }

@@ -9,3 +9,4 @@ com.ibm.streamsx.dps/impl/nl/include
 toolkit.xml
 output
 
+/dump.rdb

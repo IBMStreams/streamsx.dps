@@ -1,0 +1,21 @@
+<project name="DpsTests" default="test" basedir=".">
+
+    <target name="clean">
+        <exec executable="sh">
+            <arg value="-c" />
+            <arg value="rm -rf tk*" />
+        </exec>
+    </target>
+
+    <target name="test" depends="dpsTTLWithReconnect">
+    </target>
+
+    <target name="dpsTTLWithReconnect">
+        <exec executable="python">
+            <arg value="-m"/>
+            <arg value="unittest"/>
+            <arg value="dpsTTLWithReconnectTests.DpsPutAndGetTTLTests"/>
+        </exec>
+    </target>
+
+</project>
