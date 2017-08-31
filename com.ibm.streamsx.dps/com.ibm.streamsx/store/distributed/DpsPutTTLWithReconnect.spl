@@ -44,7 +44,7 @@ namespace com.ibm.streamsx.store.distributed;
  * @param metricsUpdateRate (default: 15.0s) Time in seconds between update of interval metrics. 
  * @param outputType (default: rstring key, rstring value) The output stream can be used to forward any attributes on the input port to the output port. 
  * 
- * @input In Stream to be put using DPS. 
+ * @input In Stream to be put using DPS. Attributes containing the key, value, and ttl must be provided (they do not need to be called any specific name, as they are specified as parameters)
  * @output Out Stream containing attributes that match input attributes. 
  * 
 
@@ -61,6 +61,9 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 		expression<float64> $metricsIntervalLength : 15.0 * 60.0;  
 		expression<float64> $metricsUpdateRate : 15.0; 
 		expression<rstring> $configFile : "etc/no-sql-kv-store-servers.cfg"; 
+		attribute $keyAttribute; 
+		attribute $valueAttribute; 
+		attribute $ttlAttribute; 
 	type
 		metricsDetails = tuple<int32 successInsert, int32 failedInsert, int32 uniqueKey, int64 TTL, int32 keyValueSize> ; 
 		metricsAggregates = tuple<int32 numInserts, int32 numFailedInserts, int32 numUniqueKeyInserts, int64 avgTTL, int32 avgKeyValueSize, int32 maxKeyValueSize> ; 
@@ -86,9 +89,10 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 					mutable uint64 dpsErr = 0; 
 					// metrics values to be sent to the aggregate
 					mutable metricsDetails tupleMetrics = {successInsert = 0, failedInsert = 0, uniqueKey = 0
-											, reconnectionAttempts = 0, TTL = (int64) In.ttl, keyValueSize = 0 }; 
+											, reconnectionAttempts = 0, TTL = (int64) $ttlAttribute, keyValueSize = 0 }; 
 					mutable uint32 storedKeySize = 0;
 					mutable uint32 storedValueSize = 0; 
+					
 					
 					if(isTraceable(Trace.trace))
 					{
@@ -115,7 +119,7 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 					/*
 					 * Check if exists in order to handle "numUniqueKeyInserts" metric
 					 */
-					if (dpsHasTTL(In.key, dpsErr, $keyEncoded) == false)
+					if (dpsHasTTL($keyAttribute, dpsErr, $keyEncoded) == false)
 					{
 						// we are adding a unique key
 						if (dpsErr == 0ul)
@@ -129,7 +133,7 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 					 * If this execution goes fine, then nothing else really matters. 
 					 * The rest is just updating metrics. 
 					 */
-					mutable boolean putSucceeded = dpsPutTTL(In.key, In.value, In.ttl, dpsErr, storedKeySize, storedValueSize, $keyEncoded, $valueEncoded); 
+					mutable boolean putSucceeded = dpsPutTTL($keyAttribute, $valueAttribute, $ttlAttribute, dpsErr, storedKeySize, storedValueSize, $keyEncoded, $valueEncoded); 
 					
 
 					
@@ -180,7 +184,7 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 							  	setCustomMetricValue("isConnected" , 1l); 
 							  	setCustomMetricValue("reconnectionAttptsSinceDisconnect" , 0l); 
 							  	// try again
-							  	putSucceeded = dpsPutTTL(In.key, In.value, In.ttl, dpsErr, storedKeySize, storedValueSize, $keyEncoded, $valueEncoded);
+								putSucceeded = dpsPutTTL($keyAttribute, $valueAttribute, $ttlAttribute, dpsErr, storedKeySize, storedValueSize, $keyEncoded, $valueEncoded); 
 							  }
 						} 
 					} 

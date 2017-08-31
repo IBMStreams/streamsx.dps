@@ -44,6 +44,9 @@ composite DpsTTLCompositesSample {
 		stream<redisPutOutputType> DpsInsert = DpsPutTTLWithReconnect(RedisBeacon)
 		{
 			param
+				keyAttribute : key; 
+				valueAttribute : value;
+				ttlAttribute : ttl; 
 				metricsIntervalLength : $metricsInterval;
 				metricsUpdateRate : $metricsUpdateRate;
 				keyEncoded : $keyEncoded;
@@ -69,9 +72,13 @@ composite DpsTTLCompositesSample {
 			output RedisGetBeacon : key = "key" + (rstring) IterationCount();
 		}
 		
+		/*
+		 * The value attribute on the output stream is where the retrieved value is placed
+		 */
 		stream<rstring key, rstring value> RedisGet = DpsGetTTLWithReconnect(RedisGetBeacon)
 		{
 			param
+				keyAttribute : key; 
 				metricsIntervalLength : $metricsInterval;
 				metricsUpdateRate : $metricsUpdateRate;
 				keyEncoded : $keyEncoded;

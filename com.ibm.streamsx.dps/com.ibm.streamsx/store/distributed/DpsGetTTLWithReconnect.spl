@@ -42,7 +42,7 @@ namespace com.ibm.streamsx.store.distributed;
  * @param metricsUpdateRate (default: 15.0s) Time in seconds between update of interval metrics. 
  * @param outputType (default: rstring value) Output stream requires an attribute called "value" matching the type of the value being retrieved from the DPS server. 
  * 
- * @input In Stream specifying get for DPS. "key" attribute is required.  
+ * @input In Stream specifying get for DPS. An attribute designated by the keyAttribute parameter must exist.  
  * @output Out Stream - Attribute "value" of the type being retrieved from DPS is required. Stream contains attributes that match input attributes plus the value attribute. 
  * 
 
@@ -59,6 +59,7 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 		expression<float64> $metricsIntervalLength : 15.0 * 60.0;  
 		expression<float64> $metricsUpdateRate : 15.0;   
 		expression<rstring> $configFile : "etc/no-sql-kv-store-servers.cfg"; 
+		attribute $keyAttribute; 
 	type
 		metricsDetails = tuple<int32 successGet, int32 failedGet, int32 keyDidNotExistReturn> ; 
 		metricsAggregates = tuple<int32 numGets, int32 numFailedGets, int32 numKeyDidNotExistReturns> ; 
@@ -86,6 +87,9 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 					// metrics values to be sent to the aggregate
 					mutable metricsDetails tupleMetrics = {successGet = 0, failedGet = 0
 											, reconnectionAttempts = 0 , keyDidNotExistReturn = 0}; 
+					// copy forward matching attributes
+					// (do this at the start to make sure we don't overwrite value from dps)
+					assignFrom(outputTuple,In); 				
 					
 					if(isTraceable(Trace.trace))
 					{
@@ -114,7 +118,7 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 					 * If this execution goes fine, then nothing else really matters. 
 					 * The rest is just updating metrics and reconnection if something goes wrong. 
 					 */
-					mutable boolean getSucceeded = dpsGetTTL(In.key, outputTuple.value, dpsErr, $keyEncoded, $valueEncoded);
+					mutable boolean getSucceeded = dpsGetTTL($keyAttribute, outputTuple.value, dpsErr, $keyEncoded, $valueEncoded);
 					
 					// 108ul errors are fine because it just means there wasn't a key in the database
 					// This will be observed by the "*KeyDidNotExistReturns" metrics
@@ -167,7 +171,7 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 							  	setCustomMetricValue("isConnected" , 1l); 
 							  	setCustomMetricValue("reconnectionAttptsSinceDisconnect" , 0l); 
 							  	// try again
-							  	getSucceeded = dpsGetTTL(In.key, outputTuple.value, dpsErr, $keyEncoded, $valueEncoded);
+							  	getSucceeded = dpsGetTTL($keyAttribute, outputTuple.value, dpsErr, $keyEncoded, $valueEncoded);
 							  }
 						} 
 					} 
@@ -207,7 +211,6 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 						appTrc(Trace.trace, "tupleMetrics: " + (rstring) tupleMetrics);
 					}
 					
-					assignFrom(outputTuple,In); 
 					submit(outputTuple, Out); 
 					submit(tupleMetrics, MetricsDetails);
 				}
