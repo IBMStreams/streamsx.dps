@@ -11,7 +11,7 @@
     </target>
 
     <target name="dpsTTLWithReconnect">
-        <exec executable="python">
+        <exec executable="python3">
             <arg value="-m"/>
             <arg value="unittest"/>
             <arg value="dpsTTLWithReconnectTests.DpsPutAndGetTTLTests"/>

@@ -15,7 +15,7 @@ import os
 
 cwd = os.getcwd()
 
-dpsToolkit = '/home/streamsadmin/git/streamsx.dps/com.ibm.streamsx.dps/'
+dpsToolkit = '../../com.ibm.streamsx.dps/'
 
 class DpsPutAndGetTTLTests(unittest.TestCase):
 
