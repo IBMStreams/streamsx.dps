@@ -35,6 +35,7 @@ namespace com.ibm.streamsx.store.distributed;
  *  * **avgKeyValueSizeBytes** Maintains a metric of the average key-value size in the last interval of time. The size is the amount of space utilized after any encoding by the DPS toolkit. Failed inserts contribute a value of 0 to the avgKeyValueSize, skewing the results downwards.
  *  * **maxKeyValueSizeBytes** Maintains a metric of the max key-value size in the last interval of time.  The size is the amount of space utilized after any encoding by the DPS toolkit.
  * 
+ * This operator forwards punctuation. 
  * 
  * @param keyEncoded (default: false) Whether or not to encode the key in base64. False is only valid if the key is rstring/ustring, otherwise it automatically defaults to true. 
  * @param valueEncoded (default: false) Whether or not to encode the value in base64. False is only valid if the value is rstring/ustring, otherwise it automatically defaults to true. 
@@ -223,6 +224,11 @@ public composite DpsPutTTLWithReconnect(input In ;output Out)
 					submit(outputTuple, Out); 
 					submit(tupleMetrics, MetricsDetails);
 					
+				}
+				// Forward punctuation
+				onPunct In :
+				{
+					submit( currentPunct() , Out);
 				}
 				onTuple UpdatedMetrics :
 				{

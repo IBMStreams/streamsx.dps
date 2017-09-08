@@ -22,6 +22,7 @@ composite DpsTTLCompositesSample {
 		expression<boolean> $keyEncoded : false;
 		expression<boolean> $valueEncoded : true; 
 		expression<float64> $period : 1.0; 
+		expression<int32> $iterations : 30; 
 		expression<float64> $metricsUpdateRate : 3.0;
 		expression<float64> $metricsInterval : 5.0 * 60.0; 
 		expression<int32> $reconnectionAttempts : 3; // -1 -> try until we succeed
@@ -32,16 +33,25 @@ composite DpsTTLCompositesSample {
 		redisGetType = tuple<rstring key> ;
 		redisGetOutputType = tuple<rstring key, rstring value> ;
 	graph
-		stream<redisInsertType> RedisBeacon = Beacon()
+		stream<redisInsertType> RedisInsertBeacon = Beacon()
 		{
 			param
 				period : $period; 
-			output RedisBeacon : key = "key" + (rstring) IterationCount()
+				iterations : $iterations; 
+			output RedisInsertBeacon : key = "key" + (rstring) IterationCount()
 				, value = "val"   + (rstring) IterationCount()
 				, ttl = $ttl; 
 		}
 		
-		stream<redisPutOutputType> DpsInsert = DpsPutTTLWithReconnect(RedisBeacon)
+		// demonstrate punctuation forwarding capability
+		stream<redisInsertType> InsertBeaconWithPunctuation = Punctor(RedisInsertBeacon)
+		{
+			param
+				punctuate : value == "val15"; 
+				position : before; 
+		}
+		
+		stream<redisPutOutputType> DpsInsert = DpsPutTTLWithReconnect(InsertBeaconWithPunctuation)
 		{
 			param
 				keyAttribute : key; 
@@ -68,14 +78,23 @@ composite DpsTTLCompositesSample {
 		{
 			param
 				period : $period; 
+				iterations : $iterations; 
 				initDelay : 5.0; 
 			output RedisGetBeacon : key = "key" + (rstring) IterationCount();
+		}
+		
+		// demonstrate punctuation forwarding capability
+		stream<redisGetType> GetBeaconWithPunctuation = Punctor(RedisGetBeacon)
+		{
+			param
+				punctuate : key == "key15"; 
+				position : before; 
 		}
 		
 		/*
 		 * The value attribute on the output stream is where the retrieved value is placed
 		 */
-		stream<rstring key, rstring value> RedisGet = DpsGetTTLWithReconnect(RedisGetBeacon)
+		stream<rstring key, rstring value> RedisGet = DpsGetTTLWithReconnect(GetBeaconWithPunctuation)
 		{
 			param
 				keyAttribute : key; 

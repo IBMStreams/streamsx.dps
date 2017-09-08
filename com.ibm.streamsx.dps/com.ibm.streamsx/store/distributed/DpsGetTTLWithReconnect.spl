@@ -42,6 +42,8 @@ namespace com.ibm.streamsx.store.distributed;
  * @param metricsUpdateRate (default: 15.0s) Time in seconds between update of interval metrics. 
  * @param outputType (default: rstring value) Output stream requires an attribute called "value" matching the type of the value being retrieved from the DPS server. 
  * 
+ * This operator forwards punctuation. 
+ * 
  * @input In Stream specifying get for DPS. An attribute designated by the keyAttribute parameter must exist.  
  * @output Out Stream - Attribute "value" of the type being retrieved from DPS is required. Stream contains attributes that match input attributes plus the value attribute. 
  * 
@@ -213,6 +215,11 @@ public composite DpsGetTTLWithReconnect(input In ;output Out)
 					
 					submit(outputTuple, Out); 
 					submit(tupleMetrics, MetricsDetails);
+				}
+				// Forward punctuation
+				onPunct In :
+				{
+					submit( currentPunct() , Out);
 				}
 				/*
 				 * Update Interval Metrics
