@@ -15,9 +15,7 @@ import os
 
 cwd = os.getcwd()
 
-dpsToolkit = '/home/streamsadmin/git/streamsx.dps/com.ibm.streamsx.dps/'
-
-
+dpsToolkit = '../../com.ibm.streamsx.dps/'
 
 class DpsPutAndGetTTLTests(unittest.TestCase):
 
@@ -78,23 +76,29 @@ class DpsPutAndGetTTLTests(unittest.TestCase):
         #
         source = topology.source(dps_put_stream(10, 300))
         source = source.map(lambda x: (x['key'], x['value'], x['ttl']),
-                            schema='tuple<rstring key, rstring value, uint32 ttl>')
+                            schema='tuple<rstring keyAttributeNotNamedKey, rstring valueAttributeNotNamedValue, uint32 ttlNotNamedTTL>')
         # Put the source stream into the DPS DB
         put_result = op.Map('com.ibm.streamsx.store.distributed::DpsPutTTLWithReconnect',
                            source,
-                           StreamSchema('tuple<rstring key>'),
+                           StreamSchema('tuple<rstring keyAttributeNotNamedKey>'),
                            params={'configFile': cwd + '/etc/no-sql-kv-store-servers.cfg',
-                                   'outputType': StreamSchema('tuple<rstring key>')},
+                                   'outputType': StreamSchema('tuple<rstring keyAttributeNotNamedKey>')},
                            name='DpsPut')
+        put_result.params['keyAttribute'] = put_result.attribute('keyAttributeNotNamedKey');
+        put_result.params['valueAttribute'] = put_result.attribute('valueAttributeNotNamedValue');
+        put_result.params['ttlAttribute'] = put_result.attribute('ttlNotNamedTTL');
+
 
         # Now go and get what we put in to the DPS DB
         get_result = op.Map('com.ibm.streamsx.store.distributed::DpsGetTTLWithReconnect',
                            put_result.stream,
-                           StreamSchema('tuple<rstring key, rstring value>'),
+                           StreamSchema('tuple<rstring keyAttribute, rstring value>'),
                            params={'configFile': cwd + '/etc/no-sql-kv-store-servers.cfg',
-                                   'outputType': StreamSchema('tuple<rstring key, rstring value>')},
+                                   'outputType': StreamSchema('tuple<rstring keyAttribute, rstring value>')},
                            name='DpsGet')
+        get_result.params['keyAttribute'] = put_result.attribute('keyAttributeNotNamedKey');
         get_result_stream = get_result.stream
+
         get_result_stream.print()
         values = get_result_stream.map(lambda x: x['value'])
         return topology, values
