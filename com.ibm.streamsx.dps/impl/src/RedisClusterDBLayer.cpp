@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2015
+# Copyright IBM Corp. 2011, 2017
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -162,6 +162,10 @@ namespace distributed
           string targetServerPassword = "";
           string targetServerName = "";
           int targetServerPort = 0;
+          int connectionAttemptCnt = 0;
+
+          // Get the current thread id that is trying to make a connection to redis cluster.
+          int threadId = (int)gettid();
 
 	  // We need only one server in the Redis cluster to do the cluster based Redis HA operations.
 	  for (std::set<std::string>::iterator it=dbServers.begin(); it!=dbServers.end(); ++it) {
@@ -211,7 +215,7 @@ namespace distributed
 				// In this case, user didn't specify the port for the chosen Redis cluster node.
 				redisClusterConnectionErrorMsg += " Redis cluster node's port number must be configured.";
 				dbError.set(redisClusterConnectionErrorMsg, DPS_INITIALIZE_ERROR);
-				SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" <<
+				SPLAPPTRC(L_ERROR, "Inside connectToDatabase, it failed with an error '" <<
 					redisClusterConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisClusterDBLayer");
 				return;
 			  }
@@ -221,39 +225,55 @@ namespace distributed
 				// Only a server name was given not followed by a : character.
 				redisClusterConnectionErrorMsg += " Redis cluster node's port number must be configured.";
 				dbError.set(redisClusterConnectionErrorMsg, DPS_INITIALIZE_ERROR);
-				SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" <<
+				SPLAPPTRC(L_ERROR, "Inside connectToDatabase, it failed with an error '" <<
 					redisClusterConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisClusterDBLayer");
 				return;
 			  }
 
+                          connectionAttemptCnt++;
+                          cout << connectionAttemptCnt << ") ThreadId=" << threadId << ". Attempting to connect to the Redis cluster node " << targetServerName << " on port " << targetServerPort << endl;                          
+                          
                           // Senthil added this cautionary comment on May/03/2017.
-                          // CAUTION: Current redis cluster version as of May/03/2017 is 2.3.8.
+                          // CAUTION: Current redis cluster version as of Aug/28/2017 is 4.0.1
                           // In that version, if we enable the requirepass configuration for the redis cluster machines,
                           // the following API crashes. I created an issue in the hiredis-cluster Github about this problem.
                           // It looks like the Redis team doesn't want anyone to use the requirepass AUTH scheme for the redis-cluster.
                           // Read Salvatore's comment here: https://groups.google.com/forum/#!topic/redis-db/Z8lMxTfDct8 
-			  redis_cluster = HiredisCommand::createCluster(targetServerName.c_str(), targetServerPort);
+                          // If the redis cluster node is inactive, the following statement may throw an exception.
+                          // We will catch it, log it and proceed to connect with the next available redis cluster node.
+                          try {
+			      redis_cluster = HiredisCommand::createCluster(targetServerName.c_str(), targetServerPort);
+                          } catch (const RedisCluster::ClusterException &ex) {
+                             redis_cluster = NULL;
+                             cout << "Caught an exception connecting to a redis cluster node at " << targetServerName << ":" << targetServerPort << " (" << ex.what() << "). Skipping it and moving on to a next available redis cluster node." << endl;
+                             // Continue with the next iteration in the for loop.
+                             continue;
+                          }
 		  }
 
 		  if (redis_cluster == NULL) {
 			  redisClusterConnectionErrorMsg += " Connection error in the createCluster API.";
+                          cout << "ThreadId=" << threadId << ". Unable to connect to the Redis cluster node " << targetServerName << " on port " << targetServerPort << endl;
 		  } else {
-			  // We connected to at least one redis-cluster server. That is enough for our needs.
                           // If the user configured it with a Redis auth password, then we must authenticate now.
                           if (targetServerPassword.length() > 0) {
 	                     std::string cmd = string(REDIS_AUTH_CMD) + targetServerPassword;
-                             redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, targetServerPassword, cmd.c_str()));
+                             try {
+                                redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, targetServerPassword, cmd.c_str()));
+                             } catch (const RedisCluster::ClusterException &ex) {
+                                redis_cluster_reply = NULL;
+                             }
 
 	                     // If we get a NULL reply, then it indicates a redis server connection error.
 	                     if (redis_cluster_reply == NULL) {
 		                dbError.set("Unable to authenticate to the redis cluster server(s). Possible connection breakage.", DPS_CONNECTION_ERROR);
-		                SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication with an error " << string("Possible connection breakage. ") << DPS_CONNECTION_ERROR, "RedisDBLayer");
+		                SPLAPPTRC(L_ERROR, "Inside connectToDatabase, it failed during authentication with an error " << string("Possible connection breakage. ") << DPS_CONNECTION_ERROR, "RedisDBLayer");
 		                return;
 	                     }
 
 	                     if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		                dbError.set("Unable to authenticate to the Redis server. Error msg=" + std::string(redis_cluster_reply->str), DPS_AUTHENTICATION_ERROR);
-		                SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication. error=" << redis_cluster_reply->str << ", rc=" << DPS_AUTHENTICATION_ERROR, "RedisDBLayer");
+		                SPLAPPTRC(L_ERROR, "Inside connectToDatabase, it failed during authentication. error=" << redis_cluster_reply->str << ", rc=" << DPS_AUTHENTICATION_ERROR, "RedisDBLayer");
 		                freeReplyObject(redis_cluster_reply);
 		                return; 
 	                     }                                 
@@ -263,26 +283,30 @@ namespace distributed
 
 			  // Reset the error string.
 			  redisClusterConnectionErrorMsg = "";
+                          cout << "ThreadId=" << threadId << ". Successfully connected to the Redis cluster node " << targetServerName << " on port " << targetServerPort << endl;
+                          // Break out of the for loop.
 			  break;
 		  }
+	  } // End of the for loop.
 
-		  // Check if there was any connection error.
-		  if (redisClusterConnectionErrorMsg != "") {
-                          cout << "Unable to connect to the Redis cluster node " << targetServerName << " on port " << targetServerPort << endl;
-			  dbError.set(redisClusterConnectionErrorMsg, DPS_INITIALIZE_ERROR);
-			  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" <<
-				  redisClusterConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisClusterDBLayer");
-			  return;
-		  }
 
-                  cout << "Successfully connected to the Redis cluster node " << targetServerName << " on port " << targetServerPort << endl;
-	  }
+          // Check if there was any connection error.
+          if (redisClusterConnectionErrorMsg != "") {
+             dbError.set(redisClusterConnectionErrorMsg, DPS_INITIALIZE_ERROR);
+             SPLAPPTRC(L_ERROR, "Inside connectToDatabase, it failed with an error '" <<
+                redisClusterConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisClusterDBLayer");
+             return;
+          }
 
 	  // We have now made connection to one server in a redis-cluster.
 	  // Let us check if the global storeId key:value pair is already there in the cache.
 	  string keyString = string(DPS_AND_DL_GUID_KEY);
 	  std::string cmd = string(REDIS_EXISTS_CMD) + keyString;
-	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+          try {
+	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+          } catch (const RedisCluster::ClusterException &ex) {
+             redis_cluster_reply = NULL;
+          }
 
 	  // If we get a NULL reply, then it indicates a redis-cluster server connection error.
 	  if (redis_cluster_reply == NULL) {
@@ -290,14 +314,14 @@ namespace distributed
 		// not even a single redis-cluster server daemon being up and running.
 		// On such errors, redis-cluster context will carry an error string.
 		// When this error occurs, we can't reuse that redis-cluster context for further server commands. This is a serious error.
-		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error with a NULL redisReply." << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply for REDIS_EXISTS_CMD.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_ERROR, "Inside connectToDatabase, it failed with an error with a NULL redisReply for REDIS_EXISTS_CMD." << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		return;
 	  }
 
 	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		  dbError.set("Unable to check the existence of the dps GUID key. Error=" + string(redis_cluster_reply->str), DPS_KEY_EXISTENCE_CHECK_ERROR);
-		  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed. Error=" <<
+		  SPLAPPTRC(L_ERROR, "Inside connectToDatabase, it failed. Error=" <<
 			  string(redis_cluster_reply->str) << ". rc=" << DPS_KEY_EXISTENCE_CHECK_ERROR, "RedisClusterDBLayer");
 		  freeReplyObject(redis_cluster_reply);
 		  return;
@@ -311,10 +335,23 @@ namespace distributed
 		  // already raced us ahead and created this guid_key, then our attempt below will be safely rejected.
 		  freeReplyObject(redis_cluster_reply);
 		  cmd = string(REDIS_SETNX_CMD) + keyString + string(" ") + string("0");
-		  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                  try {
+		     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                  } catch (const RedisCluster::ClusterException &ex) {
+                     redis_cluster_reply = NULL;
+                  }
+
+                  if (redis_cluster_reply == NULL) {
+		     dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply for REDIS_SETNX_CMD.", DPS_CONNECTION_ERROR);
+		     SPLAPPTRC(L_ERROR, "Inside connectToDatabase, it failed with an error with a NULL redisReply for REDIS_SETNX_CMD." << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		     return;
+                  }
 	  }
 
-	  freeReplyObject(redis_cluster_reply);
+          if (redis_cluster_reply != NULL) {
+	     freeReplyObject(redis_cluster_reply);
+          }
+
 	  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase done", "RedisClusterDBLayer");
   }
 
@@ -346,11 +383,15 @@ namespace distributed
  	// Additionally, in Redis, store names can have space characters in them.
  	string keyString = string(DPS_STORE_NAME_TYPE) + base64_encoded_name;
 	std::string cmd = string(REDIS_EXISTS_CMD) + keyString;
-	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+        try {
+	   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+        } catch (const RedisCluster::ClusterException &ex) {
+           redis_cluster_reply = NULL;
+        }
 
 	if (redis_cluster_reply == NULL) {
-		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside createStore, it failed for store " << name << " with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. ", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_ERROR, "Inside createStore, it failed for store " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		releaseGeneralPurposeLock(base64_encoded_name);
 		return 0;
 	}
@@ -382,7 +423,18 @@ namespace distributed
 		uint64_t storeId = 0;
 		keyString = string(DPS_AND_DL_GUID_KEY);
 		cmd = string(REDIS_INCR_CMD) + keyString;
-		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                try {
+		   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                } catch (const RedisCluster::ClusterException &ex) {
+                   redis_cluster_reply = NULL;
+                }
+
+	        if (redis_cluster_reply == NULL) {
+		   dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. ", DPS_CONNECTION_ERROR);
+		   SPLAPPTRC(L_ERROR, "Inside createStore, it failed for store " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		   releaseGeneralPurposeLock(base64_encoded_name);
+		   return 0;
+	        }
 
 		if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 			dbError.set("Unable to get a unique store id for a store named " + name + ". Error=" + std::string(redis_cluster_reply->str), DPS_GUID_CREATION_ERROR);
@@ -423,7 +475,18 @@ namespace distributed
 			value << storeId;
 			keyString = string(DPS_STORE_NAME_TYPE) + base64_encoded_name;
 			cmd = string(REDIS_SET_CMD) + keyString + " " + value.str();
-			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                        try {
+			   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                        } catch (const RedisCluster::ClusterException &ex) {
+                           redis_cluster_reply = NULL;
+                        }
+
+	                if (redis_cluster_reply == NULL) {
+		           dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. ", DPS_CONNECTION_ERROR);
+		           SPLAPPTRC(L_ERROR, "Inside createStore, it failed for store " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		           releaseGeneralPurposeLock(base64_encoded_name);
+		           return 0;
+	                }
 
 			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				// Problem in creating the "Store Name" entry in the cache.
@@ -457,7 +520,18 @@ namespace distributed
 			keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + value.str();
 			cmd = string(REDIS_HSET_CMD) + keyString + " " +
 				string(REDIS_STORE_ID_TO_STORE_NAME_KEY) + " " + base64_encoded_name;
-			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                        try {
+			   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                        } catch (const RedisCluster::ClusterException &ex) {
+                           redis_cluster_reply = NULL;
+                        }
+
+	                if (redis_cluster_reply == NULL) {
+		           dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. ", DPS_CONNECTION_ERROR);
+		           SPLAPPTRC(L_ERROR, "Inside createStore, it failed for store " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		           releaseGeneralPurposeLock(base64_encoded_name);
+		           return 0;
+	                }
 
 			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				// Problem in creating the "Store Content Hash" metadata1 entry in the cache.
@@ -470,8 +544,19 @@ namespace distributed
 				// Delete the previous store name root entry we made.
 				keyString = string(DPS_STORE_NAME_TYPE) + base64_encoded_name;
 				cmd = string(REDIS_DEL_CMD) + keyString;
-				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
-				freeReplyObject(redis_cluster_reply);
+                                try {
+				   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                                } catch (const RedisCluster::ClusterException &ex) {
+                                   redis_cluster_reply = NULL;
+                                }
+
+	                        if (redis_cluster_reply == NULL) {
+		                   dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. ", DPS_CONNECTION_ERROR);
+		                   SPLAPPTRC(L_ERROR, "Inside createStore, it failed for store " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+                                } else {
+				   freeReplyObject(redis_cluster_reply);
+                                }
+
 				releaseGeneralPurposeLock(base64_encoded_name);
 				return 0;
 			}
@@ -486,7 +571,18 @@ namespace distributed
 
 			cmd = string(REDIS_HSET_CMD) + keyString + " " +
 				string(REDIS_SPL_TYPE_NAME_OF_KEY) + " " + base64_encoded_keySplTypeName;
-			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                        try {
+			   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                        } catch (const RedisCluster::ClusterException &ex) {
+                           redis_cluster_reply = NULL;
+                        }
+
+	                if (redis_cluster_reply == NULL) {
+		            dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. ", DPS_CONNECTION_ERROR);
+		            SPLAPPTRC(L_ERROR, "Inside createStore, it failed for store " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+                            releaseGeneralPurposeLock(base64_encoded_name);
+                            return 0;
+                        }
 
 			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				// Problem in creating the "Store Content Hash" metadata2 entry in the cache.
@@ -498,13 +594,36 @@ namespace distributed
 				freeReplyObject(redis_cluster_reply);
 				// Delete the store contents hash we created above.
 				cmd = string(REDIS_DEL_CMD) + keyString;
-				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                                try {
+				   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                                } catch (const RedisCluster::ClusterException &ex) {
+                                   redis_cluster_reply = NULL;
+                                }
+
+	                        if (redis_cluster_reply == NULL) {
+		                   dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. ", DPS_CONNECTION_ERROR);
+		                   SPLAPPTRC(L_ERROR, "Inside createStore, it failed for store " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+                                   releaseGeneralPurposeLock(base64_encoded_name);
+                                   return 0;
+                                }
+
 				freeReplyObject(redis_cluster_reply);
 				// Delete the previous store name root entry we made.
 				keyString = string(DPS_STORE_NAME_TYPE) + base64_encoded_name;
 				cmd = string(REDIS_DEL_CMD) + keyString;
-				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
-				freeReplyObject(redis_cluster_reply);
+                                try {
+				   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                                } catch (const RedisCluster::ClusterException &ex) {
+                                   redis_cluster_reply = NULL;
+                                }
+
+	                        if (redis_cluster_reply == NULL) {
+		                   dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. ", DPS_CONNECTION_ERROR);
+		                   SPLAPPTRC(L_ERROR, "Inside createStore, it failed for store " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+                                } else {                                                                
+				   freeReplyObject(redis_cluster_reply);
+                                }
+
 				releaseGeneralPurposeLock(base64_encoded_name);
 				return 0;
 			}
@@ -516,7 +635,18 @@ namespace distributed
 			// Add the value spl type name metadata.
 			cmd = string(REDIS_HSET_CMD) + keyString + " " +
 				string(REDIS_SPL_TYPE_NAME_OF_VALUE) + " " + base64_encoded_valueSplTypeName;
-			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                        try {
+			   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                        } catch (const RedisCluster::ClusterException &ex) {
+                           redis_cluster_reply = NULL;
+                        }
+
+	                if (redis_cluster_reply == NULL) {
+		           dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+		           SPLAPPTRC(L_ERROR, "Inside createStore, it failed for store " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+                           releaseGeneralPurposeLock(base64_encoded_name);
+                           return 0;
+                        }
 
 			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				// Problem in creating the "Store Content Hash" metadata3 entry in the cache.
@@ -528,13 +658,36 @@ namespace distributed
 				freeReplyObject(redis_cluster_reply);
 				// Delete the store contents hash we created above.
 				cmd = string(REDIS_DEL_CMD) + keyString;
-				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                                try {
+				   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                                } catch (const RedisCluster::ClusterException &ex) {
+                                   redis_cluster_reply = NULL;
+                                }
+
+	                        if (redis_cluster_reply == NULL) {
+		                   dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. ", DPS_CONNECTION_ERROR);
+		                   SPLAPPTRC(L_ERROR, "Inside createStore, it failed for store " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+                                   releaseGeneralPurposeLock(base64_encoded_name);
+                                   return 0;
+                                }
+
 				freeReplyObject(redis_cluster_reply);
 				// Delete the previous store name root entry we made.
 				keyString = string(DPS_STORE_NAME_TYPE) + base64_encoded_name;
 				cmd = string(REDIS_DEL_CMD) + keyString;
-				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
-				freeReplyObject(redis_cluster_reply);
+                                try {
+				   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                                } catch (const RedisCluster::ClusterException &ex) {
+                                   redis_cluster_reply = NULL;
+                                }
+
+	                        if (redis_cluster_reply == NULL) {
+		                   dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+		                   SPLAPPTRC(L_ERROR, "Inside createStore, it failed for store " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+                                } else {
+				   freeReplyObject(redis_cluster_reply);
+                                }
+
 				releaseGeneralPurposeLock(base64_encoded_name);
 				return 0;
 			}
@@ -588,11 +741,15 @@ namespace distributed
 	// "0" at the beginning followed by the actual store name.  "0" + 'store name'
 	std::string storeNameKey = DPS_STORE_NAME_TYPE + base64_encoded_name;
 	string cmd = string(REDIS_EXISTS_CMD) + storeNameKey;
-	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeNameKey, cmd.c_str()));
+        try {
+	   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeNameKey, cmd.c_str()));
+        } catch (const RedisCluster::ClusterException &ex) {
+           redis_cluster_reply = NULL;
+        }
 
 	if (redis_cluster_reply == NULL) {
-		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside findStore, it failed for store " << name << " with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. ", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_ERROR, "Inside findStore, it failed for store " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		return 0;
 	}
 
@@ -619,7 +776,17 @@ namespace distributed
 	// We can get the storeId and return it to the caller.
 	freeReplyObject(redis_cluster_reply);
 	cmd = string(REDIS_GET_CMD) + storeNameKey;
-	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeNameKey, cmd.c_str()));
+        try {
+	   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeNameKey, cmd.c_str()));
+        } catch (const RedisCluster::ClusterException &ex) {
+           redis_cluster_reply = NULL;
+        }
+
+	if (redis_cluster_reply == NULL) {
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_ERROR, "Inside findStore, it failed for store " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		return 0;
+	}
 
 	if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Unable to get an existing store id from the cache.
@@ -696,13 +863,37 @@ namespace distributed
 	// '1' + 'store id' => 'Redis Hash'  [It will always have this entry: dps_name_of_this_store ==> 'store name']
 	string storeContentsHashKey = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
 	cmd = string(REDIS_DEL_CMD) + storeContentsHashKey;
-	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeContentsHashKey, cmd.c_str()));
+        try {
+	   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeContentsHashKey, cmd.c_str()));
+        } catch (const RedisCluster::ClusterException &ex) {
+           redis_cluster_reply = NULL;
+        }
+
+	if (redis_cluster_reply == NULL) {
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_ERROR, "Inside findStore, it failed for store id " << storeIdString << " with a NULL redisReply.  Application code may call the DPS reconnect API and then retry the failed operation." << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+                releaseStoreLock(storeIdString);
+		return(false);
+	}
+
 	freeReplyObject(redis_cluster_reply);
 
 	// Finally, delete the StoreName key now.
 	string storeNameKey = string(DPS_STORE_NAME_TYPE) + storeName;
 	cmd = string(REDIS_DEL_CMD) + storeNameKey;
-	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeNameKey, cmd.c_str()));
+        try {
+	   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeNameKey, cmd.c_str()));
+        } catch (const RedisCluster::ClusterException &ex) {
+           redis_cluster_reply = NULL;
+        }
+
+	if (redis_cluster_reply == NULL) {
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_ERROR, "Inside findStore, it failed for store id " << storeIdString << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+                releaseStoreLock(storeIdString);
+		return(false);
+	}
+
 	freeReplyObject(redis_cluster_reply);
 
 	// Life of this store ended completely with no trace left behind.
@@ -749,11 +940,15 @@ namespace distributed
 	string cmd = string(REDIS_HSET_CMD) + keyString + " " +
 			base64_encoded_data_item_key + " " +  "%b";
 	// We want to pass the exact binary data item value as given to us by the caller of this method.
-	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str(), (const char*)valueData, (size_t)valueSize));
+        try {
+	   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str(), (const char*)valueData, (size_t)valueSize));
+        } catch (const RedisCluster::ClusterException &ex) {
+           redis_cluster_reply = NULL;
+        }
 
 	if (redis_cluster_reply == NULL) {
-		dbError.set("Unable to connect to the redis-cluster server(s).  Got a NULL redisReply.", DPS_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside put, it failed for store " << storeIdString << " with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		dbError.set("Unable to connect to the redis-cluster server(s).  Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_ERROR, "Inside put, it failed for store " << storeIdString << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		return(false);
 	}
 
@@ -823,11 +1018,15 @@ namespace distributed
 	string cmd = string(REDIS_HSET_CMD) + keyString + " " +
 		base64_encoded_data_item_key + " " +  "%b";
 	// We want to pass the exact binary data item value as given to us by the caller of this method.
-	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str(), (const char*)valueData, (size_t)valueSize));
+        try {
+	   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str(), (const char*)valueData, (size_t)valueSize));
+        } catch (const RedisCluster::ClusterException &ex) {
+           redis_cluster_reply = NULL;
+        }
 
 	if (redis_cluster_reply == NULL) {
-		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed for store " << storeIdString << " with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. ", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_ERROR, "Inside putSafe, it failed for store " << storeIdString << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		releaseStoreLock(storeIdString);
 		return(false);
 	}
@@ -917,7 +1116,11 @@ namespace distributed
 
           if (encodeKey == true || encodeValue == true) {
 	     // We want to pass the exact binary data item value as given to us by the caller of this method.
-	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, cmd.c_str(), (const char*)(&valueData[valueIdx]), (size_t)(valueSize-valueIdx)));
+             try {
+	        redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, cmd.c_str(), (const char*)(&valueData[valueIdx]), (size_t)(valueSize-valueIdx)));
+             } catch (const RedisCluster::ClusterException &ex) {
+                redis_cluster_reply = NULL;
+             }
           } else {
              // This is the case where the caller doesn't want to encode the key as well as the value.
              // encodeKey == false and encodeValue == false.
@@ -938,12 +1141,16 @@ namespace distributed
              argv.push_back(value_as_plain_string.c_str());
              argvlen.push_back(value_as_plain_string.size());
              // We are using here the argv style Redis command instead of the all-in-one string based Redis command.
-             redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, argv.size(), &(argv[0]), &(argvlen[0])));
+             try {
+                redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, argv.size(), &(argv[0]), &(argvlen[0])));
+             } catch (const RedisCluster::ClusterException &ex) {
+                redis_cluster_reply = NULL;
+             }
           }
 
 	  if (redis_cluster_reply == NULL) {
-		  dbError.setTTL("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
-		  SPLAPPTRC(L_DEBUG, "Inside putTTL, it failed for executing the set command with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		  dbError.setTTL("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+		  SPLAPPTRC(L_ERROR, "Inside putTTL, it failed for executing the set command with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		  return(false);
 	  }
 
@@ -1087,11 +1294,15 @@ namespace distributed
                 argvlen.push_back(base64_encoded_data_item_key.size());
 
                 // We are using here the argv style Redis command instead of the all-in-one string based Redis command.
-		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, argv.size(), &(argv[0]), &(argvlen[0])));
+                try {
+		   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, argv.size(), &(argv[0]), &(argvlen[0])));
+                } catch (const RedisCluster::ClusterException &ex) {
+                   redis_cluster_reply = NULL;
+                }
 
 		if (redis_cluster_reply == NULL) {
-			dbError.setTTL("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside getTTL, it failed for executing the setx command with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+			dbError.setTTL("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+			SPLAPPTRC(L_ERROR, "Inside getTTL, it failed for executing the setx command with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 			return(false);
 		}
 
@@ -1177,11 +1388,15 @@ namespace distributed
 	string base64_encoded_data_item_key;
 	base64_encode(data_item_key, base64_encoded_data_item_key);
 	string cmd = string(REDIS_HDEL_CMD) + keyString + " " + base64_encoded_data_item_key;
-	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+        try {
+	   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+        } catch (const RedisCluster::ClusterException &ex) {
+           redis_cluster_reply = NULL;
+        }
 
 	if (redis_cluster_reply == NULL) {
-		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside remove, it failed for store id " << storeIdString << " with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_ERROR, "Inside remove, it failed for store id " << storeIdString << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		releaseStoreLock(storeIdString);
 		return(false);
 	}
@@ -1242,11 +1457,15 @@ namespace distributed
 		// Since this data item has a TTL value, it is not stored in the Redis hash (i.e. user created store).
 		// Instead, it will be in the global area of the Redis DB. Hence, use the regular del command instead of the hash del command.
 		string cmd = string(REDIS_DEL_CMD) + base64_encoded_data_item_key;
-		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, cmd.c_str()));
+                try {
+		   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, cmd.c_str()));
+                } catch (const RedisCluster::ClusterException &ex) {
+                   redis_cluster_reply = NULL;
+                }
 
 		if (redis_cluster_reply == NULL) {
-			dbError.setTTL("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside removeTTL, it failed to remove a data item with TTL with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+			dbError.setTTL("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+			SPLAPPTRC(L_ERROR, "Inside removeTTL, it failed to remove a data item with TTL with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 			return(false);
 		}
 
@@ -1340,10 +1559,15 @@ namespace distributed
                 }
 
 		string cmd = string(REDIS_EXISTS_CMD) + base64_encoded_data_item_key;
-		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, cmd.c_str()));
+                try {
+		   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, base64_encoded_data_item_key, cmd.c_str()));
+                } catch (const RedisCluster::ClusterException &ex) {
+                   redis_cluster_reply = NULL;
+                }
 
 		if (redis_cluster_reply == NULL) {
-			dbError.setTTL("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+			dbError.setTTL("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+			SPLAPPTRC(L_ERROR, "Inside hasTTL, it failed to check the existence of a data item with TTL with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 			return(false);
 		}
 
@@ -1414,11 +1638,15 @@ namespace distributed
 	// Delete the entire store contents hash.
 	string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
 	string cmd = string(REDIS_DEL_CMD) + keyString;
-	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+        try {
+	   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+        } catch (const RedisCluster::ClusterException &ex) {
+           redis_cluster_reply = NULL;
+        }
 
 	if (redis_cluster_reply == NULL) {
-		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside clear, it failed for store id " << storeIdString << " with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_ERROR, "Inside clear, it failed for store id " << storeIdString << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		releaseStoreLock(storeIdString);
 		return;
 	}
@@ -1442,7 +1670,18 @@ namespace distributed
 	// 1) Store name.
 	cmd = string(REDIS_HSET_CMD) + keyString + " " +
 		string(REDIS_STORE_ID_TO_STORE_NAME_KEY) + " " + storeName;
-	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+        try {
+	   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+        } catch (const RedisCluster::ClusterException &ex) {
+           redis_cluster_reply = NULL;
+        }
+
+	if (redis_cluster_reply == NULL) {
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_ERROR, "Inside clear, it failed for store id " << storeIdString << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		releaseStoreLock(storeIdString);
+		return;
+	}
 
 	if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Problem in creating the "Store Content Hash" metadata1 entry in the cache.
@@ -1461,7 +1700,18 @@ namespace distributed
 	// 2) Key spl type name.
 	cmd = string(REDIS_HSET_CMD) + keyString + " " +
 		string(REDIS_SPL_TYPE_NAME_OF_KEY) + " " + keySplTypeName;
-	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+        try {
+	   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+        } catch (const RedisCluster::ClusterException &ex) {
+           redis_cluster_reply = NULL;
+        }
+
+	if (redis_cluster_reply == NULL) {
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_ERROR, "Inside clear, it failed for store id " << storeIdString << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		releaseStoreLock(storeIdString);
+		return;
+	}
 
 	if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Problem in creating the "Store Content Hash" metadata2 entry in the cache.
@@ -1480,7 +1730,18 @@ namespace distributed
 	// 3) Value spl type name.
 	cmd = string(REDIS_HSET_CMD) + keyString + " " +
 		string(REDIS_SPL_TYPE_NAME_OF_VALUE) + " " + valueSplTypeName;
-	redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+        try {
+	   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+        } catch (const RedisCluster::ClusterException &ex) {
+           redis_cluster_reply = NULL;
+        }
+
+	if (redis_cluster_reply == NULL) {
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_ERROR, "Inside clear, it failed for store id " << storeIdString << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		releaseStoreLock(storeIdString);
+		return;
+	}
 
 	if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Problem in creating the "Store Content Hash" metadata3 entry in the cache.
@@ -1571,10 +1832,15 @@ namespace distributed
   bool RedisClusterDBLayer::storeIdExistsOrNot(string storeIdString, PersistenceError & dbError) {
 	  string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
 	  string cmd = string(REDIS_EXISTS_CMD) + keyString;
-	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+          try {
+	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+          } catch (const RedisCluster::ClusterException &ex) {
+             redis_cluster_reply = NULL;
+          }
 
 	  if (redis_cluster_reply == NULL) {
-		dbError.set("StoreIdExistsOrNot: Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+		dbError.set("StoreIdExistsOrNot: Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_ERROR, "Inside storeIdExistsOrNot, it failed for store id " << storeIdString << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		return(false);
 	  }
 
@@ -1610,9 +1876,14 @@ namespace distributed
 		// Winner will hold the lock until they release it voluntarily or
 		// until the Redis back-end removes this lock entry after the DPS_AND_DL_GET_LOCK_TTL times out.
 		cmd = string(REDIS_SETNX_CMD) + storeLockKey + " " + "1";
-		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeLockKey, cmd.c_str()));
+                try {
+		   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeLockKey, cmd.c_str()));
+                } catch (const RedisCluster::ClusterException &ex) {
+                   redis_cluster_reply = NULL;
+                }
 
 		if (redis_cluster_reply == NULL) {
+		SPLAPPTRC(L_ERROR, "a) Inside acquireStoreLock, it failed  with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 			return(false);
 		}
 
@@ -1629,13 +1900,29 @@ namespace distributed
 			std::ostringstream cmd_stream;
 			cmd_stream << string(REDIS_EXPIRE_CMD) << storeLockKey << " " << DPS_AND_DL_GET_LOCK_TTL;
 			cmd = cmd_stream.str();
-			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeLockKey, cmd.c_str()));
+                        try {
+			   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeLockKey, cmd.c_str()));
+                        } catch (const RedisCluster::ClusterException &ex) {
+                           redis_cluster_reply = NULL;
+                           SPLAPPTRC(L_ERROR, "b) Inside acquireStoreLock, it failed  with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+                        }
 
 			if (redis_cluster_reply == NULL) {
+                                // We already got a NULL reply. There is not much use in the code block below.
+                                // In any case, we will give it a try.
 				// Delete the erroneous lock data item we created.
 				cmd = string(REDIS_DEL_CMD) + " " + storeLockKey;
-				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeLockKey, cmd.c_str()));
-				freeReplyObject(redis_cluster_reply);
+                                try {
+				   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeLockKey, cmd.c_str()));
+                                } catch (const RedisCluster::ClusterException &ex) {
+                                   redis_cluster_reply = NULL;
+                                   SPLAPPTRC(L_ERROR, "c) Inside acquireStoreLock, it failed  with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+                                }
+
+                                if (redis_cluster_reply != NULL) {
+				   freeReplyObject(redis_cluster_reply);
+                                }
+
 				return(false);
 			}
 
@@ -1644,8 +1931,17 @@ namespace distributed
 				freeReplyObject(redis_cluster_reply);
 				// Delete the erroneous lock data item we created.
 				cmd = string(REDIS_DEL_CMD) + " " + storeLockKey;
-				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeLockKey, cmd.c_str()));
-				freeReplyObject(redis_cluster_reply);
+                                try {
+				   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeLockKey, cmd.c_str()));
+                                } catch (const RedisCluster::ClusterException &ex) {
+                                   redis_cluster_reply = NULL;
+                                   SPLAPPTRC(L_ERROR, "d) Inside acquireStoreLock, it failed  with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+                                }
+
+                                if (redis_cluster_reply != NULL) {
+				   freeReplyObject(redis_cluster_reply);
+                                }
+
 				return(false);
 			}
 
@@ -1674,8 +1970,16 @@ namespace distributed
 	  // '4' + 'store id' + 'dps_lock' => 1
 	  std::string storeLockKey = DPS_STORE_LOCK_TYPE + storeIdString + DPS_LOCK_TOKEN;
 	  string cmd = string(REDIS_DEL_CMD) + storeLockKey;
-	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeLockKey, cmd.c_str()));
-	  freeReplyObject(redis_cluster_reply);
+          try {
+	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, storeLockKey, cmd.c_str()));
+          } catch (const RedisCluster::ClusterException &ex) {
+             redis_cluster_reply = NULL;
+             SPLAPPTRC(L_ERROR, "Inside releaseStoreLock, it failed  with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+          }
+
+          if (redis_cluster_reply != NULL) {
+	     freeReplyObject(redis_cluster_reply);
+          }
   }
 
   bool RedisClusterDBLayer::readStoreInformation(std::string const & storeIdString, PersistenceError & dbError,
@@ -1696,10 +2000,15 @@ namespace distributed
 	  string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
 	  string cmd = string(REDIS_HGET_CMD) + keyString +
 			  " " + string(REDIS_STORE_ID_TO_STORE_NAME_KEY);
-	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+          try {
+	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+          } catch (const RedisCluster::ClusterException &ex) {
+             redis_cluster_reply = NULL;
+          }
 
 	  if (redis_cluster_reply == NULL) {
-		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+                SPLAPPTRC(L_ERROR, "a) Inside readStoreInformation, it failed  with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		return(false);
 	  }
 
@@ -1731,10 +2040,15 @@ namespace distributed
 	  // 2) Let us get the spl type name for this store's key.
 	  cmd = string(REDIS_HGET_CMD) + keyString +
 			  " " + string(REDIS_SPL_TYPE_NAME_OF_KEY);
-	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+          try {
+	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+          } catch (const RedisCluster::ClusterException &ex) {
+             redis_cluster_reply = NULL;
+          }
 
 	  if (redis_cluster_reply == NULL) {
-		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+                SPLAPPTRC(L_ERROR, "b) Inside readStoreInformation, it failed  with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		return(false);
 	  }
 
@@ -1766,10 +2080,15 @@ namespace distributed
 	  // 3) Let us get the spl type name for this store's value.
 	  cmd = string(REDIS_HGET_CMD) + keyString +
 			  " " + string(REDIS_SPL_TYPE_NAME_OF_VALUE);
-	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+          try {
+	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+          } catch (const RedisCluster::ClusterException &ex) {
+             redis_cluster_reply = NULL;
+          }
 
 	  if (redis_cluster_reply == NULL) {
-		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+		dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+                SPLAPPTRC(L_ERROR, "c) Inside readStoreInformation, it failed  with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		return(false);
 	  }
 
@@ -1800,10 +2119,15 @@ namespace distributed
 
 	  // 4) Let us get the size of the store contents hash now.
 	  cmd = string(REDIS_HLEN_CMD) + keyString;
-	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+          try {
+	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+          } catch (const RedisCluster::ClusterException &ex) {
+             redis_cluster_reply = NULL;
+          }
 
 	  if (redis_cluster_reply == NULL) {
-		  dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+		  dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+                  SPLAPPTRC(L_ERROR, "d) Inside readStoreInformation, it failed with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		  return(false);
 	  }
 
@@ -1971,12 +2295,16 @@ namespace distributed
 		}
 	  }
 
-	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+          try {
+	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+          } catch (const RedisCluster::ClusterException &ex) {
+             redis_cluster_reply = NULL;
+          }
 
 	  if (redis_cluster_reply == NULL) {
-		  dbError.set("From Redis data store: Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
-		  SPLAPPTRC(L_DEBUG, "From Redis data store: Inside runDataStoreCommand, it failed to run this command: '" <<
-				  cmd << "'. Failed with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+		  dbError.set("From Redis data store: Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+		  SPLAPPTRC(L_ERROR, "From Redis data store: Inside runDataStoreCommand, it failed to run this command: '" <<
+				  cmd << "'. Failed with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
 		  return(false);
 	  }
 
@@ -2046,11 +2374,15 @@ namespace distributed
      }
 
      // We are using here the argv style Redis command instead of the all-in-one string based Redis command.
-     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, argv.size(), &(argv[0]), &(argvlen[0])));
+     try {
+        redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, argv.size(), &(argv[0]), &(argvlen[0])));
+     } catch (const RedisCluster::ClusterException &ex) {
+        redis_cluster_reply = NULL;
+     }
 
      if (redis_cluster_reply == NULL) {
-        dbError.set("Redis_Cluster_Reply_Null error. Unable to connect to the redis server(s).", DPS_CONNECTION_ERROR);
-        SPLAPPTRC(L_DEBUG, "Redis_Cluster_Reply_Null error. Inside runDataStoreCommand using Redis cmdList, it failed for executing the user given Redis command list." << ". " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+        dbError.set("Redis_Cluster_Reply_Null error. Unable to connect to the redis server(s). Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+        SPLAPPTRC(L_ERROR, "Redis_Cluster_Reply_Null error. Inside runDataStoreCommand using Redis cmdList, it failed for executing the user given Redis command list. Application code may call the DPS reconnect API and then retry the failed operation." << DPS_CONNECTION_ERROR, "RedisDBLayer");
         return(false);
      }
 
@@ -2109,10 +2441,15 @@ namespace distributed
 			// This action is performed on the Store Contents Hash that takes the following format.
 			// '1' + 'store id' => 'Redis Hash'  [It will always have this entry: dps_name_of_this_store ==> 'store name']
 			cmd = string(REDIS_HEXISTS_CMD) + keyString + " " + keyDataString;
-			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                        try {
+			   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                        } catch (const RedisCluster::ClusterException &ex) {
+                           redis_cluster_reply = NULL;
+                        }
 
 			if (redis_cluster_reply == NULL) {
-				dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+				dbError.set("a) getDataItemFromStore: Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+                                SPLAPPTRC(L_ERROR, "a) Redis_Cluster_Reply_Null error. getDataItemFromStore: Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
 				return(false);
 			}
 
@@ -2150,10 +2487,15 @@ namespace distributed
 
 	    // Fetch the data item now.
 		cmd = string(REDIS_HGET_CMD) + keyString + " " + keyDataString;
-		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                try {
+		   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                } catch (const RedisCluster::ClusterException &ex) {
+                   redis_cluster_reply = NULL;
+                }
 
 		if (redis_cluster_reply == NULL) {
-			dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+			dbError.set("b) getDataItemFromStore: Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+                        SPLAPPTRC(L_ERROR, "b) Redis_Cluster_Reply_Null error. getDataItemFromStore: Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
 			return(false);
 		}
 
@@ -2288,9 +2630,14 @@ namespace distributed
 		// Winner will hold the lock until they release it voluntarily or
 		// until the Redis back-end removes this lock entry after the DPS_AND_DL_GET_LOCK_TTL times out.
 		cmd = string(REDIS_SETNX_CMD) + genericLockKey + " " + "1";
-		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, genericLockKey, cmd.c_str()));
+                try {
+		   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, genericLockKey, cmd.c_str()));
+                } catch (const RedisCluster::ClusterException &ex) {
+                   redis_cluster_reply = NULL;
+                }
 
 		if (redis_cluster_reply == NULL) {
+                        SPLAPPTRC(L_ERROR, "a) Redis_Cluster_Reply_Null error. acquireGeneralPurposeLock: Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
 			return(false);
 		}
 
@@ -2307,13 +2654,29 @@ namespace distributed
 			std::ostringstream cmd_stream;
 			cmd_stream << string(REDIS_EXPIRE_CMD) << genericLockKey << " " << DPS_AND_DL_GET_LOCK_TTL;
 			cmd = cmd_stream.str();
-			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, genericLockKey, cmd.c_str()));
+                        try {
+			   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, genericLockKey, cmd.c_str()));
+                        } catch (const RedisCluster::ClusterException &ex) {
+                           redis_cluster_reply = NULL;
+                           SPLAPPTRC(L_ERROR, "b) Redis_Cluster_Reply_Null error. acquireGeneralPurposeLock: Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+                        }
 
 			if (redis_cluster_reply == NULL) {
+                                // We already got a NULL reply. There is not much use in the code block below.
+                                // In any case, we will give it a try.
 				// Delete the erroneous lock data item we created.
 				cmd = string(REDIS_DEL_CMD) + " " + genericLockKey;
-				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, genericLockKey, cmd.c_str()));
-				freeReplyObject(redis_cluster_reply);
+                                try {
+				   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, genericLockKey, cmd.c_str()));
+                                } catch (const RedisCluster::ClusterException &ex) {
+                                   redis_cluster_reply = NULL;
+                                   SPLAPPTRC(L_ERROR, "c) Redis_Cluster_Reply_Null error. acquireGeneralPurposeLock: Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+                                }
+
+                                if (redis_cluster_reply != NULL) {
+				   freeReplyObject(redis_cluster_reply);
+                                }
+
 				return(false);
 			}
 
@@ -2322,8 +2685,17 @@ namespace distributed
 				freeReplyObject(redis_cluster_reply);
 				// Delete the erroneous lock data item we created.
 				cmd = string(REDIS_DEL_CMD) + " " + genericLockKey;
-				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, genericLockKey, cmd.c_str()));
-				freeReplyObject(redis_cluster_reply);
+                                try {
+				   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, genericLockKey, cmd.c_str()));
+                                } catch (const RedisCluster::ClusterException &ex) {
+                                   redis_cluster_reply = NULL;
+                                   SPLAPPTRC(L_ERROR, "d) Redis_Cluster_Reply_Null error. acquireGeneralPurposeLock: Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+                                }
+
+                                if (redis_cluster_reply != NULL) {
+				   freeReplyObject(redis_cluster_reply);
+                                }
+
 				return(false);
 			}
 
@@ -2352,8 +2724,16 @@ namespace distributed
 	  // '501' + 'entity name' + 'generic_lock' => 1
 	  std::string genericLockKey = GENERAL_PURPOSE_LOCK_TYPE + entityName + GENERIC_LOCK_TOKEN;
 	  string cmd = string(REDIS_DEL_CMD) + genericLockKey;
-	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, genericLockKey, cmd.c_str()));
-	  freeReplyObject(redis_cluster_reply);
+          try {
+	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, genericLockKey, cmd.c_str()));
+          } catch (const RedisCluster::ClusterException &ex) {
+             redis_cluster_reply = NULL;
+             SPLAPPTRC(L_ERROR, "Redis_Cluster_Reply_Null error. releaseGeneralPurposeLock: Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+          }
+
+          if (redis_cluster_reply != NULL) {
+	     freeReplyObject(redis_cluster_reply);
+          }
   }
 
   RedisClusterDBLayerIterator::RedisClusterDBLayerIterator() {
@@ -2408,10 +2788,15 @@ namespace distributed
 
 		  string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
 		  string cmd = string(REDIS_HKEYS_CMD) + keyString;
-		  this->redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, keyString, cmd.c_str()));
+                  try {
+		     this->redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, keyString, cmd.c_str()));
+                  } catch (const RedisCluster::ClusterException &ex) {
+                     this->redis_cluster_reply = NULL;
+                  }
 
 			if (this->redis_cluster_reply == NULL) {
-				dbError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+				dbError.set("getNext: Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
+                                SPLAPPTRC(L_ERROR, "Redis_Cluster_Reply_Null error. getNext: Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
 				this->hasData = false;
 				return(false);
 			}
@@ -2561,12 +2946,16 @@ namespace distributed
 		// '5' + 'lock name' ==> 'lock id'
 		std::string lockNameKey = DL_LOCK_NAME_TYPE + base64_encoded_name;
 		std::string cmd = string(REDIS_EXISTS_CMD) + lockNameKey;
-		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
+                try {
+		   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
+                } catch (const RedisCluster::ClusterException &ex) {
+                   redis_cluster_reply = NULL;
+                }
 
 		// If we get a NULL reply, then it indicates a redis-cluster server connection error.
 		if (redis_cluster_reply == NULL) {
-			lkError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DL_CONNECTION_ERROR);
-			SPLAPPTRC(L_DEBUG, "Inside createOrGetLock, it failed for the lock named " << name << " with a NULL redisReply. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+			lkError.set("a) createOrGetLock: Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DL_CONNECTION_ERROR);
+			SPLAPPTRC(L_ERROR, "a) Inside createOrGetLock, it failed for the lock named " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
 			return(0);
 		}
 
@@ -2575,7 +2964,17 @@ namespace distributed
 			// We can get the lockId and return it to the caller.
 			freeReplyObject(redis_cluster_reply);
 			cmd = string(REDIS_GET_CMD) + lockNameKey;
-			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
+                        try {
+			   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
+                        } catch (const RedisCluster::ClusterException &ex) {
+                           redis_cluster_reply = NULL;
+                        }
+
+		        if (redis_cluster_reply == NULL) {
+			   lkError.set("b) createOrGetLock: Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DL_CONNECTION_ERROR);
+			   SPLAPPTRC(L_ERROR, "b) Inside createOrGetLock, it failed for the lock named " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+			   return(0);
+		        }
 
 			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				// Unable to get an existing lock id from the cache.
@@ -2615,7 +3014,17 @@ namespace distributed
 			uint64_t lockId = 0;
 			std::string guid_key = DPS_AND_DL_GUID_KEY;
 			cmd = string(REDIS_INCR_CMD) + guid_key;
-			redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, guid_key, cmd.c_str()));
+                        try { 
+			   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, guid_key, cmd.c_str()));
+                        } catch (const RedisCluster::ClusterException &ex) {
+                           redis_cluster_reply = NULL;
+                        }
+
+		        if (redis_cluster_reply == NULL) {
+			   lkError.set("c) createOrGetLock: Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DL_CONNECTION_ERROR);
+			   SPLAPPTRC(L_ERROR, "c) Inside createOrGetLock, it failed for the lock named " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+			   return(0);
+		        }
 
 			if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 				lkError.set("Unable to get a unique lock id for a lock named " + name + ". Error=" +
@@ -2641,7 +3050,17 @@ namespace distributed
 				value << lockId;
 				std::string value_string = value.str();
 				cmd = string(REDIS_SET_CMD) + lockNameKey + " " + value_string;
-				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
+                                try {
+				   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
+                                } catch (const RedisCluster::ClusterException &ex) {
+                                   redis_cluster_reply = NULL;
+                                }
+
+		                if (redis_cluster_reply == NULL) {
+			           lkError.set("d) createOrGetLock: Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DL_CONNECTION_ERROR);
+			           SPLAPPTRC(L_ERROR, "d) Inside createOrGetLock, it failed for the lock named " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+			           return(0);
+		                }
 
 				if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 					// Problem in creating the "Lock Name" entry in the cache.
@@ -2663,7 +3082,17 @@ namespace distributed
 				std::string lockInfoKey = DL_LOCK_INFO_TYPE + value_string;  // LockId becomes the new key now.
 				value_string = string("0_0_0_") + base64_encoded_name;
 				cmd = string(REDIS_SET_CMD) + lockInfoKey + " " + value_string;
-				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockInfoKey, cmd.c_str()));
+                                try {
+				   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockInfoKey, cmd.c_str()));
+                                } catch (const RedisCluster::ClusterException &ex) {
+                                   redis_cluster_reply = NULL;
+                                }
+
+		                if (redis_cluster_reply == NULL) {
+			           lkError.set("e) createOrGetLock: Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DL_CONNECTION_ERROR);
+			           SPLAPPTRC(L_ERROR, "e) Inside createOrGetLock, it failed for the lock named " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+			           return(0);
+		                }
 
 				if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 					// Problem in creating the "LockId:LockInfo" entry in the cache.
@@ -2672,8 +3101,17 @@ namespace distributed
 					// Delete the previous entry we made.
 					freeReplyObject(redis_cluster_reply);
 					cmd = string(REDIS_DEL_CMD) + lockNameKey;
-					redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
-					freeReplyObject(redis_cluster_reply);
+                                        try {
+					   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
+                                        } catch (const RedisCluster::ClusterException &ex) {
+                                           redis_cluster_reply = NULL;
+			                   SPLAPPTRC(L_ERROR, "f) Inside createOrGetLock, it failed for the lock named " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+                                        }
+
+                                        if (redis_cluster_reply != NULL) {
+					   freeReplyObject(redis_cluster_reply);
+                                        }
+
 					releaseGeneralPurposeLock(base64_encoded_name);
 					return 0;
 				}
@@ -2738,14 +3176,31 @@ namespace distributed
 		// '6' + 'lock id' ==> 'lock use count' + '_' + 'lock expiration time expressed as elapsed seconds since the epoch' + '_' + 'pid that owns this lock' + "_" + lock name'
 		std::string lockInfoKey = DL_LOCK_INFO_TYPE + lockIdString;
 		string cmd = string(REDIS_DEL_CMD) + lockInfoKey;
-		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockInfoKey, cmd.c_str()));
-		freeReplyObject(redis_cluster_reply);
+
+                try {
+		   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockInfoKey, cmd.c_str()));
+                } catch (const RedisCluster::ClusterException &ex) {
+                   redis_cluster_reply = NULL;
+                   SPLAPPTRC(L_ERROR, "a) Inside removeLock, it failed with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+                }
+
+                if (redis_cluster_reply != NULL) {
+		   freeReplyObject(redis_cluster_reply);
+                }
 
 		// We can now delete the lock name root entry.
 		string lockNameKey = DL_LOCK_NAME_TYPE + lockName;
 		cmd = string(REDIS_DEL_CMD) + lockNameKey;
-		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
-		freeReplyObject(redis_cluster_reply);
+                try {
+		   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
+                } catch (const RedisCluster::ClusterException &ex) {
+                   redis_cluster_reply = NULL;
+                   SPLAPPTRC(L_ERROR, "b) Inside removeLock, it failed with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+                }
+
+                if (redis_cluster_reply != NULL) {
+		   freeReplyObject(redis_cluster_reply);
+                }
 
 		// We can delete the lock item itself now.
 		releaseLock(lock, lkError);
@@ -2795,7 +3250,12 @@ namespace distributed
 		  // We will add the lease time to the current timestamp i.e. seconds elapsed since the epoch.
 		  time_t new_lock_expiry_time = time(0) + (time_t)leaseTime;
 		  cmd = string(REDIS_SETNX_CMD) + distributedLockKey + " " + "1";
-		  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, distributedLockKey, cmd.c_str()));
+                  try {
+		     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, distributedLockKey, cmd.c_str()));
+                  } catch (const RedisCluster::ClusterException &ex) {
+                     redis_cluster_reply = NULL;
+                     SPLAPPTRC(L_ERROR, "a) Inside acquireLock, it failed with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+                  }
 
 			if (redis_cluster_reply == NULL) {
 				return(false);
@@ -2814,13 +3274,31 @@ namespace distributed
 				ostringstream expiryTimeInMillis;
 				expiryTimeInMillis << (leaseTime*1000.00);
 				cmd = string(REDIS_PSETEX_CMD) + distributedLockKey + " " + expiryTimeInMillis.str() + " " + "2";
-				redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, distributedLockKey, cmd.c_str()));
+                                try {
+				   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, distributedLockKey, cmd.c_str()));
+                                } catch (const RedisCluster::ClusterException &ex) {
+                                   redis_cluster_reply = NULL;
+                                   SPLAPPTRC(L_ERROR, "b) Inside acquireLock, it failed with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+
+                                }
 
 				if (redis_cluster_reply == NULL) {
+                                        // We already got a NULL reply which is not good.
+                                        // Most likely, it is a connection error with the redis cluster node.
+                                        // In any case, let us try the following code block which may also fail.
 					// Delete the erroneous lock data item we created.
 					cmd = string(REDIS_DEL_CMD) + " " + distributedLockKey;
-					redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, distributedLockKey, cmd.c_str()));
-					freeReplyObject(redis_cluster_reply);
+                                        try {
+					   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, distributedLockKey, cmd.c_str()));
+                                        } catch (const RedisCluster::ClusterException &ex) {
+                                           redis_cluster_reply = NULL;
+                                           SPLAPPTRC(L_ERROR, "c) Inside acquireLock, it failed with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+                                        }
+
+                                        if (redis_cluster_reply != NULL) {
+					   freeReplyObject(redis_cluster_reply);
+                                        }
+
 					return(false);
 				}
 
@@ -2829,8 +3307,17 @@ namespace distributed
 					freeReplyObject(redis_cluster_reply);
 					// Delete the erroneous lock data item we created.
 					cmd = string(REDIS_DEL_CMD) + " " + distributedLockKey;
-					redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, distributedLockKey, cmd.c_str()));
-					freeReplyObject(redis_cluster_reply);
+                                        try {
+					   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, distributedLockKey, cmd.c_str()));
+                                        } catch (const RedisCluster::ClusterException &ex) {
+                                           redis_cluster_reply = NULL;
+                                           SPLAPPTRC(L_ERROR, "d) Inside acquireLock, it failed with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+                                        }
+
+                                        if (redis_cluster_reply != NULL) {
+					   freeReplyObject(redis_cluster_reply);
+                                        }
+
 					return(false);
 				}
 
@@ -2904,7 +3391,17 @@ namespace distributed
 	  // '7' + 'lock id' + 'dl_lock' => 1
 	  std::string distributedLockKey = DL_LOCK_TYPE + lockIdString + DL_LOCK_TOKEN;
 	  string cmd = string(REDIS_DEL_CMD) + distributedLockKey;
-	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, distributedLockKey, cmd.c_str()));
+          try {
+	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, distributedLockKey, cmd.c_str()));
+          } catch (const RedisCluster::ClusterException &ex) {
+             redis_cluster_reply = NULL;
+             SPLAPPTRC(L_ERROR, "Inside releaseLock, it failed with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+          }
+
+          if (redis_cluster_reply == NULL) {
+             lkError.set("Unable to release the distributed lock id " + lockIdString + ". Possible connection error.", DL_CONNECTION_ERROR);
+             return;
+          }
 
 	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		  lkError.set("Unable to release the distributed lock id " + lockIdString + ". " + std::string(redis_cluster_reply->str), DL_LOCK_RELEASE_ERROR);
@@ -2938,7 +3435,17 @@ namespace distributed
 	  lockInfoValue << lockUsageCnt << "_" << lockExpirationTime << "_" << lockOwningPid << "_" << _lockName;
 	  string lockInfoValueString = lockInfoValue.str();
 	  cmd = string(REDIS_SET_CMD) + lockInfoKey + " " + lockInfoValueString;
-	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockInfoKey, cmd.c_str()));
+          try {
+	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockInfoKey, cmd.c_str()));
+          } catch (const RedisCluster::ClusterException &ex) {
+             redis_cluster_reply = NULL;
+          }
+
+          if (redis_cluster_reply == NULL) {
+             lkError.set("updateLockInformation: Unable to update 'LockId:LockInfo' for " + _lockName + ". Possible connection error. Application code may call the DPS reconnect API and then retry the failed operation.", DL_CONNECTION_ERROR);
+             SPLAPPTRC(L_ERROR, "Inside updateLockInformation, it failed with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+             return(false);
+          }
 
 	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		  // Problem in updating the "LockId:LockInfo" entry in the cache.
@@ -2965,7 +3472,17 @@ namespace distributed
 	  // '6' + 'lock id' ==> 'lock use count' + '_' + 'lock expiration time expressed as elapsed seconds since the epoch' + '_' + 'pid that owns this lock' + "_" + lock name'
 	  string lockInfoKey = DL_LOCK_INFO_TYPE + lockIdString;
 	  cmd = string(REDIS_GET_CMD) + lockInfoKey;
-	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockInfoKey, cmd.c_str()));
+          try {
+	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockInfoKey, cmd.c_str()));
+          } catch (const RedisCluster::ClusterException &ex) {
+             redis_cluster_reply = NULL;
+          }
+
+          if (redis_cluster_reply == NULL) {
+             lkError.set("readLockInformation: Unable to get LockInfo for " + lockIdString + ". Possible connection error. Application code may call the DPS reconnect API and then retry the failed operation.", DL_CONNECTION_ERROR);
+             SPLAPPTRC(L_ERROR, "Inside readLockInformation, it failed with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+             return(false);
+          }
 
 	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 		// Unable to get the LockInfo from our cache.
@@ -3035,10 +3552,15 @@ namespace distributed
   bool RedisClusterDBLayer::lockIdExistsOrNot(string lockIdString, PersistenceError & lkError) {
 	  string keyString = string(DL_LOCK_INFO_TYPE) + lockIdString;
 	  string cmd = string(REDIS_EXISTS_CMD) + keyString;
-	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, keyString, cmd.c_str()));
+          try {
+	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, keyString, cmd.c_str()));
+          } catch (const RedisCluster::ClusterException &ex) {
+             redis_cluster_reply = NULL;
+          }
 
 	  if (redis_cluster_reply == NULL) {
-		lkError.set("LockIdExistsOrNot: Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+		lkError.set("lockIdExistsOrNot: LockIdExistsOrNot: Unable to connect to the redis-cluster server(s). Got a NULL redisReply.. Application code may call the DPS reconnect API and then retry the failed operation.", DL_CONNECTION_ERROR);
+                SPLAPPTRC(L_ERROR, "Inside lockIdExistsOrNot, it failed with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
 		return(false);
 	  }
 
@@ -3075,12 +3597,16 @@ namespace distributed
 	  // '5' + 'lock name' ==> 'lock id'
 	  std::string lockNameKey = DL_LOCK_NAME_TYPE + base64_encoded_name;
 	  std::string cmd = string(REDIS_EXISTS_CMD) + lockNameKey;
-	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
+          try {
+	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
+          } catch (const RedisCluster::ClusterException &ex) {
+             redis_cluster_reply = NULL;
+          }
 
 	  // If we get a NULL reply, then it indicates a redis-cluster server connection error.
 	  if (redis_cluster_reply == NULL) {
-		lkError.set("Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DL_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside getPidForLock, it failed for the lock named " << name << " with a NULL redisReply. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+		lkError.set("a) getPidForLock: Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DL_CONNECTION_ERROR);
+		SPLAPPTRC(L_ERROR, "a) Inside getPidForLock, it failed for the lock named " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
 		return(0);
 	  }
 
@@ -3089,7 +3615,18 @@ namespace distributed
 		// We can get the lockId and return it to the caller.
 		freeReplyObject(redis_cluster_reply);
 		cmd = string(REDIS_GET_CMD) + lockNameKey;
-		redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
+                try {
+		   redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(this->redis_cluster, lockNameKey, cmd.c_str()));
+                } catch (const RedisCluster::ClusterException &ex) {
+                   redis_cluster_reply = NULL;
+                }
+
+	        if (redis_cluster_reply == NULL) {
+		   lkError.set("b) getPidForLock: Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DL_CONNECTION_ERROR);
+		   SPLAPPTRC(L_ERROR, "b) Inside getPidForLock, it failed for the lock named " << name << " with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterDBLayer");
+		   return(0);
+	        }
+
 
 		if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
 			// Unable to get an existing lock id from the cache.
@@ -3145,12 +3682,17 @@ namespace distributed
 	 	  // the command string passed by the caller. Let us parse it now.
 	 	  string keyString = "";
 	 	  string cmd = "WAIT 1 0";
-	 	  redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                  try {
+	 	     redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, keyString, cmd.c_str()));
+                  } catch (const RedisCluster::ClusterException &ex) {
+                     redis_cluster_reply = NULL;
+                  }
 
 	 	  if (redis_cluster_reply == NULL) {
-	 		  dbError.set("Inside persist: Unable to connect to the redis-cluster server(s). Got a NULL redisReply.", DPS_CONNECTION_ERROR);
+	 		  dbError.set("Inside persist: Unable to connect to the redis-cluster server(s). Got a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation.", DPS_CONNECTION_ERROR);
 	 		  SPLAPPTRC(L_ERROR, "Inside persist: Unable to connect to the redis-cluster server(s). '" <<
-	 				  cmd << "'. Failed with a NULL redisReply. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+	 				  cmd << "'. Failed with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+                          return;
 	 	  }
 
 	 	  if (redis_cluster_reply->type == REDIS_REPLY_ERROR) {
@@ -3194,7 +3736,12 @@ namespace distributed
          // We will simply do a read API for a dummy key.
          // If it results in a connection error, that will tell us the status of the connection.
 	 string cmd = string(REDIS_GET_CMD) + string("my_dummy_key");
-         redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, string("my_dummy_key"), cmd.c_str()));
+         try {
+            redis_cluster_reply = static_cast<redisReply*>(HiredisCommand::Command(redis_cluster, string("my_dummy_key"), cmd.c_str()));
+         } catch (const RedisCluster::ClusterException &ex) {
+            redis_cluster_reply = NULL;
+            SPLAPPTRC(L_ERROR, "Inside isConnected: Unable to connect to the redis-cluster server(s). Failed with a NULL redisReply. Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterDBLayer");
+         }
 
 	 if (redis_cluster_reply == NULL) {
             // Connection error.
@@ -3208,8 +3755,11 @@ namespace distributed
 
   // This method will reestablish the status of the connection to the back-end data store.
   bool RedisClusterDBLayer::reconnect(std::set<std::string> & dbServers, PersistenceError & dbError) {
-          // Delete the existing cluster connection object.
-	  delete redis_cluster;
+          if (redis_cluster != NULL) {
+             // Delete the existing cluster connection object.
+	     delete redis_cluster;
+          }
+
           redis_cluster = NULL;
           connectToDatabase(dbServers, dbError);
 

@@ -1,0 +1,16 @@
+<project name="DpsTests" default="test">
+
+    <target name="clean">
+       <ant dir="dpsTTLWithReconnect" target="clean">
+       </ant> 
+    </target>
+
+    <target name="test" depends="dpsTTLWithReconnect">
+    </target>
+
+    <target name="dpsTTLWithReconnect">
+        <ant dir="dpsTTLWithReconnect">
+        </ant>
+    </target>
+
+</project>

@@ -11,7 +11,7 @@ use spl.time::* ;
  * 	totalReconnections - 
  * 	
  */
-stateful boolean initializeDpsConnection()
+stateful boolean initializeDpsConnection(rstring configFile)
 {
 	mutable boolean connected = false ;
 	rstring isConnectedMetric = "isConnected" ;
@@ -20,6 +20,8 @@ stateful boolean initializeDpsConnection()
 			"Maintains a metric of if we think we are connected to Redis or not.",
 			Sys.Gauge, 0l) ;
 	}
+	
+	dpsSetConfigFile(configFile); 
 	
 	/*
 	 * Setup Redis connection

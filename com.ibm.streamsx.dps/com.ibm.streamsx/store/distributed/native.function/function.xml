@@ -618,9 +618,27 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
         <prototype>public stateful boolean dpsIsConnected()</prototype>
       </function>
       <function>
-        <description>It allows to reconnect to the back-end data store.
-@return true if the connection could be re-established, false otherwise.</description>        
-        <prototype>public stateful boolean dpsReconnect()</prototype>
+        <description>It allows to reconnect to the back-end data store. A simple example that waits 5 seconds and tries to reconnect is given below.
+@return true if the connection could be re-established, false otherwise.
+
+    
+	// invoke a DPS function
+	mutable uint64 err = 0ul;
+	dpsPut(storeHandle, myKey, myValue, err);	
+
+	// check for connection problems, DPS_CONNECTION_ERROR = 102, DL_CONNECTION_ERROR = 501
+	if(err == 102ul || err == 501ul) {
+		// wait 5 seconds 
+		block(5.0);
+		// retry to connect 
+		if (dpsReconnect() == false) {
+			// if that was not successful, give up
+			abort();
+		{
+	}
+
+</description>
+        <prototype>public stateful boolean dpsReconnect()</prototype>        
       </function>
       <function>
         <description>Allows you to initialize the connection to DPS without throwing an exception on failure.
