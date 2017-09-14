@@ -634,7 +634,7 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
 		if (dpsReconnect() == false) {
 			// if that was not successful, give up
 			abort();
-		{
+		}
 	}
 
 </description>
