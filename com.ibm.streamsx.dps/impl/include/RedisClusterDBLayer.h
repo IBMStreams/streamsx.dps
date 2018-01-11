@@ -86,6 +86,7 @@ namespace distributed
   	  	  Cluster<redisContext>::ptr_t redis_cluster;
   	  	  redisReply *redis_cluster_reply;
   	  	  RedisClusterDBLayer *redisClusterDBLayerPtr;
+                  std::string password_for_redis_cluster;
 
   	  	  RedisClusterDBLayerIterator();
 	  	  ~RedisClusterDBLayerIterator();
@@ -99,7 +100,7 @@ namespace distributed
   private:
 	  Cluster<redisContext>::ptr_t redis_cluster;
 	  redisReply *redis_cluster_reply;
-
+          std::string password_for_redis_cluster;
 
 	  bool readStoreInformation(std::string const & storeIdString, PersistenceError & dbError,
 	  		  uint32_t & dataItemCnt, std::string & storeName,
