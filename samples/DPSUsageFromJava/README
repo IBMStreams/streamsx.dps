@@ -1,16 +1,23 @@
 This application demonstrates how to use the DPS toolkit Java API from a Java operator.
+
 To compile this application from the command line, run the Makefile by typing "make"
 Launch by submitting the job to the domain:
-streamtool submitjob -d [domain] /output/JavaDPSDemo/Distributed/JavaDPSDemo.sab
+streamtool submitjob -d [domain] output/JavaDPSDemo/Distributed/JavaDPSDemo.sab
 
+To compile this sample application in Studio, copy the sample to a convenient directory
+and import the sample into Studio as existing project. Than right click on the project, and 
+choose run the "Build Project" command. Then you can launch the resulting SAB file.
 
-To compile this sample application in Studio, the library containing the DPS Java API must be both on the toolkit path and in the Java classpath.
+NOTE:
+If the toolkit is not located in the standard Streams toolkit directory (for example,
+because you loaded it from Github), you have to set the environment variable DPS_TOOLKIT_HOME
+to point to the directory where the info.xml file of the toolkit is located.
+For example enter the command :
+export DPS_TOOLKIT_HOME=/myhome/mytoolkits/com.ibm.streamsx.dps
+before running the make command.
+If this variable is not set the DPS toolkit from the standard Streams toolkit location will be used.
 
-Add the jar to the classpath through Studio:
-1. Right click on the project, select "Build Path" > "Configure Build Path"
-2. In the "Libraries" tab, click "Add External Jars"
-3. Browse to <STREAMS_INSTALL>/toolkits/com.ibm.streamsx.dps/impl/java/lib and select "dps-helper.jar"
-4. Click OK and build the project.
-
-Then you can build and launch the build configuration.
-
+To set this variable from within Streams Studio, do the following :
+1) Right click on the project and choose "Configure SPL Build ..."
+2) Open the SPL Build / Environment tab, and click "Add"
+3) Add the new variable with the correct location and click the OK button.
