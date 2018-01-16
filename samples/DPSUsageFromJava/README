@@ -2,11 +2,13 @@ This application demonstrates how to use the DPS toolkit Java API from a Java op
 
 To compile this application from the command line, run the Makefile by typing "make"
 Launch by submitting the job to the domain:
-streamtool submitjob -d [domain] output/JavaDPSDemo/Distributed/JavaDPSDemo.sab
+streamtool submitjob -d [domain] output/JavaDPSDemo/Distributed/application.JavaDPSDemo.sab
 
 To compile this sample application in Studio, copy the sample to a convenient directory
 and import the sample into Studio as existing project. Than right click on the project, and 
-choose run the "Build Project" command. Then you can launch the resulting SAB file.
+choose the "Build Project" command. Then you can launch the resulting SAB file. Open the
+Resources/output/JavaDPSDemo/Ditributed folder, right click on "application.JavaDPSDemo.sab"
+and select "Launch ..." -> "Launch as Distributed"
 
 NOTE:
 If the toolkit is not located in the standard Streams toolkit directory (for example,
@@ -19,5 +21,5 @@ If this variable is not set the DPS toolkit from the standard Streams toolkit lo
 
 To set this variable from within Streams Studio, do the following :
 1) Right click on the project and choose "Configure SPL Build ..."
-2) Open the SPL Build / Environment tab, and click "Add"
+2) Open the SPL Build -> Environment tab, and click "Add"
 3) Add the new variable with the correct location and click the OK button.
