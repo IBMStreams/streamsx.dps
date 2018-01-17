@@ -186,12 +186,12 @@ namespace distributed
        SPLAPPTRC(L_ERROR, "Going to read the DPS configuration details from the Streams app config '" + 
           dpsConfigFile + "'.", "DistributedProcessStore");
        // Let us first get the NoSQL db name from the Streams app config.
-       SPL::rstring defaultValue = "+ZXC987-";
+       SPL::rstring defaultValue = "";
        SPL::rstring propertyName = "dps.nosql.db";
-       noSqlKvStoreProductName = SPL::Functions::Utility::getApplicationConfigurationProperty(dpsConfigFile, propertyName, defaultValue); 
+       noSqlKvStoreProductName = SPL::Functions::Utility::getApplicationConfigurationProperty(dpsConfigFile, propertyName, defaultValue).string();
        std::string serverConfig = "";
 
-       if (noSqlKvStoreProductName != defaultValue) {
+       if (noSqlKvStoreProductName != defaultValue.string()) {
           // We got the NoSQL DB name.
           // We can now get all the server names.
           propertyName = "dps.server";
@@ -200,9 +200,9 @@ namespace distributed
              char buf[68];
              sprintf(buf, "%d", serverCnt+1);
              propertyName = "dps.server" + std::string(buf);
-             serverConfig = SPL::Functions::Utility::getApplicationConfigurationProperty(dpsConfigFile, propertyName, defaultValue);
+             serverConfig = SPL::Functions::Utility::getApplicationConfigurationProperty(dpsConfigFile, propertyName, defaultValue).string();
 
-             if(serverConfig != defaultValue) {
+             if(serverConfig != defaultValue.string()) {
                 dbServers.insert(serverConfig);
                 serverCnt++;
              } else {
