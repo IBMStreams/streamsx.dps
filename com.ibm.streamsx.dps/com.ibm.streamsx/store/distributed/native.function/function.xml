@@ -608,7 +608,18 @@ The machine name, Linux OS version and the CPU architecture (x86 or PPC) will be
       </function>
       <function>
         <description>Allows for setting a path to the configuration file. Relative paths are relative to the toolkit root directory. If not set, then 'etc/no-sql-kv-store-servers.cfg' file will be used.
-@param dpsConfigFile the path to the configuration file that should be used
+If a file with the given name is not found, the DPS toolkit tries to read the configuration from a Streams application configuration object with the given name.
+In order to use the Streams application configuration, the user must call the dpsSetConfigFile method to specify the Streams app config name.
+In the Streams application configuration, the user has to specify every configuration line as an individual property.
+The names of the properties are as shown below. Following is an example of how a DPS application configuration named dps-cfg-for-app1 would be created using the streamtool:
+ 
+	streamtool mkappconfig --property dps.nosql.db=redis dps-cfg-for-app1   
+	streamtool chappconfig --property dps.server1=MyMachine1:6379:MyPassword dps-cfg-for-app1
+	streamtool chappconfig --property dps.server2=MyMachine2:6379:MyPassword dps-cfg-for-app1
+	streamtool chappconfig --property dps.server3=MyMachine3:6379:MyPassword dps-cfg-for-app1
+	streamtool chappconfig --property dps.server4=MyMachine4:6379:MyPassword dps-cfg-for-app1
+        
+@param dpsConfigFile the path to the configuration file or the name of an application configuration that should be used
 @return returns always true</description>
         <prototype>public stateful boolean dpsSetConfigFile(rstring dpsConfigFile)</prototype>
       </function>
