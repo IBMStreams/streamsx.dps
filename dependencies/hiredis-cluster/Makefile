@@ -4,6 +4,13 @@ PKG_NAME := cpp-hiredis-cluster
 VERSION := master
 ARCHIVE := master.zip
 ARCHIVE_INSTALL := $(PKG_NAME)-$(VERSION)-$(OS)-$(ARCH)-install-bin.tar.gz
+# list of supported platforms
+ARCH1 := $(PKG_NAME)-$(VERSION)-el6-ppc64-install-bin.tar.gz
+ARCH2 := $(PKG_NAME)-$(VERSION)-el6-x86_64-install-bin.tar.gz
+ARCH3 := $(PKG_NAME)-$(VERSION)-el7-ppc64-install-bin.tar.gz
+ARCH4 := $(PKG_NAME)-$(VERSION)-el7-ppc64le-install-bin.tar.gz
+ARCH5 := $(PKG_NAME)-$(VERSION)-el7-x86_64-install-bin.tar.gz
+ARCH6 := $(PKG_NAME)-$(VERSION)-sles11-x86_64-install-bin.tar.gz
 URL := https://github.com/shinberg/$(PKG_NAME)/archive/$(ARCHIVE)
 PKG_DIR = $(PKG_NAME)-$(VERSION)
 GEN_DIR := $(shell pwd)/gen
@@ -34,6 +41,17 @@ $(ARCHIVE_INSTALL):
 #	cd $(PKG_DIR) && patch -p1 < ../hirediscommand.h.cpp11.patch
 #	touch -c $@
 
+packages:
+	tar czvf master.tgz include
+	cp master.tgz $(ARCH1)
+	cp master.tgz $(ARCH2)
+	cp master.tgz $(ARCH3)
+	cp master.tgz $(ARCH4)
+	cp master.tgz $(ARCH5)
+	cp master.tgz $(ARCH6)
+	
 clean:
 	rm -rf $(PKG_DIR) $(GEN_DIR)
 	rm -rf $(TARGETDIR)/include/hiredis-cluster
+	rm -rf master.tgz
+
