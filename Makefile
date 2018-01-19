@@ -22,6 +22,7 @@ SUBDIRS += dependencies
 SUBDIRS += com.ibm.streamsx.dps/impl
 
 TARFILE = com.ibm.streamsx.dps-install.tar.gz
+BINTARFILE = com.ibm.streamsx.dps-$(ARCH)-$(OS).tar.gz
 
 ARCH = $(shell dependencies/platform-info.pl --arch)
 OS = $(shell dependencies/platform-info.pl  --osname_rpm_format)
@@ -40,7 +41,7 @@ all: check-streams gen-message check-compiler ${SUBDIRS:%=%.all}
 	$(STREAMS_INSTALL)/bin/spl-make-toolkit -i $(TOOLKIT_DIR) -m
 	$(STREAMS_INSTALL)/bin/spl-make-doc --output-directory $(DOC_DIR)/spldoc -i $(TOOLKIT_DIR) --doc-title "Streams DPS Toolkit"
 
-clean: check-streams ${SUBDIRS:%=%.clean} install-clean
+clean: check-streams ${SUBDIRS:%=%.clean} install-clean binpackage-clean
 	ant -f $(TOOLKIT_DIR)/impl/build.xml -Ddoc.dir=$(PWD)/$(DOC_DIR) clean
 	$(STREAMS_INSTALL)/bin/spl-make-toolkit -c -i $(TOOLKIT_DIR) -m
 	$(STREAMS_INSTALL)/bin/spl-make-doc -c --output-directory $(DOC_DIR)/spldoc -i $(TOOLKIT_DIR) --doc-title "Streams DPS Toolkit"
@@ -49,8 +50,17 @@ clean: check-streams ${SUBDIRS:%=%.clean} install-clean
 install:
 	tar --exclude='*.o' -czvf $(TARFILE) ./$(TOOLKIT_DIR)
 
+binpackage:
+	tar --exclude='*.o' --exclude=.gitignore --exclude=.classpath \
+		--exclude=Makefile --exclude=build.xml --exclude=src --exclude=java/src \
+		--exclude=java/classes --exclude=.project --exclude=.settings \
+		--exclude=.toolkitList -czvf $(BINTARFILE) ./$(TOOLKIT_DIR)
+
 install-clean:
 	rm -f $(TARFILE)
+
+binpackage-clean:
+	rm -f $(BINTARFILE)
 
 gen-message:
 	cd $(TOOLKIT_DIR); $(SPL_MAKE_TOOLKIT) -i . --no-mixed-mode-preprocessing
