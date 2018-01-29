@@ -2244,17 +2244,33 @@ namespace distributed
   /// DPS put/get/remove/has DPS APIs.]
   bool RedisDBLayer::runDataStoreCommand(std::vector<std::string> const & cmdList, std::string & resultValue, PersistenceError & dbError) {
      resultValue = "";
-
-     // Return now if there is no valid connection to the Redis server.
-     if (redisPartitions[0].rdsc == NULL) {
-        dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
-        SPLAPPTRC(L_DEBUG, "Inside runDataStoreCommand, it failed. There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
-        return(false);
-     }
+     string keyString = "";
 
      if (cmdList.size() == 0) {
         resultValue = "Error: Empty Redis command list was given by the caller.";
         dbError.set(resultValue, DPS_RUN_DATA_STORE_COMMAND_ERROR);
+        return(false);
+     }
+
+     // We need a key string to do the client side partitioning of this command in order to
+     // distribute this native Reids command to one of the parallel Redis servers specified in the DPS configuration.
+     // Such a user defined parallel Redis server setup is possible only when DPS is configured with redis
+     // and not with redis-cluster. Get the key string from the command list.
+     if (cmdList.size() > 1) {
+        // Most of the commands should have the key or the hash name at this location.
+        keyString = cmdList.at(1);
+     } else {
+        // Take the only element available as the key string.
+        keyString = cmdList.at(0);
+     }
+
+     // Get the corresponding redis server partition index using the key string.
+     int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
+
+     // Return now if there is no valid connection to the Redis server.
+     if (redisPartitions[partitionIdx].rdsc == NULL) {
+        dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+        SPLAPPTRC(L_DEBUG, "Inside runDataStoreCommand, it failed. There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
         return(false);
      }
 
@@ -2268,11 +2284,11 @@ namespace distributed
         argvlen.push_back((*it).size());
      }
 
-     redis_reply = (redisReply*) redisCommandArgv(redisPartitions[0].rdsc, argv.size(), &(argv[0]), &(argvlen[0]));
+     redis_reply = (redisReply*) redisCommandArgv(redisPartitions[partitionIdx].rdsc, argv.size(), &(argv[0]), &(argvlen[0]));
 
      if (redis_reply == NULL) {
-        dbError.set("Redis_Reply_Null error. Unable to connect to the redis server(s). " + std::string(redisPartitions[0].rdsc->errstr), DPS_CONNECTION_ERROR);
-	SPLAPPTRC(L_DEBUG, "Redis_Reply_Null error. Inside runDataStoreCommand using Redis cmdList, it failed for executing the user given Redis command list. Error=" << std::string(redisPartitions[0].rdsc->errstr) << ". " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+        dbError.set("Redis_Reply_Null error. Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+	SPLAPPTRC(L_DEBUG, "Redis_Reply_Null error. Inside runDataStoreCommand using Redis cmdList, it failed for executing the user given Redis command list. Error=" << std::string(redisPartitions[partitionIdx].rdsc->errstr) << ". " << DPS_CONNECTION_ERROR, "RedisDBLayer");
 	return(false);
      }
 
