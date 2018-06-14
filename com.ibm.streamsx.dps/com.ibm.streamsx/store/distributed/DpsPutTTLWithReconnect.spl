@@ -44,6 +44,10 @@ namespace com.ibm.streamsx.store.distributed;
  * @param metricsIntervalLength (default: 15 * 60s) Time in seconds of the sliding window that the interval metrics are maintained over.  
  * @param metricsUpdateRate (default: 15.0s) Time in seconds between update of interval metrics. 
  * @param outputType (default: rstring key, rstring value) The output stream can be used to forward any attributes on the input port to the output port. 
+ * @param configFile (default: etc/no-sql-kv-store-servers.cfg) the name of the configuration file used for DPS
+ * @param keyAttribute the name of an input stream attribute containing the key for the put operation. The attribute can be of any type.
+ * @param valueAttribute the name of an input stream attribute containing the value for the put operation. The attribute can be of any type.
+ * @param ttlAttribute the name of an input stream attribute containing the TTL (time-to-live) value for the put operation. The attribute must be of type uint32. The value is given in seconds. A value of 0 means no expiration.
  * 
  * @input In Stream to be put using DPS. Attributes containing the key, value, and ttl must be provided (they do not need to be called any specific name, as they are specified as parameters)
  * @output Out Stream containing attributes that match input attributes. 
