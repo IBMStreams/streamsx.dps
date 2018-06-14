@@ -40,7 +40,9 @@ namespace com.ibm.streamsx.store.distributed;
  * @param reconnectionInterval (default: 5s) Number of seconds to wait between each reconnection attempt. 
  * @param metricsIntervalLength (default: 15 * 60s) Time in seconds of the sliding window that the interval metrics are maintained over.  
  * @param metricsUpdateRate (default: 15.0s) Time in seconds between update of interval metrics. 
- * @param outputType (default: rstring value) Output stream requires an attribute called "value" matching the type of the value being retrieved from the DPS server. 
+ * @param outputType (default: rstring value) Output stream requires an attribute called "value" matching the type of the value being retrieved from the DPS server.
+ * @param configFile (default: etc/no-sql-kv-store-servers.cfg) the name of the configuration file used for DPS
+ * @param keyAttribute the name of an input stream attribute containing the key for the get operation. The attribute can be of any type. 
  * 
  * This operator forwards punctuation. 
  * 
