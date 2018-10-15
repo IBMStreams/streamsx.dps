@@ -31,6 +31,28 @@ For configuration hints and other information, see the [Wiki pages](https://gith
 Other things to consider when working with this toolkit:
 * [The messages and the NLS for toolkits](https://github.com/IBMStreams/administration/wiki/Messages-and-National-Language-Support-for-toolkits)
 
+## Building the toolkit ##
+
+To build the toolkit perform the following steps:
+
+1. Clone the repository   
+   `git clone https://github.com/IBMStreams/streamsx.dps.git`
+2. Build the toolkit   
+   `make clean all`
+
+Prerequisuites   
+you need to have the following rpm packages installed on the build machine:
+```
+curl
+curl-devel
+lua
+lua-devel
+openldap-devel
+openssl-devel
+cyrus-sasl
+cyrus-sasl-devel
+```
+
 ## Learn more about Streams ##
 * [IBM Streams on Github](http://ibmstreams.github.io)
 * [Introduction to Streams Quick Start Edition](http://ibmstreams.github.io/streamsx.documentation/docs/4.1/qse-intro/)
