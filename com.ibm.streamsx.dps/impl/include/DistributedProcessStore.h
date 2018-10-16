@@ -17,9 +17,6 @@
 
 #include <memory>
 
-using namespace SPL;
-using namespace std;
-
 namespace com {
 namespace ibm {
 namespace streamsx {
@@ -435,7 +432,7 @@ namespace distributed
 
     /// Get the SPL literal type name for a given key or value
     /// @return the SPL type name
-    SPL::rstring getSPLTypeName(ConstValueHandle const & handle);
+    SPL::rstring getSPLTypeName(SPL::ConstValueHandle const & handle);
 
     /// Get the key SPL type name for a given store id.
     /// @param store store handle
@@ -551,8 +548,8 @@ namespace distributed
     // We are going to save the SPL type names of the key and value as part of this
     // store's metadata. That will help us in the Java dps API "findStore" to cache the
     // key and spl type names inside the Java StoreImpl object by querying from the store's metadata.
-    string keySplTypeName = getSPLTypeName(key);
-    string valueSplTypeName = getSPLTypeName(value);
+    std::string keySplTypeName = getSPLTypeName(key);
+    std::string valueSplTypeName = getSPLTypeName(value);
     SPL::uint64 res = db_->createStore(name, keySplTypeName, valueSplTypeName, *dbError_);
     err = dbError_->getErrorCode();
     return res;
@@ -571,8 +568,8 @@ namespace distributed
     // We are going to save the SPL type names of the key and value as part of this
     // store's metadata. That will help us in the Java dps API "findStore" to cache the
     // key and spl type names inside the Java StoreImpl object by querying from the store's metadata.
-    string keySplTypeName = getSPLTypeName(key);
-    string valueSplTypeName = getSPLTypeName(value);
+    std::string keySplTypeName = getSPLTypeName(key);
+    std::string valueSplTypeName = getSPLTypeName(value);
     SPL::uint64 res = db_->createOrGetStore(name, keySplTypeName, valueSplTypeName, *dbError_);
     err = dbError_->getErrorCode();
     return res;
@@ -751,7 +748,7 @@ namespace distributed
          SPL::rstring resultString = "";
 
          if (valueSize >= 0) {
-            resultString = string((const char *)valueData, valueSize);
+            resultString = std::string((const char *)valueData, valueSize);
          }         
 
         SPL::NativeByteBuffer value_nbf2;
