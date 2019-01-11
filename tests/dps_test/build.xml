@@ -1,0 +1,82 @@
+<project name="DpsTests" default="test" basedir=".">
+
+    <target name="clean">
+        <exec executable="sh">
+            <arg value="-c" />
+            <arg value="rm -rf tk*" />
+        </exec>
+    	<delete>
+    	    <fileset dir="${basedir}" includes="**/*.pyc,**/StreamsLogs*.tgz,**/job_*.tar.gz,tk*.zip,*.sab,dump.rdb"/>
+    	</delete>
+    	<delete includeemptydirs="true">
+    	    <fileset dir="${basedir}" includes="**/__pycache__/**"/>
+    	</delete>	
+    </target>
+
+    <target name="indextoolkits">
+    </target>	
+	
+    <target name="test" depends="TestLocal">
+    </target>
+
+    <target name="TestLocal">
+        <exec executable="/bin/sh"
+          dir="${basedir}">
+          <arg value="-c"/>
+          <arg value="unset DPS_CFG;python3 -u -m unittest dpsTests.DpsTests"/>
+        </exec>
+    </target>
+
+   <target name="TestCloud">
+		<exec executable="python3" failonerror="true">
+	    	<arg value="-u"/>
+	        <arg value="-m"/>
+	        <arg value="unittest"/>
+	        <arg value="dpsTests.TestCloud.test_dps_composites"/>
+	    </exec>
+    </target>
+
+   <target name="TestCloudLocal">
+		<exec executable="python3" failonerror="true">
+	    	<arg value="-u"/>
+	        <arg value="-m"/>
+	        <arg value="unittest"/>
+	        <arg value="dpsTests.TestCloudLocal.test_dps_composites"/>
+	    </exec>
+    </target>
+	
+   <target name="TestCloudRemote">
+        <exec executable="/bin/sh"
+          dir="${basedir}">
+          <arg value="-c"/>
+          <arg value="unset STREAMS_INSTALL;python3 -u -m unittest dpsTests.TestCloudRemote.test_dps_composites"/>
+        </exec>
+    </target>
+
+   <target name="TestICP">
+		<exec executable="python3" failonerror="true">
+	    	<arg value="-u"/>
+	        <arg value="-m"/>
+	        <arg value="unittest"/>
+	        <arg value="dpsTests.TestICP.test_dps_composites"/>
+	    </exec>
+    </target>
+
+   <target name="TestICPLocal">
+		<exec executable="python3" failonerror="true">
+	    	<arg value="-u"/>
+	        <arg value="-m"/>
+	        <arg value="unittest"/>
+	        <arg value="dpsTests.TestICPLocal.test_dps_composites"/>
+	    </exec>
+    </target>
+	
+   <target name="TestICPRemote">
+        <exec executable="/bin/sh"
+          dir="${basedir}">
+          <arg value="-c"/>
+          <arg value="unset STREAMS_INSTALL;python3 -u -m unittest dpsTests.TestICPRemote.test_dps_composites"/>
+        </exec>
+    </target>
+	
+</project>
