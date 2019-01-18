@@ -1,3 +1,11 @@
 */tk*
 */dump.rdb
 /dump.rdb
+job*.tar.gz
+*.pyc
+*output/
+*toolkit.xml
+*__pycache__/
+*tk*/
+*tk*.zip
+*.sab
