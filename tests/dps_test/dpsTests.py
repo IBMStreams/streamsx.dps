@@ -216,6 +216,7 @@ class TestICP(DpsTests):
 
     def setUp(self):
         Tester.setup_distributed(self)
+        self.test_config = self._service(False)
         # disable ssl verification
         self.test_config[streamsx.topology.context.ConfigParams.SSL_VERIFY] = False
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -223,6 +224,25 @@ class TestICP(DpsTests):
         self.dps_cfg_file = os.path.basename(self.dps_cfg)
         # toolkit from this repository is used
         self.dpsToolkit = '../../com.ibm.streamsx.dps/'
+
+    def _service(self, remote_build=True):
+        streams_rest_url = os.environ['STREAMS_REST_URL']
+        streams_service_name = os.environ['STREAMS_SERVICE_NAME']
+        streams_user = os.environ['STREAMS_USERNAME']
+        streams_password = os.environ['STREAMS_PASSWORD']
+        uri_parsed = urlparse(streams_rest_url)
+        hostname = uri_parsed.hostname
+        r = requests.get('https://'+hostname+':31843/v1/preauth/validateAuth', auth=(streams_user, streams_password), verify=False)
+        token = r.json()['accessToken']
+        cfg =  {
+            'type':'streams',
+            'connection_info':{
+                'serviceBuildEndpoint':'https://'+hostname+':32085',
+                'serviceRestEndpoint': 'https://'+uri_parsed.netloc+'/streams/rest/instances/'+streams_service_name},
+            'service_token': token }
+        cfg[streamsx.topology.context.ConfigParams.FORCE_REMOTE_BUILD] = remote_build
+        return cfg
+
 
 class TestICPLocal(TestICP):
     """ Test in ICP env using local installed toolkit """
@@ -233,6 +253,7 @@ class TestICPLocal(TestICP):
 
     def setUp(self):
         Tester.setup_distributed(self)
+        self.test_config = self._service(False)
         # disable ssl verification
         self.test_config[streamsx.topology.context.ConfigParams.SSL_VERIFY] = False
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -251,6 +272,7 @@ class TestICPRemote(TestICP):
 
     def setUp(self):
         Tester.setup_distributed(self)
+        self.test_config = self._service(True)
         # disable ssl verification
         self.test_config[streamsx.topology.context.ConfigParams.SSL_VERIFY] = False
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
