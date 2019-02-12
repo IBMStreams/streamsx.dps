@@ -75,7 +75,7 @@
         <exec executable="/bin/sh"
           dir="${basedir}">
           <arg value="-c"/>
-          <arg value="unset STREAMS_INSTALL;python3 -u -m unittest dpsTests.TestICPRemote.test_dps_composites"/>
+          <arg value="python3 -u -m unittest dpsTests.TestICPRemote.test_dps_composites"/>
         </exec>
     </target>
 	

@@ -15,6 +15,9 @@ import streamsx.spl.toolkit as tk
 import urllib3
 import os
 
+import streamsx.topology.context
+import requests
+from urllib.parse import urlparse
 
 
 class DpsTests(unittest.TestCase):
