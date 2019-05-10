@@ -3,7 +3,6 @@
 # All Rights Reserved.
 ###########################################################
 
-PACKAGES += aerospike
 PACKAGES += cassandra
 PACKAGES += couchbase
 PACKAGES += curl
