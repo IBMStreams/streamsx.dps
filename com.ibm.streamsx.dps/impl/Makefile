@@ -42,11 +42,12 @@ HELPER_LIBS += $(CLOUDANT_LIB)
 HELPER_LIBS += $(MONGO_LIB)
 HELPER_LIBS += $(MEMCACHED_LIB)
 
-ifeq ($(ARCH),x86_64)
-AERO_OBJ = AerospikeDBLayer.o
-AERO_LIB = $(LIB)/libDPSAerospike.so
-HELPER_LIBS += $(AERO_LIB)
-endif
+## remove aerospike support in v4
+#ifeq ($(ARCH),x86_64)
+#AERO_OBJ = AerospikeDBLayer.o
+#AERO_LIB = $(LIB)/libDPSAerospike.so
+#HELPER_LIBS += $(AERO_LIB)
+#endif
 
 DISTRIBUTED_PROCESS_STORE_LIB = $(LIB)/libDistributedProcessStoreLib.so
 DISTRIBUTED_PROCESS_STORE_LIB_STATIC = $(LIB)/libDistributedProcessStoreLibStatic.a
@@ -99,9 +100,10 @@ $(DISTRIBUTED_PROCESS_STORE_LIB_STATIC): $(DISTRIBUTED_PROCESS_STORE_OBJS)
 	mkdir -p $(LIB)
 	ar rcs $@ $^
 
-$(AERO_LIB): $(AERO_OBJ)
-	mkdir -p $(LIB)
-	$(CXX) $(LDFLAGS) -o $@ $^
+## remove aerospike support in v4
+#$(AERO_LIB): $(AERO_OBJ)
+#	mkdir -p $(LIB)
+#	$(CXX) $(LDFLAGS) -o $@ $^
 
 $(COUCH_LIB): $(COUCH_OBJ)
 	mkdir -p $(LIB)
@@ -145,7 +147,8 @@ clean:
 	rm -f $(CASSANDRA_LIB) $(CASSANDRA_OBJ)
 	rm -f $(HBASE_LIB) $(HBASE_OBJ)
 	rm -f $(MONGO_LIB) $(MONGO_OBJ)
-	rm -f $(AERO_LIB) $(AERO_OBJ)
+## remove aerospike support in v4	
+#	rm -f $(AERO_LIB) $(AERO_OBJ)
 	rm -f $(COUCH_LIB) $(COUCH_OBJ)
 	rm -rf $(LIB)
 

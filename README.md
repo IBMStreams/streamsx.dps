@@ -18,7 +18,6 @@ DPS toolkit for the purpose of sharing application state in a distributed manner
 <li>HBase</li>
 <li>Mongo</li>
 <li>Couchbase</li>
-<li>Aerospike</li>
 <li>Redis-Cluster   [New cluster feature is available in Redis version 3 and above]</li>
 </ol>
 

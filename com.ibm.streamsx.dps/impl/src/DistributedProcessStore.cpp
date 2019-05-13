@@ -327,13 +327,14 @@ namespace distributed
 		   libraryLoadingError = true;
 		}
 #if !( defined (__PPC64__) )
- 	} else if (noSqlKvStoreProductName.compare("aerospike") == 0) {
- 		handle1 = load_dependent_lib(toolkitDir, "libaerospike.so");
- 		kvLibName= "libDPSAerospike.so";
-
-		if (handle1 == NULL) {
-		   libraryLoadingError = true;
-		}
+// removed support for aerospike in version 4 of the toolkit
+// 	} else if (noSqlKvStoreProductName.compare("aerospike") == 0) {
+// 		handle1 = load_dependent_lib(toolkitDir, "libaerospike.so");
+// 		kvLibName= "libDPSAerospike.so";
+//
+//		if (handle1 == NULL) {
+//		   libraryLoadingError = true;
+//		}
 #endif
 	} else if (noSqlKvStoreProductName.compare("redis-cluster") == 0) {
 		handle1 = load_dependent_lib(toolkitDir, "libuv.so");
