@@ -212,10 +212,10 @@ class TestICP(DpsTests):
         super().setUpClass()
         env_chk = True
         try:
-            print("STREAMS_REST_URL="+str(os.environ['STREAMS_REST_URL']))
+            print("CP4D_URL="+str(os.environ['CP4D_URL']))
         except KeyError:
             env_chk = False
-        assert env_chk, "STREAMS_REST_URL environment variable must be set"
+        assert env_chk, "CP4D_URL environment variable must be set"
 
     def setUp(self):
         Tester.setup_distributed(self)
