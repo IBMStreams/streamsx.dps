@@ -36,7 +36,7 @@ DOC_DIR = com.ibm.streamsx.dps/doc
 PUBLISH_ROOT ?= $(HOME)/publish
 PUBLISH_DIR ?= $(PUBLISH_ROOT)/$(ARCH)/$(OS)
 
-all: check-streams gen-message check-compiler ${SUBDIRS:%=%.all}
+all: check-streams gen-message ${SUBDIRS:%=%.all}
 	ant -f $(TOOLKIT_DIR)/impl/build.xml -Ddoc.dir=$(PWD)/$(DOC_DIR) all
 	$(STREAMS_INSTALL)/bin/spl-make-toolkit -i $(TOOLKIT_DIR) -m
 	$(STREAMS_INSTALL)/bin/spl-make-doc --output-directory $(DOC_DIR)/spldoc -i $(TOOLKIT_DIR) --doc-title "Streams DPS Toolkit"
