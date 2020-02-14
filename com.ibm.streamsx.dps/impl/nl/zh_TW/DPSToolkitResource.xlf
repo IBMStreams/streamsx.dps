@@ -87,7 +87,7 @@
 
         <trans-unit id="StreamsDPSToolkitMessages_CDIST1005" extraData="DPSMSG_CANNOT_CONNECT" resname="CDIST1005E">
           <source>Cannot connect to database. Details: ''{0}''.</source>
-          <target>無法連接至資料庫。詳細資料：''{0}''。</target>
+          <target>無法連接至資料庫。 詳細資料：''{0}''。</target>
         </trans-unit>
 
       </group>

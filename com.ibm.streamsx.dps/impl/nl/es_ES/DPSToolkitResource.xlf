@@ -66,7 +66,7 @@
         <!-- TRNOTE Do not translate : DpsHelper dlopen -->
         <trans-unit id="StreamsDPSToolkitMessages_CDIST1001" extraData="DPSMSG_DLOPEN_FAILED" resname="CDIST1001E">
           <source>DpsHelper: dlopen failed for {0} : {1}</source>
-          <target>DpsHelper: dlopen ha fallado para {0} : {1}</target>
+          <target>DpsHelper: Anomalía de dlopen para {0} : {1}</target>
         </trans-unit>
 
 		<!-- TRNOTE Do not translate : NoSQL store -->
@@ -77,12 +77,12 @@
 
         <trans-unit id="StreamsDPSToolkitMessages_CDIST1003" extraData="DPSMSG_CANNOT_OPEN_LIBS" resname="CDIST1003E">
           <source>Cannot initialize libraries for chosen database {0}, error message: {1}</source>
-          <target>No se pueden inicializar las bibliotecas para la base de datos seleccionada {0}, mensaje de error: {1}</target>
+          <target>No se pueden inicializar las bibliotecas para la base de datos elegida {0}, mensaje de error: {1}</target>
         </trans-unit>
 
         <trans-unit id="StreamsDPSToolkitMessages_CDIST1004" extraData="DPSMSG_CANNOT_INIT_LIBS" resname="CDIST1004E">
           <source>Cannot initialize libraries for chosen database {0}, library {1} missing or corrupted</source>
-          <target>No se pueden inicializar las bibliotecas para la base de datos seleccionada {0}, la biblioteca {1} falta o está dañada</target>
+          <target>No se pueden inicializar las bibliotecas para la base de datos elegida {0}, falta la biblioteca {1} o está dañada</target>
         </trans-unit>
 
         <trans-unit id="StreamsDPSToolkitMessages_CDIST1005" extraData="DPSMSG_CANNOT_CONNECT" resname="CDIST1005E">
