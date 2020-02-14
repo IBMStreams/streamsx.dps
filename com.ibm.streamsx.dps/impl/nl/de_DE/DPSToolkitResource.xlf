@@ -60,7 +60,7 @@
 		<!-- TRNOTE Do not translate : NoSQL K/V store -->
         <trans-unit id="StreamsDPSToolkitMessages_CDIST1000" extraData="DPSMSG_CANNOT_GET_PRODUCT_NAME" resname="CDIST1000E">
           <source>Cannot get NoSQL K/V store product name and/or the server names from the configuration file ''{0}''</source>
-          <target>NoSQL K/V-Speicherproduktname und/oder die Servernamen können aus der Konfigurationsdatei ''{0}'' nicht abgerufen werden</target>
+          <target>NoSQL K/V-Speicherproduktname und/oder die Servernamen können aus der Konfigurationsdatei ''{0}'' nicht abgerufen werden.</target>
         </trans-unit>
         
         <!-- TRNOTE Do not translate : DpsHelper dlopen -->
@@ -82,7 +82,7 @@
 
         <trans-unit id="StreamsDPSToolkitMessages_CDIST1004" extraData="DPSMSG_CANNOT_INIT_LIBS" resname="CDIST1004E">
           <source>Cannot initialize libraries for chosen database {0}, library {1} missing or corrupted</source>
-          <target>Bibliotheken für ausgewählte Datenbank {0} können nicht initialisiert werden, Bibliothek {1} fehlt oder ist beschädigt</target>
+          <target>Bibliotheken für ausgewählte Datenbank {0} können nicht initialisiert werden, Bibliothek {1} fehlt oder ist beschädigt.</target>
         </trans-unit>
 
         <trans-unit id="StreamsDPSToolkitMessages_CDIST1005" extraData="DPSMSG_CANNOT_CONNECT" resname="CDIST1005E">

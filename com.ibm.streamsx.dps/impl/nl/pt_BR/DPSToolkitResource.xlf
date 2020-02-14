@@ -82,7 +82,7 @@
 
         <trans-unit id="StreamsDPSToolkitMessages_CDIST1004" extraData="DPSMSG_CANNOT_INIT_LIBS" resname="CDIST1004E">
           <source>Cannot initialize libraries for chosen database {0}, library {1} missing or corrupted</source>
-          <target>Não é possível inicializar bibliotecas para o banco de dados escolhido {0}, biblioteca {1} ausente ou corrompida </target>
+          <target>Não é possível inicializar bibliotecas para o banco de dados escolhido {0}, biblioteca {1} ausente ou corrompida</target>
         </trans-unit>
 
         <trans-unit id="StreamsDPSToolkitMessages_CDIST1005" extraData="DPSMSG_CANNOT_CONNECT" resname="CDIST1005E">
