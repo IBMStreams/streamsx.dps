@@ -17,7 +17,7 @@ repository               : "IBMStreams/streamsx.dps" # GitHub username/repo-name
 github_base_url          : "https://github.com" # your github server, will differ when enterprise github
 github_editme_path       : https://github.com/IBMStreams/streamsx.dps/blob/gh-pages
 spldoc_path              : &default_cta_url "/doc/spldoc/html"
-toolkit_excerpt          : &default_excerpt "Supports Streams application to work with databases via JDBC"
+toolkit_excerpt          : &default_excerpt "This streamsx.dps toolkit allows a simple way for the SPL, C++ and Java operators belonging to a single or multiple applications to share the application specific state information via an external Key/Value store."
 teaser                   : # path of fallback teaser image, e.g. "/assets/images/500x300.png"
 # breadcrumbs            : false # true, false (default)
 words_per_minute         : 200
