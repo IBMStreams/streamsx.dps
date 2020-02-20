@@ -1,0 +1,38 @@
+# main links
+main:
+  - title: "Domain Knowledge"
+    url: /docs/knowledge/overview/
+  - title: "User Documentation"
+    url: /docs/user/overview
+  - title: "Developer Documentation"
+    url: /docs/developer/overview
+
+# knowledge documentation links
+knowledgedocs:
+  - title: Background knowledge
+    children:
+      - title: "Overview - Use case"
+        url: /docs/knowledge/usecase/overview
+
+# user documentation links
+userdocs:
+  - title: User documentation
+    children:
+      - title: "Overview"
+        url: /docs/user/overview
+      - title: "How to connect to a DB2"
+        url: /docs/user/db2
+      - title: "How to connect to a Oracle"
+        url: /docs/user/oracle
+      - title: "How to connect to a PostgresSql"
+        url: /docs/user/postgressql
+      - title: "How to connect to a Teradata"
+        url: /docs/user/teradata
+
+# developer documentation links
+developerdocs:
+  - title: Developer documentation
+    children:
+      - title: "General Toolkit development"
+        url: /docs/development/overview
+

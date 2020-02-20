@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xml:lang="en-us" lang="en-us">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="copyright" content="(C) Copyright 2005"/>
+<meta name="DC.rights.owner" content="(C) Copyright 2005"/>
+<meta name="DC.Type" content="reference"/>
+<meta name="DC.Title" content="SPL File DpsPutTTLWithReconnect.spl"/>
+<meta name="DC.Format" content="XHTML"/>
+<meta name="DC.Identifier" content="spldoc_compilationunit"/>
+<link rel="stylesheet" type="text/css" href="../../html/commonltr.css"/>
+<link rel="stylesheet" type="text/css" href="../../html/spldoc.css"/>
+<title>SPL File DpsPutTTLWithReconnect.spl</title>
+</head>
+<body id="spldoc_compilationunit">
+
+
+<h1 class="title topictitle1">SPL File <tt class="ph tt">DpsPutTTLWithReconnect.spl</tt></h1>
+
+<div class="body refbody">
+<div class="section">
+<p class="p">
+<a class="xref" href="../toolkits/toolkits.html">Streams DPS Toolkit</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.dps.html">com.ibm.streamsx.dps 4.1.1</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.store.distributed.html">com.ibm.streamsx.store.distributed</a> &gt; DpsPutTTLWithReconnect.spl</p>
+
+</div>
+
+<div class="section"><h2 class="title sectiontitle splhead-1">Content</h2>
+  
+  <dl class="dl">
+    <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+    
+      <dt class="dt dlterm splhead-2">Operators</dt>
+
+      <dd class="dd">
+<ul class="sl simple">
+<li class="sli"><strong class="ph b"><a class="xref" href="spl$com.ibm.streamsx.store.distributed$DpsPutTTLWithReconnect.html#spldoc_compilationunit__composite_operator__DpsPutTTLWithReconnect">DpsPutTTLWithReconnect</a></strong>: DpsPutTTLWithReconnect Uses the dpsPutTTL function to write key-value pairs to Redis (of any type).
+</li>
+
+</ul>
+
+      </dd>
+
+    
+  </dl>
+
+</div>
+
+<div class="section"><h2 class="title sectiontitle splhead-1">Composites</h2>
+  
+</div>
+
+<div class="section" id="spldoc_compilationunit__composite_operator__DpsPutTTLWithReconnect"><h2 class="title sectiontitle splpart">composite DpsPutTTLWithReconnect(output Out; input In)</h2>
+  
+</div>
+
+<div class="section">
+
+<p class="p">DpsPutTTLWithReconnect Uses the dpsPutTTL function to write key-value pairs to Redis (of any type).  The purpose of this composite is to provide extensive error handling, a reconnection policy, and a complete set of informative metrics. 
+</p>
+
+<p class="p">By default, keys and values are not encoded in order to provide maximum ease of access via non-Streams methods. If non-String types are provided for either the key or value, they will automatically be encoded. Use the  Base64 encoding options to save space. 
+</p>
+
+<p class="p">Note: The following metrics are only valid once we have established an initial connection to the  DPS server. Before that connection, we will throw exceptions (without failure) and the isConnected metric will be valid. All other metrics will be unusable until first-connection is established. 
+</p>
+
+<div class="p"><strong class="ph b">Longterm and Current Metrics:</strong> 
+<ul class="ul">
+<li class="li"> <strong class="ph b">isConnected</strong> Maintains a metric of if we think we are connected to Redis or not.</li>
+
+<li class="li"> <strong class="ph b">totalInserts</strong> Maintains a metric of the number of total inserts done since startup.</li>
+
+<li class="li"> <strong class="ph b">totalFailedInserts</strong> Maintains a metric of the number of failed inserts since startup.</li>
+
+<li class="li"> <strong class="ph b">totalReconnections</strong> Maintains a metric of the number of reconnections to the DPS Server since startup.</li>
+
+</ul>
+
+</div>
+
+<p class="p"><strong class="ph b">Interval Metrics:</strong> 
+</p>
+
+<div class="p">
+<ul class="ul">
+<li class="li"> <strong class="ph b">numInserts</strong> Maintains a metric of the number inserts completed in the last interval of time.</li>
+
+<li class="li"> <strong class="ph b">numFailedInserts</strong> Maintains a metric of the number of failed inserts done.</li>
+
+<li class="li"> <strong class="ph b">numUniqueKeyInserts</strong> Maintains a metric of the number of unique keys inserted in the last interval of time.</li>
+
+<li class="li"> <strong class="ph b">reconnectionAttptsSinceDisconnect</strong> Maintains a metric of the number of reconnection attempts in the last interval of time.</li>
+
+<li class="li"> <strong class="ph b">avgTTLMinutes</strong> Maintains a metric of the average TTL in minutes over the last interval of time. </li>
+
+<li class="li"> <strong class="ph b">avgKeyValueSizeBytes</strong> Maintains a metric of the average key-value size in the last interval of time. The size is the amount of space utilized after any encoding by the DPS toolkit. Failed inserts contribute a value of 0 to the avgKeyValueSize, skewing the results downwards.</li>
+
+<li class="li"> <strong class="ph b">maxKeyValueSizeBytes</strong> Maintains a metric of the max key-value size in the last interval of time.  The size is the amount of space utilized after any encoding by the DPS toolkit.</li>
+
+</ul>
+
+</div>
+
+<p class="p">This operator forwards punctuation. 
+</p>
+
+</div>
+
+<div class="section"><h2 class="title sectiontitle">Parameters</h2>
+
+<ul class="sl simple">
+<li class="sli"><strong class="ph b">keyEncoded</strong>: (default: false) Whether or not to encode the key in base64. False is only valid if the key is rstring/ustring, otherwise it automatically defaults to true. 
+</li>
+
+<li class="sli"><strong class="ph b">valueEncoded</strong>: (default: false) Whether or not to encode the value in base64. False is only valid if the value is rstring/ustring, otherwise it automatically defaults to true. 
+</li>
+
+<li class="sli"><strong class="ph b">reconnectionAttempts</strong>: (default: 1) Number of reconnection attempts per incoming tuple. Use -1 for unlimited, i.e. don't ever drop tuple, keep trying to reconnect. If set to 0, we will never reconnect upon connection loss.
+</li>
+
+<li class="sli"><strong class="ph b">reconnectionInterval</strong>: (default: 5s) Number of seconds to wait between each reconnection attempt. 
+</li>
+
+<li class="sli"><strong class="ph b">outputType</strong>: (default: rstring key, rstring value) The output stream can be used to forward any attributes on the input port to the output port. 
+</li>
+
+<li class="sli"><strong class="ph b">metricsIntervalLength</strong>: (default: 15 * 60s) Time in seconds of the sliding window that the interval metrics are maintained over.  
+</li>
+
+<li class="sli"><strong class="ph b">metricsUpdateRate</strong>: (default: 15.0s) Time in seconds between update of interval metrics. 
+</li>
+
+<li class="sli"><strong class="ph b">configFile</strong>: (default: etc/no-sql-kv-store-servers.cfg) the name of the configuration file used for DPS
+</li>
+
+<li class="sli"><strong class="ph b">keyAttribute</strong>: the name of an input stream attribute containing the key for the put operation. The attribute can be of any type.
+</li>
+
+<li class="sli"><strong class="ph b">valueAttribute</strong>: the name of an input stream attribute containing the value for the put operation. The attribute can be of any type.
+</li>
+
+<li class="sli"><strong class="ph b">ttlAttribute</strong>: the name of an input stream attribute containing the TTL (time-to-live) value for the put operation. The attribute must be of type uint32. The value is given in seconds. A value of 0 means no expiration. 
+</li>
+
+</ul>
+
+</div>
+
+<div class="section"><h2 class="title sectiontitle">Input Ports</h2>
+
+<ul class="sl simple">
+<li class="sli"><strong class="ph b">In</strong>: Stream to be put using DPS. Attributes containing the key, value, and ttl must be provided (they do not need to be called any specific name, as they are specified as parameters)
+</li>
+
+</ul>
+
+</div>
+
+<div class="section"><h2 class="title sectiontitle">Output Ports</h2>
+
+<ul class="sl simple">
+<li class="sli"><strong class="ph b">Out</strong>: Stream containing attributes that match input attributes. 
+</li>
+
+</ul>
+
+</div>
+
+</div>
+
+
+</body>
+</html>
