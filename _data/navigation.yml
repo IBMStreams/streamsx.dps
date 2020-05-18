@@ -22,6 +22,6 @@ userdocs:
 developerdocs:
   - title: Developer documentation
     children:
-      - title: "General Toolkit development"
-        url: /docs/development/overview
+      - title: "Overview"
+        url: /docs/user/overview
 
