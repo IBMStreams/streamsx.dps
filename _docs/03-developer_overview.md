@@ -13,7 +13,7 @@ sidebar:
 
 # Build the toolkit
 
-Run the following command in the `streamsx.jdbc` directory:
+Run the following command in the `streamsx.dps` directory:
 
     make all
 

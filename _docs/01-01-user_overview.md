@@ -14,6 +14,6 @@ sidebar:
 
 ## SPLDOC
 
-[SPLDoc for the com.ibm.streamsx.jdbc toolkit](https://ibmstreams.github.io/streamsx.pds/doc/spldoc/html/index.html)
+[SPLDoc for the com.ibm.streamsx.dps toolkit](https://ibmstreams.github.io/streamsx.dps/doc/spldoc/html/index.html)
 
 
