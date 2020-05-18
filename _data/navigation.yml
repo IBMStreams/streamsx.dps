@@ -10,10 +10,7 @@ main:
 # knowledge documentation links
 knowledgedocs:
   - title: Background knowledge
-    children:
-      - title: "Overview - Use case"
-        url: /docs/knowledge/usecase/overview
-
+ 
 # user documentation links
 userdocs:
   - title: User documentation
