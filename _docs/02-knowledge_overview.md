@@ -12,6 +12,8 @@ sidebar:
 {% include editme %}
 
 
-The IBMStreams/streamsx.jdbc toolkit project is an open source Streams toolkit project focused on the development of operators and functions that extend IBM Streams ability to interact with database via JDBC.
+The IBMStreams/streamsx.dps toolkit project is an open source Streams toolkit project.
+
+This Streams toolkit allows a simple way for the SPL, C++ and Java operators belonging to a single or multiple applications to share the application specific state information via an external K/V store. It does this via a collection of APIs that can be called from any part of the SPL, C++ and Java operator code.
 
 
