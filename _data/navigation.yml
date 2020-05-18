@@ -20,15 +20,7 @@ userdocs:
     children:
       - title: "Overview"
         url: /docs/user/overview
-      - title: "How to connect to a DB2"
-        url: /docs/user/db2
-      - title: "How to connect to a Oracle"
-        url: /docs/user/oracle
-      - title: "How to connect to a PostgresSql"
-        url: /docs/user/postgressql
-      - title: "How to connect to a Teradata"
-        url: /docs/user/teradata
-
+ 
 # developer documentation links
 developerdocs:
   - title: Developer documentation
