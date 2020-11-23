@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2017
+# Copyright IBM Corp. 2011, 2020
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -79,14 +79,9 @@ It is important to note that a Streams application designer/developer should car
 of his/her application will access the store simultaneously i.e. who puts what, who gets what and at
 what frequency from where etc.
 
-This C++ project has a companion SPL project (058_data_sharing_between_non_fused_spl_custom_and_cpp_primitive_operators).
-Please refer to the commentary in that SPL project file for learning about the procedure to do an
-end-to-end test run involving the SPL code, serialization/deserialization code,
-redis-cluster interface code (this file), and your redis-cluster infrastructure.
-
-As a first step, you should run the ./mk script from the C++ project directory (DistributedProcessStoreLib).
-That will take care of building the .so file for the dps and copy it to the SPL project's impl/lib directory.
-==================================================================================================================
+There are simple and advanced examples included in the DPS toolkit to test all the features described in the previous
+paragraph.
+========================================================================================================
 */
 
 #include "RedisClusterDBLayer.h"

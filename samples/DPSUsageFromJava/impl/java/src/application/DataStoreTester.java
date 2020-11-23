@@ -27,16 +27,15 @@ import com.ibm.streamsx.dps.StoreFactory;
 @PrimitiveOperator(name="DataStoreTester", namespace="application",
 description="This operator is a no-op.  It exists for the purpose of demonstrating how to successfully fuse two Java operators that use the DPS toolkit.  Because it is fused with the TickerIdGenerator operator, the SharedLoader annotation is used in both classes. See the operators' source for more information.")
 @InputPorts({@InputPortSet(description="Port that ingests tuples", cardinality=1, optional=false, windowingMode=WindowMode.NonWindowed, windowPunctuationInputMode=WindowPunctuationInputMode.Oblivious), @InputPortSet(description="Optional input ports", optional=true, windowingMode=WindowMode.NonWindowed, windowPunctuationInputMode=WindowPunctuationInputMode.Oblivious)})
-//To compile Add the DPS toolkit's Java library (dps-helper.jar) to the toolkit path of this operator.
+
+//Add the DPS toolkit's Java library (dps-helper.jar) to the path of this operator.
 //There are 2 ways to do this:
-
-//1. If your application will have access to the Streams install location at runtimen, then you can specify the full path to the location of the dps-helper.jar file present inside the DPS toolkit as follows:
+//1. If your application will have access to the Streams install location at runtime, then you can specify the full path to the location of the dps-helper.jar file present inside the DPS toolkit as follows:
 //@Libraries("@STREAMS_INSTALL@/toolkits/com.ibm.streamsx.dps/impl/java/lib/dps-helper.jar")
-//if that path will be accessible at runtime. 
+//if that path will be accessible at compile time and at runtime. 
 
-//2. Or, you can copy the dps-helper.jar from <STREAMS_INSTALL>/toolkits/com.ibm.streamsx.dps/impl/java/lib/dps-helper.jar into the impl/lib folder of this application and reference it as follows:
-@Libraries("impl/lib/dps-helper.jar")
-//we choose option 2, because the Makefile will copy the dps-helper from the toolkit location to impl/lib
+//2. Or, you can copy the dps-helper.jar either from the <STREAMS_INTSALL>/toolkits/com.ibm.streamsx.dps/impl/java/lib/dps-helper.jar or from a more recent version of the DPS toolkit directory into the impl/java/lib folder of this application and reference it as follows. You will have to create the lib sub-directory inside impl/java of this application before copying the jar file there. It is done in the Makefile of this example. If you choose this option, then you must ensure that the @Libraries shown above is commented out and the following one is uncommented.
+@Libraries("impl/java/lib/dps-helper.jar")
 
 // Add the following annotation if you are going to fuse this Java operator with other Java operators that will also use
 // the DPS APIs. In that case, it is necessary to add the following annotation so that the fused PE will use a shared class loader.

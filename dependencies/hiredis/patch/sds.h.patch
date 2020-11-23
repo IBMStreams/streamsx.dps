@@ -1,20 +1,19 @@
---- hiredis-0.13.3/sds.h.orig	2016-05-27 13:22:18.410499697 -0400
-+++ hiredis-0.13.3/sds.h	2016-05-27 13:37:08.880365569 -0400
-@@ -39,6 +39,9 @@
- #include "win32.h"
- #endif
+--- hiredis-1.0.0/sds.h.orig 2020-08-03 14:18:07.000000000 -0400
++++ hiredis-1.0.0/sds.h 2020-10-10 13:43:56.988507551 -0400
+@@ -44,6 +44,9 @@
+ #include <stdarg.h>
+ #include <stdint.h>
  
 +#ifdef __cplusplus
 +extern "C" {
 +#endif
  typedef char *sds;
  
- struct sdshdr {
-@@ -102,4 +105,9 @@
- sds sdsRemoveFreeSpace(sds s);
- size_t sdsAllocSize(sds s);
+ /* Note: sdshdr5 is never used, we just access the flags byte directly.
+@@ -275,4 +278,8 @@
+ int sdsTest(int argc, char *argv[]);
+ #endif
  
-+ 
 +#ifdef __cplusplus
 +}
 +#endif

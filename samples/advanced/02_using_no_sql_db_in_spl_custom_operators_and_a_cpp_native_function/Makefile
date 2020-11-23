@@ -22,7 +22,10 @@
 #                                                                  
 # end_generated_IBM_copyright_prolog                               
 
-DPS_TOOLKIT_HOME ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.dps
+# Since the DPS toolkit version you are using could be more
+# recent than the one in the IBM Streams installation directory,
+# you may want to ensure that the following DPS toolkit path is correct.
+DPS_TOOLKIT_HOME ?= $(HOME)/streamsx.dps/com.ibm.streamsx.dps
 
 # If the user wants to use a different version of
 # the DPS toolkit than the one shipped in the
@@ -30,9 +33,16 @@ DPS_TOOLKIT_HOME ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.dps
 # always set the STREAMS_SPLPATH environment variable
 # and point to a specific version of the DPS toolkit.
 ifndef STREAMS_SPLPATH
-   SPLC_FLAGS ?= -a -z -t $(DPS_TOOLKIT_HOME)
+   #SPLC_FLAGS ?= -a -z -t $(DPS_TOOLKIT_HOME)
+   SPLC_FLAGS ?= -a -z
+   # This example includes C++ native funtions that use DPS APIs as well.
+   # In order to build the C++ native functions with the correct .so files 
+   # present in the DPS toolkit's impl directory, it is necessary to
+   # export the following. This will get used inside the C++ native functions'
+   # impl/bin/archLevel file.
+   export STREAMS_SPLPATH=${DPS_TOOLKIT_HOME}
 else
-   SPLC_FLAGS ?= -a -z 
+   SPLC_FLAGS ?= -a -z
 endif
 
 SPLC = $(STREAMS_INSTALL)/bin/sc

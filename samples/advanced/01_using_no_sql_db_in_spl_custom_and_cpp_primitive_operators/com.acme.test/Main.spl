@@ -48,6 +48,10 @@ composite Main {
 	// Hence, each operator will be running as individual PEs (Processing Elements) so that
 	// we can verify whether the dps functions will work correctly across different PEs.	
 	graph
+                //This operator is required in order for the C++ operators to function properly.
+		() as DPSAux1 = DPSAux() {
+		}
+
 		// Let us kick-start our ride into the world of the distributed process store (dps).
 		stream<dummy_signal> StartSignal = Beacon() {
 			param

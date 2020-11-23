@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2014
+# Copyright IBM Corp. 2011, 2020
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -267,6 +267,7 @@ namespace distributed
     void* handle1 = NULL;
     void* handle2 = NULL;
     void* handle3 = NULL;
+    void* handle4 = NULL;
     bool libraryLoadingError = false;
     std::string  kvLibName =  "";
     std::string toolkitDir = ProcessingElement::pe().getToolkitDirectory("com.ibm.streamsx.dps")  + "/impl/ext/lib" ;
@@ -278,9 +279,15 @@ namespace distributed
 	} else if (noSqlKvStoreProductName.compare("redis") == 0) {
 		handle1 = load_dependent_lib(toolkitDir, "libuv.so");
 		handle2 = load_dependent_lib(toolkitDir, "libhiredis.so");
+                // Oct/12/2020 to support "TLS for redis". If the user configures the DPS toolkit to
+                // use "TLS for redis", then this additional .so file will take care of that need.
+                // On the IBM Streams application Linux machines, it is a must to install opensssl and
+                // and openssl-devel RPM packages. The following libhiredis_ssl.so file has a dependency on the
+                // /lib64/libssl.so and /lib64/libcrypto.so libraries that are part of openssl.
+		handle3 = load_dependent_lib(toolkitDir, "libhiredis_ssl.so");	
 		kvLibName= "libDPSRedis.so";
 
-		if (handle1 == NULL || handle2 == NULL) {
+		if (handle1 == NULL || handle2 == NULL || handle3 == NULL) {
 		   libraryLoadingError = true;
 		}
 	} else if (noSqlKvStoreProductName.compare("cassandra") == 0) {
@@ -344,6 +351,21 @@ namespace distributed
 		if (handle1 == NULL || handle2 == NULL) {
 		   libraryLoadingError = true;
 		}
+	} else if (noSqlKvStoreProductName.compare("redis-cluster-plus-plus") == 0) {
+		handle1 = load_dependent_lib(toolkitDir, "libuv.so");
+		handle2 = load_dependent_lib(toolkitDir,"libhiredis.so");
+                // Oct/12/2020 to support "TLS for redis". If the user configures the DPS toolkit to
+                // use "TLS for redis", then this additional .so file will take care of that need.
+                // On the IBM Streams application Linux machines, it is a must to install opensssl and
+                // and openssl-devel RPM packages. The following libhiredis_ssl.so file has a dependency on the
+                // /lib64/libssl.so and /lib64/libcrypto.so libraries that are part of openssl.
+		handle3 = load_dependent_lib(toolkitDir, "libhiredis_ssl.so");	
+		handle4 = load_dependent_lib(toolkitDir, "libredis++.so");
+		kvLibName= "libDPSRedisClusterPlusPlus.so";
+
+		if (handle1 == NULL || handle2 == NULL || handle3 == NULL || handle4 == NULL) {
+		   libraryLoadingError = true;
+		}
 	} else {
 		// Invalid no-sql store product name configured. Abort now.
                 // SPLAPPLOG is causing it to get stuck in RHEL6/CentOS6 (RHEL7/CentOS7 is fine) when the @catch annotation is used in the calling SPL code.
@@ -381,6 +403,11 @@ namespace distributed
 	         handle3 = NULL;
 	      }
 
+              if (handle4 != NULL) {
+                 dlclose(handle4);
+	         handle4 = NULL;
+	      }
+
               if (handle != NULL) {
                  dlclose(handle);
 	         handle = NULL;
@@ -416,6 +443,11 @@ namespace distributed
 	            handle3 = NULL;
 	         }
 
+                 if (handle4 != NULL) {
+                    dlclose(handle4);
+	            handle4 = NULL;
+	         }
+
                  if (handle != NULL) {
                     dlclose(handle);
 	            handle = NULL;
@@ -447,6 +479,11 @@ namespace distributed
       if (handle3 != NULL) {
          dlclose(handle3);
          handle3 = NULL;
+      }
+
+      if (handle4 != NULL) {
+         dlclose(handle4);
+	 handle4 = NULL;
       }
 
       if (handle != NULL) {

@@ -141,13 +141,15 @@ import com.ibm.streams.operator.types.*;
 description="Java Operator TickerIdGenerator")
 @InputPorts({@InputPortSet(description="Port that ingests tuples", cardinality=1, optional=false, windowingMode=WindowMode.NonWindowed, windowPunctuationInputMode=WindowPunctuationInputMode.Oblivious), @InputPortSet(description="Optional input ports", optional=true, windowingMode=WindowMode.NonWindowed, windowPunctuationInputMode=WindowPunctuationInputMode.Oblivious)})
 @OutputPorts({@OutputPortSet(description="Port that produces tuples", cardinality=1, optional=false, windowPunctuationOutputMode=WindowPunctuationOutputMode.Generating), @OutputPortSet(description="Optional output ports", optional=true, windowPunctuationOutputMode=WindowPunctuationOutputMode.Generating)})
+
 //Add the DPS toolkit's Java library (dps-helper.jar) to the path of this operator.
 //There are 2 ways to do this:
 //1. If your application will have access to the Streams install location at runtime, then you can specify the full path to the location of the dps-helper.jar file present inside the DPS toolkit as follows:
-@Libraries("@STREAMS_INSTALL@/toolkits/com.ibm.streamsx.dps/impl/java/lib/dps-helper.jar")
-//if that path will be accessible at runtime. 
-//2. Or, you can copy the dps-helper.jar from <STREAMS_INTSALL>/toolkits/com.ibm.streamsx.dps/impl/java/lib/dps-helper.jar into the lib folder of this application and reference it as follows:
-//@Libraries("lib/dps-helper.jar")
+//@Libraries("@STREAMS_INSTALL@/toolkits/com.ibm.streamsx.dps/impl/java/lib/dps-helper.jar")
+//if that path will be accessible at compile time and at runtime. 
+
+//2. Or, you can copy the dps-helper.jar either from the <STREAMS_INTSALL>/toolkits/com.ibm.streamsx.dps/impl/java/lib/dps-helper.jar or from a more recent version of the DPS toolkit directory into the impl/java/lib folder of this application and reference it as follows. You will have to create the lib sub-directory inside impl/java of this application before copying the jar file there. It is done in the Makefile of this example. If you choose this option, then you must ensure that the @Libraries shown above is commented out and the following one is uncommented.
+@Libraries("impl/java/lib/dps-helper.jar")
 
 // Add the following annotation if you are going to fuse this Java operator with other Java operators that will also use
 // the DPS APIs. In that case, it is necessary to add the following annotation so that the fused PE will use a shared class loader.
@@ -1530,7 +1532,8 @@ public class TickerIdGenerator extends AbstractOperator {
 		// command you are sending here.				
 		//
         if (dbProductName.equalsIgnoreCase("redis") == true ||
-    		dbProductName.equalsIgnoreCase("redis-cluster") == true) {
+    	    dbProductName.equalsIgnoreCase("redis-cluster") == true ||
+            dbProductName.equalsIgnoreCase("redis-cluster-plus-plus") == true) {
 			// Let us try some simple Redis native commands (one way calls that don't fetch anything from the DB)
 			// (You can't do get command using this technique. Similarly, no complex type keys or values.
 			//  In that case, please use the regular dps APIs.)
@@ -1567,6 +1570,16 @@ public class TickerIdGenerator extends AbstractOperator {
                 // a lot of Redis related work using this new API.
                 List<RString> myCmdList = new ArrayList<RString>();
                 String redisResult = "";
+                String hashTag = "";
+
+                // If it is Redis cluster, let us use hash tags when running commands that use multiple keys. This is needed to avoid the CROSSSLOT error.
+                // https://stackoverflow.com/questions/38042629/redis-cross-slot-error
+                // https://redis.io/topics/cluster-spec#keys-hash-tags
+                if(dbProductName.equalsIgnoreCase("redis-cluster") == true || dbProductName.equalsIgnoreCase("redis-cluster-plus-plus") == true) {
+                   hashTag = "{my_h_tag}";
+                } else {
+                   hashTag = "";
+                } 
                    
                 // Redis command: SETEX 'My Key 1' 60 'This is MyValue1 with some JSON. ..."
                 // From your Redis command, add the distinct parts into a List<RString>
@@ -1726,6 +1739,7 @@ public class TickerIdGenerator extends AbstractOperator {
                 myCmdList.clear();
                 redisResult = "";
                 myCmdList.add(new RString("PING"));
+                myCmdList.add(new RString("Hello New York"));
 
                 try {
                    redisResult = sf.runDataStoreCommand(myCmdList);
@@ -1739,15 +1753,15 @@ public class TickerIdGenerator extends AbstractOperator {
                 myCmdList.clear();
                 redisResult = "";
                 myCmdList.add(new RString("MSET"));
-                myCmdList.add(new RString("one"));
+                myCmdList.add(new RString(hashTag + "one"));
                 myCmdList.add(new RString("1"));
-                myCmdList.add(new RString("two"));
+                myCmdList.add(new RString(hashTag + "two"));
                 myCmdList.add(new RString("2"));
-                myCmdList.add(new RString("three"));
+                myCmdList.add(new RString(hashTag + "three"));
                 myCmdList.add(new RString("3"));
-                myCmdList.add(new RString("four"));
+                myCmdList.add(new RString(hashTag + "four"));
                 myCmdList.add(new RString("4"));
-                myCmdList.add(new RString("sixty two"));
+                myCmdList.add(new RString(hashTag + "sixty two"));
                 myCmdList.add(new RString("62"));
 
                 try {
@@ -1771,16 +1785,36 @@ public class TickerIdGenerator extends AbstractOperator {
                    System.out.println("Redis command Test13 [KEYS]-->runDataStoreCommand redisResult=" + sfe.getErrorCode() + ", msg=" + sfe.getErrorMessage());
                 }
 
+                // Redis command: MGET one two three four 'sixty two' 
+                // From your Redis command, add the distinct parts into a list<rstring>
+                myCmdList.clear();
+                redisResult = "";
+                myCmdList.add(new RString("MGET"));
+                myCmdList.add(new RString(hashTag + "one"));
+                myCmdList.add(new RString(hashTag + "two"));
+                myCmdList.add(new RString(hashTag + "three"));
+                myCmdList.add(new RString(hashTag + "four"));
+                // This is a non-existing key for which there will be no result returned.
+                myCmdList.add(new RString(hashTag + "five"));
+                myCmdList.add(new RString(hashTag + "sixty two"));
+
+                try {
+                   redisResult = sf.runDataStoreCommand(myCmdList);
+                   System.out.println("Redis command Test13b [MGET]-->runDataStoreCommand redisResult=" + redisResult);
+                } catch (StoreFactoryException sfe) {
+                   System.out.println("Redis command Test13b [MGET]-->runDataStoreCommand redisResult=" + sfe.getErrorCode() + ", msg=" + sfe.getErrorMessage());
+                }
+
                 // Redis command: DEL one two three four 'sixty two' 
                 // From your Redis command, add the distinct parts into a List<RString>
                 myCmdList.clear();
                 redisResult = "";
                 myCmdList.add(new RString("DEL"));
-                myCmdList.add(new RString("one"));
-                myCmdList.add(new RString("two"));
-                myCmdList.add(new RString("three"));
-                myCmdList.add(new RString("four"));
-                myCmdList.add(new RString("sixty two"));
+                myCmdList.add(new RString(hashTag + "one"));
+                myCmdList.add(new RString(hashTag + "two"));
+                myCmdList.add(new RString(hashTag + "three"));
+                myCmdList.add(new RString(hashTag + "four"));
+                myCmdList.add(new RString(hashTag + "sixty two"));
 
                 try {
                    redisResult = sf.runDataStoreCommand(myCmdList);

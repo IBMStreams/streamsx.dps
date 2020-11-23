@@ -22,7 +22,16 @@
 #                                                                  
 # end_generated_IBM_copyright_prolog                               
 
-DPS_TOOLKIT_HOME ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.dps
+# Since the DPS toolkit version you are using could be more
+# recent than the one in the IBM Streams installation directory,
+# you may want to ensure that the following DPS toolkit path is correct.
+#
+# This example includes a C++ operator that uses DPS APIs as well.
+# In order to build that C++ operator with the correct .so files 
+# present in the DPS toolkit's impl directory, it is necessary to
+# export the following. This will get used inside the C++ operator's
+# impl/bin/archLevel file.
+export DPS_TOOLKIT_HOME=$(HOME)/streamsx.dps/com.ibm.streamsx.dps
 
 SPLC_FLAGS ?= -a -t $(DPS_TOOLKIT_HOME)
 SPLC = $(STREAMS_INSTALL)/bin/sc

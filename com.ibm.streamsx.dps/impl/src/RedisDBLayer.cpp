@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2014
+# Copyright IBM Corp. 2011, 2020
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -71,13 +71,8 @@ It is important to note that a Streams application designer/developer should car
 of his/her application will access the store simultaneously i.e. who puts what, who gets what and at
 what frequency from where etc.
 
-This C++ project has a companion SPL project (058_data_sharing_between_non_fused_spl_custom_and_cpp_primitive_operators).
-Please refer to the commentary in that SPL project file for learning about the procedure to do an
-end-to-end test run involving the SPL code, serialization/deserialization code,
-redis interface code (this file), and your redis infrastructure.
-
-As a first step, you should run the ./mk script from the C++ project directory (DistributedProcessStoreLib).
-That will take care of building the .so file for the dps and copy it to the SPL project's impl/lib directory.
+There are simple and advanced examples included in the DPS toolkit to test all the features described in the previous
+paragraph.
 ==================================================================================================================
 */
 
@@ -107,6 +102,15 @@ That will take care of building the .so file for the dps and copy it to the SPL 
 #include <streams_boost/archive/iterators/transform_width.hpp>
 #include <streams_boost/archive/iterators/insert_linebreaks.hpp>
 #include <streams_boost/archive/iterators/remove_whitespace.hpp>
+#include <streams_boost/foreach.hpp>
+#include <streams_boost/tokenizer.hpp>
+// On the IBM Streams application Linux machines, it is a must to install opensssl and
+// and openssl-devel RPM packages. The following include files and the SSL custom
+// initialization logic below in this file will require openssl to be available.
+// In particular, we will use the /lib64/libssl.so and /lib64/libcrypto.so libraries 
+// that are part of openssl.
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 using namespace std;
 using namespace SPL;
@@ -150,325 +154,526 @@ namespace distributed
         
   void RedisDBLayer::connectToDatabase(std::set<std::string> const & dbServers, PersistenceError & dbError)
   {
-	  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase", "RedisDBLayer");
+     SPLAPPTRC(L_DEBUG, "Inside connectToDatabase", "RedisDBLayer");
+     // Get the name, OS version and CPU type of this machine.
+     struct utsname machineDetails;
 
-	  // Get the name, OS version and CPU type of this machine.
-	  struct utsname machineDetails;
+     if(uname(&machineDetails) < 0) {
+        dbError.set("Unable to get the machine/os/cpu details.", DPS_INITIALIZE_ERROR);
+        SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed to get the machine/os/cpu details. " << DPS_INITIALIZE_ERROR, "RedisDBLayer");
+        return;
+     } else {
+        nameOfThisMachine = string(machineDetails.nodename);
+        osVersionOfThisMachine = string(machineDetails.sysname) + string(" ") + string(machineDetails.release);
+        cpuTypeOfThisMachine = string(machineDetails.machine);
+     }
 
-	  if(uname(&machineDetails) < 0) {
-		  dbError.set("Unable to get the machine/os/cpu details.", DPS_INITIALIZE_ERROR);
-		  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed to get the machine/os/cpu details. " << DPS_INITIALIZE_ERROR, "RedisDBLayer");
-		  return;
-	  } else {
-		  nameOfThisMachine = string(machineDetails.nodename);
-		  osVersionOfThisMachine = string(machineDetails.sysname) + string(" ") + string(machineDetails.release);
-		  cpuTypeOfThisMachine = string(machineDetails.machine);
-	  }
+     string redisConnectionErrorMsg = "Unable to initialize the redis connection context.";
+     // Senthil added this block of code on May/02/2017.
+     // As part of the Redis configuration in the DPS config file, we now allow the user to specify
+     // an optional Redis authentication password as shown below.
+     // server:port:RedisPassword:ConnectionTimeoutValue:use_tls
+     string targetServerPassword = "";
+     string targetServerName = "";
+     int targetServerPort = 0;
+     int connectionTimeout = 0;
+     int useTls = -1;
+     int connectionAttemptCnt = 0;
 
-	  string redisConnectionErrorMsg = "Unable to initialize the redis connection context.";
-          // Senthil added this block of code on May/02/2017.
-          // As part of the Redis configuration in the DPS config file, we now allow the user to specify
-          // an optional Redis authentication password as shown below.
-          // server:port:RedisPassword
-          string targetServerPassword = "";
-	  string targetServerName = "";
-	  int targetServerPort = 0;
+     // Get the current thread id that is trying to make a connection to redis cluster.
+     int threadId = (int)gettid();
 
-	  // When the Redis cluster releases with support for the hiredis client, then change this logic to
-	  // take advantage of the Redis cluster features.
-	  //
-	  // If the user configured only one redis server, connect to it using unixsocket or TCP.
-	  // If the user configured multiple redis servers, then we are going to do the client side
-	  // partitioning. In that case, we will connect to all of them and get a separate handle
-	  // and store them in an array of structures.
-	  //
-	  if (dbServers.size() == 1) {
-		  // This means, no client side Redis partitioning.
-		  redisPartitionCnt = 0;
-		  // We have only one Redis server configured by the user.
-		  for (std::set<std::string>::iterator it=dbServers.begin(); it!=dbServers.end(); ++it) {
-			  std::string serverName = *it;
-			  // If the user has configured to use the unix domain socket, take care of that as well.
-			  if (serverName == "unixsocket") {
-				  redisPartitions[0].rdsc = redisConnectUnix((char *)"/tmp/redis.sock");
-			  } else {
-				  struct timeval timeout = { 1, 500000 }; // 1.5 seconds {tv_sec, tv_microsecs}
-	              // Redis server name can have port number specified along with it --> MyHost:2345
-	              char serverNameBuf[300];
-	              strcpy(serverNameBuf, serverName.c_str());
-	              char *ptr = strtok(serverNameBuf, ":");
+     // When the Redis cluster releases with support for the hiredis client, then change this logic to
+     // take advantage of the Redis cluster features.
+     //
+     // If the user configured only one redis server, connect to it using unixsocket or TCP.
+     // If the user configured multiple redis servers, then we are going to do the client side
+     // partitioning. In that case, we will connect to all of them and get a separate handle
+     // and store them in an array of structures.
+     //
+     if (dbServers.size() == 1) {
+        // This means, no client side Redis partitioning. In addition, we will optionally
+        // support "TLS for Redis" only when a single redis server is configured.
+        redisPartitionCnt = 0;
+        // We have only one Redis server configured by the user.
+        for (std::set<std::string>::iterator it=dbServers.begin(); it!=dbServers.end(); ++it) {
+           std::string serverName = *it;
+           // If the user has configured to use the unix domain socket, take care of that as well.
+           if (serverName == "unixsocket") {
+              redisPartitions[0].rdsc = redisConnectUnix((char *)"/tmp/redis.sock");
+           } else {
+              // Redis server name can have port number, password, connection timeout value and 
+              // use_tls=1 specified along with it --> MyHost:2345:xyz:5:use_tls
+              int32_t tokenCnt = 0;
+              // This technique to get the empty tokens while tokenizing a string is described in this URL:
+              // https://stackoverflow.com/questions/22331648/boosttokenizer-point-separated-but-also-keeping-empty-fields
+              typedef streams_boost::tokenizer<streams_boost::char_separator<char> > tokenizer;
+              streams_boost::char_separator<char> sep(
+                 ":", // dropped delimiters
+                 "",  // kept delimiters
+                 streams_boost::keep_empty_tokens); // empty token policy
 
-	              while(ptr) {
-	                if (targetServerName == "") {
-	                  // This must be our first token.
-	                  targetServerName = string(ptr);
-	                  ptr = strtok(NULL, ":");
-	                } else if (targetServerPort == 0){
-	                  // This must be our second token.
-	                  targetServerPort = atoi(ptr);
+              STREAMS_BOOST_FOREACH(std::string token, tokenizer(serverName, sep)) {
+                 tokenCnt++;
+
+                 if (tokenCnt == 1) {
+                    // This must be our first token.
+                    if (token != "") {
+                       targetServerName = token;
+                    }
+                 } else if (tokenCnt == 2){
+                    // This must be our second token.
+                    if (token != "") {
+                       targetServerPort = atoi(token.c_str());
+                    }
                           
-                          if (targetServerPort == 0) {
-                             targetServerPort = REDIS_SERVER_PORT;
-                          }
-
-	                  ptr = strtok(NULL, ":");
-	                } else if (targetServerPassword == "") {
-                          // This must be our third token.
-                          targetServerPassword = string(ptr);
-                          // We are done.
-                          break;
-                        }
-	              }
-
-	              if (targetServerName == "") {
-	                // User only specified the server name and no port.
-	            	// (This is the case of server name followed by a : character with a missing port number)
-	                targetServerName = serverName;
-	                // In this case, use the default Redis server port.
-	                targetServerPort = REDIS_SERVER_PORT;
-	              }
-
-	              if (targetServerPort == 0) {
-	                // User didn't give a Redis server port.
-	            	// Only a server name was given not followed by a : character.
-	                // Use the default Redis server port.
-	                targetServerPort = REDIS_SERVER_PORT;
-	              }
-
-	              redisPartitions[0].rdsc = redisConnectWithTimeout(targetServerName.c_str(), targetServerPort, timeout);
-			  }
-
-			  if (redisPartitions[0].rdsc == NULL || redisPartitions[0].rdsc->err) {
-				  if (redisPartitions[0].rdsc) {
-					  redisConnectionErrorMsg += " Connection error: " + string(redisPartitions[0].rdsc->errstr);
-				  }
-
-                                  cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
-			  } else {
-				  // We connected to at least one redis server. That is enough for our needs.
-                                  // If the user configured it with a Redis auth password, then we must authenticate now.
-                                  // If the authentication is successful, all good. If any error, Redis will send one of the
-                                  // following two errors:
-                                  // ERR invalid password  (OR) ERR Client sent AUTH, but no password is set
-                                  if (targetServerPassword.length() > 0) {
-	                             std::string cmd = string(REDIS_AUTH_CMD) + targetServerPassword;
-	                             redis_reply = (redisReply*)redisCommand(redisPartitions[0].rdsc, cmd.c_str());
-
-	                             // If we get a NULL reply, then it indicates a redis server connection error.
-	                             if (redis_reply == NULL) {
-		                        // When this error occurs, we can't reuse that redis context for further server commands. This is a serious error.
-                                        cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
-		                        dbError.set("Unable to authenticate to the redis server(s). Possible connection breakage. " + std::string(redisPartitions[0].rdsc->errstr), DPS_CONNECTION_ERROR);
-		                        SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication with an error " << string("Possible connection breakage. ") << DPS_CONNECTION_ERROR, "RedisDBLayer");
-		                        return;
-	                             }
-
-	                             if (redis_reply->type == REDIS_REPLY_ERROR) {
-                                        cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
-		                        dbError.set("Unable to authenticate to the Redis server. Error msg=" + std::string(redis_reply->str), DPS_AUTHENTICATION_ERROR);
-		                        SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication. error=" << redis_reply->str << ", rc=" << DPS_AUTHENTICATION_ERROR, "RedisDBLayer");
-		                        freeReplyObject(redis_reply);
-		                        return; 
-	                             }                                 
-
-                                     freeReplyObject(redis_reply);
-                                  } // End of Redis authentication.
-
-				  // Reset the error string.
-				  redisConnectionErrorMsg = "";
-                                  cout << "Successfully connected to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
-				  break;
-			  }
-		  }
-
-		  // Check if there was any connection error.
-		  if (redisConnectionErrorMsg != "") {
-			  if (redisPartitions[0].rdsc != NULL) {
-				  redisFree(redisPartitions[0].rdsc);
-				  redisPartitions[0].rdsc = NULL;
-			  }
-
-			  dbError.set(redisConnectionErrorMsg, DPS_INITIALIZE_ERROR);
-			  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" << redisConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisDBLayer");
-			  return;
-		  }
-	  } else {
-		  // We have more than one Redis server configured by the user.
-		  // In our dps toolkit, we allow only upto 50 servers. (It is just our own limit).
-		  if (dbServers.size() > 50) {
-			  redisConnectionErrorMsg += " Too many Redis servers configured. DPS toolkit supports only a maximum of 50 Redis servers.";
-			  dbError.set(redisConnectionErrorMsg, DPS_TOO_MANY_REDIS_SERVERS_CONFIGURED);
-			  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" << redisConnectionErrorMsg << "'. " << DPS_TOO_MANY_REDIS_SERVERS_CONFIGURED, "RedisDBLayer");
-			  return;
-		  }
-
-		  redisPartitionCnt = dbServers.size();
-		  int32_t idx = -1;
-		  // Now stay in a loop and connect to each of them.
-		  for (std::set<std::string>::iterator it=dbServers.begin(); it!=dbServers.end(); ++it) {
-			  std::string serverName = *it;
-			  struct timeval timeout = { 1, 500000 }; // 1.5 seconds {tv_sec, tv_microsecs}
-			  // In the case of client side Redis server partitioning, we expect the user to configure the ports of
-			  // their Redis servers starting from our REDIS_SERVER_PORT (base port number 6379) + 2 and go up by one for each new Redis server.
-			  idx++;
-
-              // Redis server name can have port number and password specified along with it --> MyHost:2345:MyPassword
-              targetServerName = "";
-              targetServerPort = 0;
-              targetServerPassword = "";
-              char serverNameBuf[300];
-              strcpy(serverNameBuf, serverName.c_str());
-              char *ptr = strtok(serverNameBuf, ":");
-
-              while(ptr) {
-	         if (targetServerName == "") {
-	            // This must be our first token.
-	            targetServerName = string(ptr);
-	            ptr = strtok(NULL, ":");
-	         } else if (targetServerPort == 0){
-	            // This must be our second token.
-	            targetServerPort = atoi(ptr);
-                          
-                    if (targetServerPort == 0) {
+                    if (targetServerPort <= 0) {
                        targetServerPort = REDIS_SERVER_PORT;
                     }
-
-	            ptr = strtok(NULL, ":");
-	         } else if (targetServerPassword == "") {
+                 } else if (tokenCnt == 3) {
                     // This must be our third token.
-                    targetServerPassword = string(ptr);
-                    // We are done.
-                    break;
+                    if (token != "") {
+                       targetServerPassword = token;
+                    }
+                 } else if (tokenCnt == 4) {
+                    // This must be our fourth token.
+                    if (token != "") {
+                       connectionTimeout = atoi(token.c_str());
+                    }
+
+                    if (connectionTimeout <= 0) {
+                       // Set it to a default of 3 seconds.
+                       connectionTimeout = 3;
+                    }
+                 } else if (tokenCnt == 5) {
+                    // This must be our fifth token.
+                    if (token != "") {
+                       useTls = atoi(token.c_str());
+                    }
+
+                    if (useTls < 0) {
+                       // Set it to a default of 0 i.e. no TLS needed.
+                       useTls = 0;
+                    }
+
+                    if (useTls > 0) {
+                       // Set it to 1 i.e. TLS needed.
+                       useTls = 1;
+                    }
+                 } // End of the long if-else block.
+              } // End of the Boost FOREACH loop.
+
+              if (targetServerName == "") {
+                 // User only specified the server name and no port.
+                 // (This is the case of server name followed by a : character with a missing port number)
+                 targetServerName = serverName;
+                 // In this case, use the default Redis server port.
+                 targetServerPort = REDIS_SERVER_PORT;
+              }
+
+              if (targetServerPort <= 0) {
+                 // User didn't give a Redis server port.
+                 // Only a server name was given not followed by a : character.
+                 // Use the default Redis server port.
+                 targetServerPort = REDIS_SERVER_PORT;
+              }
+
+              // Password is already set to empty string at the time of variable declaration.
+              // Because of that, we are good even if the redis configuration string has this field as blank.
+
+              if (connectionTimeout <= 0) {
+                 // User didn't configure a connectionTimeout field at all. So, set it to 3 seconds.
+                 connectionTimeout = 3;
+              }
+
+              if (useTls < 0) {
+                 // User didn't configure a useTls field at all, So, set it to 0 i.e. no TLS needed.
+                 useTls = 0;
+              }
+
+              // Use this line to test out the parsed tokens from the Redis configuration string.
+              string clusterPasswordUsage = "a";
+
+              if (targetServerPassword.length() <= 0) {
+                 clusterPasswordUsage = "no";
+              }
+
+              cout << connectionAttemptCnt << ") ThreadId=" << threadId << ". Attempting to connect to the Redis server " << targetServerName << " on port " << targetServerPort << " with " << clusterPasswordUsage << " password. " << "connectionTimeout=" << connectionTimeout << ", use_tls=" << useTls << "." << endl;
+
+              // Redis connection timeout structure format: {tv_sec, tv_microsecs}
+              struct timeval timeout = { connectionTimeout, 0 }; 
+              redisPartitions[0].rdsc = redisConnectWithTimeout(targetServerName.c_str(), targetServerPort, timeout);
+           } // End of if (serverName == "unixsocket") {
+
+           if (redisPartitions[0].rdsc == NULL || redisPartitions[0].rdsc->err) {
+              if (redisPartitions[0].rdsc) {
+                 redisConnectionErrorMsg += " Connection error: " + string(redisPartitions[0].rdsc->errstr);
+              }
+
+              cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << ". " << redisConnectionErrorMsg << endl;
+           } else {
+              // If the user has configured to use TLS, we must now establish the Redis server
+              // connection we made above to go over TLS. This has to be done before executing
+              // any Redis command including the password authentication command.
+              if (useTls == 1) {
+                 // In order NOT to do any client side peer verification, the new SSL feature in
+                 // hiredis library (as of Nov/2019) requires us to do the SSL context and
+                 // SSL (i.e. ssl_st) structure initialization on our own with the appropriate 
+                 // SSL peer verification flags.
+                 // hiredis SSL feature will always do the peer verification and hence we must
+                 // do the disabling of the peer verification on our own. In our case, the Streams DPS client 
+                 // application always trusts the remote Redis server running either in an on-prem environment or 
+                 // in the IBM Cloud Compose Redis or in the AWS Elasticache Redis. After all, the remote Redis service
+                 // instance is always created by the same entity i.e. customer team and it gets used by that same team.
+                 // So, in a trusted setup such as this, we can avoid the overhead involved in the peer verification that 
+                 // happens before the SSL connection establishment with the remote Redis service. In spite of disabling the 
+                 // peer verification at the DPS (hiredis) client side, data going back and forth 
+                 // between the client and the Redis server will always be encrypted which is 
+                 // what is more important than the peer verification done at the client side.
+                 // 
+                 // The following piece of SSL initialization code is from the following IBM Z URL:
+                 // https://www.ibm.com/support/knowledgecenter/en/SSB23S_1.1.0.13/gtps7/s5sple2.html
+                 //
+                 SSL_CTX *ssl_ctx;
+                 SSL *myssl;
+                                  
+                 SSL_library_init();
+                 SSL_load_error_strings();
+
+                 // Create a new SSL context block
+                 ssl_ctx=SSL_CTX_new(SSLv23_client_method());
+
+                 if (!ssl_ctx) {
+                    cout << "Unable to do SSL connection to the Redis server " << targetServerName << " on port " << targetServerPort << ", Error=SSL_CTX_new failed." << endl;
+                    dbError.set("Unable to do SSL connection to the redis server. Error=SSL_CTX_new failed." , DPS_CONNECTION_ERROR);
+                    SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during SSL connection with an error " << "'SSL_CTX_new failed'." << ", rc=" << DPS_CONNECTION_ERROR, "RedisDBLayer");
+                    return;                                        
+                 }
+
+                 // Disable the deprecated SSLv2 and SSLv3 protocols in favor of the TLS protocol that superseded SSL.
+                 SSL_CTX_set_options(ssl_ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+                 // Set for no peer/server verification.
+                 SSL_CTX_set_verify(ssl_ctx,SSL_VERIFY_NONE,NULL);
+
+                 // Create a new ssl object structure.
+                 myssl=SSL_new(ssl_ctx);
+
+                 if(!myssl) {
+                    cout << "Unable to do SSL connection to the Redis server " << targetServerName << " on port " << targetServerPort << ", Error=SSL_new failed." << endl;
+                    dbError.set("Unable to do SSL connection to the redis server. Error=SSL_new failed." , DPS_CONNECTION_ERROR);
+                    SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during SSL connection with an error " << "'SSL_new failed'." << ", rc=" << DPS_CONNECTION_ERROR, "RedisDBLayer");
+                    return;
+                 }
+                                  
+                 if (redisInitiateSSL(redisPartitions[0].rdsc, myssl) != REDIS_OK) {
+                    cout << "Unable to do SSL connection to the Redis server " << targetServerName << " on port " << targetServerPort << ", Error=" << std::string(redisPartitions[0].rdsc->errstr) << endl;
+                    dbError.set("Unable to do SSL connection to the redis server. " + std::string(redisPartitions[0].rdsc->errstr), DPS_CONNECTION_ERROR);
+                    SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during SSL connection with an error " << 
+                       std::string(redisPartitions[0].rdsc->errstr) << ", rc=" << DPS_CONNECTION_ERROR, "RedisDBLayer");
+                    return;                                        
+                 }
+              } // End of if (useTls == 1) 
+
+              // We connected to at least one redis server. That is enough for our needs.
+              // If the user configured it with a Redis auth password, then we must authenticate now.
+              // If the authentication is successful, all good. If any error, Redis will send one of the
+              // following two errors:
+              // ERR invalid password (OR) ERR Client sent AUTH, but no password is set
+              if (targetServerPassword.length() > 0) {
+                 std::string cmd = string(REDIS_AUTH_CMD) + targetServerPassword;
+                 redis_reply = (redisReply*)redisCommand(redisPartitions[0].rdsc, cmd.c_str());
+
+                 // If we get a NULL reply, then it indicates a redis server connection error.
+                 if (redis_reply == NULL) {
+                    // When this error occurs, we can't reuse that redis context for further server commands. This is a serious error.
+                    cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
+                    dbError.set("Unable to authenticate to the redis server(s). Possible connection breakage. " + std::string(redisPartitions[0].rdsc->errstr), DPS_CONNECTION_ERROR);
+                    SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication with an error " << string("Possible connection breakage. ") << DPS_CONNECTION_ERROR, "RedisDBLayer");
+                    return;
+                 }
+
+                 if (redis_reply->type == REDIS_REPLY_ERROR) {
+                    cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
+                    dbError.set("Unable to authenticate to the Redis server. Error msg=" + std::string(redis_reply->str), DPS_AUTHENTICATION_ERROR);
+                    SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication. error=" << redis_reply->str << ", rc=" << DPS_AUTHENTICATION_ERROR, "RedisDBLayer");
+                    freeReplyObject(redis_reply);
+                    return; 
+                 }                                 
+
+                 freeReplyObject(redis_reply);
+              } // End of Redis authentication.
+
+              // Reset the error string.
+              redisConnectionErrorMsg = "";
+              cout << "Successfully connected to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
+              break;
+           } // End of else block within which connection to single Redis server is done.
+        } // Outer for loop that iterates over just a single Redis server.
+
+        // Check if there was any connection error.
+        if (redisConnectionErrorMsg != "") {
+           if (redisPartitions[0].rdsc != NULL) {
+              redisFree(redisPartitions[0].rdsc);
+              redisPartitions[0].rdsc = NULL;
+           }
+
+           dbError.set(redisConnectionErrorMsg, DPS_INITIALIZE_ERROR);
+           SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" << redisConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisDBLayer");
+           return;
+        }
+     } else {
+        // We have more than one Redis server configured by the user.
+        // In our dps toolkit, we allow only upto 50 servers. (It is just our own limit).
+        // Please note that TLS is not allowed in a multi-server non-cluster Redis config.
+        // Because, IBM Cloud, AWS etc. will allow only one server for Redis non-cluster. 
+        // For on-prem (roll your own), DPS toolkit allows grouping multiple 
+        // non-cluster Redis servers to do its own sharding. In that special
+        // configuration, we will not support TLS.    
+        if (dbServers.size() > 50) {
+           redisConnectionErrorMsg += " Too many Redis servers configured. DPS toolkit supports only a maximum of 50 Redis servers.";
+           dbError.set(redisConnectionErrorMsg, DPS_TOO_MANY_REDIS_SERVERS_CONFIGURED);
+           SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" << redisConnectionErrorMsg << "'. " << DPS_TOO_MANY_REDIS_SERVERS_CONFIGURED, "RedisDBLayer");
+           return;
+        }
+
+        redisPartitionCnt = dbServers.size();
+        int32_t idx = -1;
+        // Now stay in a loop and connect to each of them.
+        for (std::set<std::string>::iterator it=dbServers.begin(); it!=dbServers.end(); ++it) {
+           std::string serverName = *it;
+           // In the case of client side Redis server partitioning, we expect the user to configure the ports of
+           // their Redis servers starting from our REDIS_SERVER_PORT (base port number 6379) + 2 and go up by one for each new Redis server.
+           idx++;
+
+           // Redis server name can have port number, password and other things specified along with it.
+           // server:port:RedisPassword:ConnectionTimeoutValue:use_tls
+           string targetServerPassword = "";
+           string targetServerName = "";
+           int targetServerPort = 0;
+           int connectionTimeout = 0;
+           // TLS makes sense only when a single non-cluster redis server is configured (e-g: IBM Compose Redis server or AWS Elasticache Redis server or an on-prem single server non-cluster Redis).
+           // When the user configures multiple Redis servers, it is not practical to do TLS on all of them. 
+           // In the case of multi-server Redis configuration, user can ignore the useTls configuration field.
+           // Even if user specifies something for that field, we will ignore it in the logic below.
+           int useTls = -1;
+
+           // Redis server name can have port number, password, connection timeout value and 
+           // use_tls=1 specified along with it --> MyHost:2345:xyz:5:use_tls
+           int32_t tokenCnt = 0;
+
+           // This technique to get the empty tokens while tokenizing a string is described in this URL:
+           // https://stackoverflow.com/questions/22331648/boosttokenizer-point-separated-but-also-keeping-empty-fields
+           //
+           typedef streams_boost::tokenizer<streams_boost::char_separator<char> > tokenizer;
+           streams_boost::char_separator<char> sep(
+              ":", // dropped delimiters
+              "",  // kept delimiters
+              streams_boost::keep_empty_tokens); // empty token policy
+
+           STREAMS_BOOST_FOREACH(std::string token, tokenizer(serverName, sep)) {
+              tokenCnt++;
+
+              if (tokenCnt == 1) {
+                 // This must be our first token.
+                 if (token != "") {
+                    targetServerName = token;
+                 }
+              } else if (tokenCnt == 2){
+                 // This must be our second token.
+                 if (token != "") {
+                    targetServerPort = atoi(token.c_str());
+                 }
+                          
+                 if (targetServerPort <= 0) {
+                    targetServerPort = REDIS_SERVER_PORT;
+                 }
+              } else if (tokenCnt == 3) {
+                 // This must be our third token.
+                 if (token != "") {
+                    targetServerPassword = token;
+                 }
+              } else if (tokenCnt == 4) {
+                 // This must be our fourth token.
+                 if (token != "") {
+                    connectionTimeout = atoi(token.c_str());
+                 }
+
+                 if (connectionTimeout <= 0) {
+                    // Set it to a default of 3 seconds.
+                    connectionTimeout = 3;
+                 }
+              } else if (tokenCnt == 5) {
+                 // This must be our fifth token.
+                 if (token != "") {
+                    useTls = atoi(token.c_str());
+                 }
+
+                 if (useTls < 0) {
+                    // Set it to a default of 0 i.e. no TLS needed.
+                    useTls = 0;
+                 }
+
+                 if (useTls > 0) {
+                    // Set it to 1 i.e. TLS needed.
+                    useTls = 1;
+                 }
+              } // End of the long if-else block.
+           } // End of the Boost FOREACH loop.
+
+           if (targetServerName == "") {
+              // User only specified the server name and no port.
+              // (This is the case of server name followed by a : character with a missing port number)
+              targetServerName = serverName;
+              // In this case, use the default Redis server port.
+              targetServerPort = REDIS_SERVER_PORT;
+           }
+
+           if (targetServerPort <= 0) {
+              // User didn't give a Redis server port.
+              // Only a server name was given not followed by a : character.
+              // Use the default Redis server port.
+              targetServerPort = REDIS_SERVER_PORT;
+           }
+
+           // Password is already set to empty string at the time of variable declaration.
+           // Because of that, we are good even if the redis configuration string has this field as blank.
+
+           if (connectionTimeout <= 0) {
+              // User didn't configure a connectionTimeout field at all. So, set it to 3 seconds.
+              connectionTimeout = 3;
+           }
+
+           // As noted in the commentary above, useTls is not applicable in a multi-server
+           // Redis configuration as it is not practical to do TLS for all of them.
+           // TLS makes sense only for a cloud service or on-prem based single Redis server.
+           // So, the useTls field will get ignored in the connection logic below.
+           if (useTls < 0) {
+              // User didn't configure a useTls field at all, So, set it to 0 i.e. no TLS needed.
+              useTls = 0;
+           }
+
+           // Use this line to test out the parsed tokens from the Redis configuration string.
+           string clusterPasswordUsage = "a";
+
+           if (targetServerPassword.length() <= 0) {
+              clusterPasswordUsage = "no";
+           }
+
+           cout << connectionAttemptCnt << ") ThreadId=" << threadId << ". Attempting to connect to the Redis serve " << targetServerName << " on port " << targetServerPort << " with " << clusterPasswordUsage << " password. " << "connectionTimeout=" << connectionTimeout << ", use_tls=" << useTls << "." << endl;
+
+           // Redis connection timeout structure format: {tv_sec, tv_microsecs}
+           struct timeval timeout = { connectionTimeout, 0 };
+           redisPartitions[idx].rdsc = redisConnectWithTimeout(targetServerName.c_str(), targetServerPort, timeout);
+
+           if (redisPartitions[idx].rdsc == NULL || redisPartitions[idx].rdsc->err) {
+              if (redisPartitions[idx].rdsc) {
+                 char serverNumber[50];
+                 sprintf(serverNumber, "%d", idx+1);
+                 redisConnectionErrorMsg += " Connection error for Redis server " + serverName + ". Error="  + string(redisPartitions[idx].rdsc->errstr);
+              }
+
+              // Since we got a connection error on one of the servers, let us disconnect from the servers that we successfully connected to so far.
+              // Loop backwards.
+              for(int32_t cnt=idx; cnt >=0; cnt--) {
+                 if (redisPartitions[cnt].rdsc != NULL) {
+                    redisFree(redisPartitions[cnt].rdsc);
+                    redisPartitions[cnt].rdsc = NULL;
                  }
               }
 
-              if (targetServerName == "") {
-                // User only specified the server name and no port.
-            	// (This is the case of server name followed by a : character with a missing port number)
-                targetServerName = serverName;
-                // In this case, use the default Redis server port.
-                targetServerPort = REDIS_SERVER_PORT;
+              cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
+              dbError.set(redisConnectionErrorMsg, DPS_INITIALIZE_ERROR);
+              SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" << redisConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisDBLayer");
+              return;
+           }
+
+           // If the user configured it with a Redis auth password, then we must authenticate now.
+           if (targetServerPassword.length() > 0) {
+              std::string cmd = string(REDIS_AUTH_CMD) + targetServerPassword;
+              redis_reply = (redisReply*)redisCommand(redisPartitions[idx].rdsc, cmd.c_str());
+
+              // If we get a NULL reply, then it indicates a redis server connection error.
+              if (redis_reply == NULL) {
+                 // When this error occurs, we can't reuse that redis context for further server commands. This is a serious error.
+                 cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
+                 dbError.set("Unable to authenticate to the redis server(s). Possible connection breakage. " + std::string(redisPartitions[idx].rdsc->errstr), DPS_CONNECTION_ERROR);
+                 SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication with an error " << string("Possible connection breakage. ") << DPS_CONNECTION_ERROR, "RedisDBLayer");
+
+                 // Since we got a connection error on one of the servers, let us disconnect from the servers that we successfully connected to so far.
+                 // Loop backwards.
+                 for(int32_t cnt=idx; cnt >=0; cnt--) {
+                    if (redisPartitions[cnt].rdsc != NULL) {
+                       redisFree(redisPartitions[cnt].rdsc);
+                       redisPartitions[cnt].rdsc = NULL;
+                    }
+                 }
+
+                 return;
               }
 
-              if (targetServerPort == 0) {
-                // User didn't give a Redis server port.
-            	// Only a server name was given not followed by a : character.
-                // Use the default Redis server port.
-                targetServerPort = REDIS_SERVER_PORT;
-              }
+              if (redis_reply->type == REDIS_REPLY_ERROR) {
+                 cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
+                 dbError.set("Unable to authenticate to the Redis server. Error msg=" + std::string(redis_reply->str), DPS_AUTHENTICATION_ERROR);
+                 SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication. error=" << redis_reply->str << ", rc=" << DPS_AUTHENTICATION_ERROR, "RedisDBLayer");
 
-			  redisPartitions[idx].rdsc = redisConnectWithTimeout(targetServerName.c_str(), targetServerPort, timeout);
+                 // Since we got an authentication error on one of the servers, let us disconnect from the servers that we successfully connected to so far.
+                 // Loop backwards.
+                 for(int32_t cnt=idx; cnt >=0; cnt--) {
+                    if (redisPartitions[cnt].rdsc != NULL) {
+                       redisFree(redisPartitions[cnt].rdsc);
+                       redisPartitions[cnt].rdsc = NULL;
+                    }
+                 }
 
-			  if (redisPartitions[idx].rdsc == NULL || redisPartitions[idx].rdsc->err) {
-				  if (redisPartitions[idx].rdsc) {
-					  char serverNumber[50];
-					  sprintf(serverNumber, "%d", idx+1);
-					  redisConnectionErrorMsg += " Connection error for Redis server " + serverName + ". Error="  + string(redisPartitions[idx].rdsc->errstr);
-				  }
+                 freeReplyObject(redis_reply);
+                 return; 
+              }                                 
 
-				  // Since we got a connection error on one of the servers, let us disconnect from the servers that we successfully connected to so far.
-				  // Loop backwards.
-				  for(int32_t cnt=idx; cnt >=0; cnt--) {
-					  if (redisPartitions[cnt].rdsc != NULL) {
-						  redisFree(redisPartitions[cnt].rdsc);
-						  redisPartitions[cnt].rdsc = NULL;
-					  }
-				  }
+              freeReplyObject(redis_reply);
+           } // End of Redis authentication.
 
-                                  cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
-				  dbError.set(redisConnectionErrorMsg, DPS_INITIALIZE_ERROR);
-				  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error '" << redisConnectionErrorMsg << "'. " << DPS_INITIALIZE_ERROR, "RedisDBLayer");
-				  return;
-			  }
+           cout << "Successfully connected to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
+        } // End of for loop.
+     } // End of the else block that connects to multiple non-cluster Redis servers.
 
-                          // If the user configured it with a Redis auth password, then we must authenticate now.
-                          if (targetServerPassword.length() > 0) {
-	                     std::string cmd = string(REDIS_AUTH_CMD) + targetServerPassword;
-	                     redis_reply = (redisReply*)redisCommand(redisPartitions[idx].rdsc, cmd.c_str());
+     // We have now made connection to one or more servers in a redis cluster.
+     // Let us check if the global storeId key:value pair is already there in the cache.
+     string keyString = string(DPS_AND_DL_GUID_KEY);
+     int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
+     std::string cmd = string(REDIS_EXISTS_CMD) + keyString;
+     redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 
-	                     // If we get a NULL reply, then it indicates a redis server connection error.
-	                     if (redis_reply == NULL) {
-		                // When this error occurs, we can't reuse that redis context for further server commands. This is a serious error.
-                                cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
-		                dbError.set("Unable to authenticate to the redis server(s). Possible connection breakage. " + std::string(redisPartitions[idx].rdsc->errstr), DPS_CONNECTION_ERROR);
-		                SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication with an error " << string("Possible connection breakage. ") << DPS_CONNECTION_ERROR, "RedisDBLayer");
+     // If we get a NULL reply, then it indicates a redis server connection error.
+     if (redis_reply == NULL) {
+        // This is how we can detect that a wrong redis server name is configured by the user or
+        // not even a single redis server daemon being up and running.
+        // On such errors, redis context will carry an error string.
+        // When this error occurs, we can't reuse that redis context for further server commands. This is a serious error.
+        dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+        SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+        return;
+     }
 
-				// Since we got a connection error on one of the servers, let us disconnect from the servers that we successfully connected to so far.
-				// Loop backwards.
-				for(int32_t cnt=idx; cnt >=0; cnt--) {
-			           if (redisPartitions[cnt].rdsc != NULL) {
-				      redisFree(redisPartitions[cnt].rdsc);
-				      redisPartitions[cnt].rdsc = NULL;
-				   }
-				}
+     if (redis_reply->type == REDIS_REPLY_ERROR) {
+        dbError.set("Unable to check the existence of the dps GUID key. Error=" + string(redis_reply->str), DPS_KEY_EXISTENCE_CHECK_ERROR);
+        SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed. Error=" << string(redis_reply->str) << ", rc=" << DPS_KEY_EXISTENCE_CHECK_ERROR, "RedisDBLayer");
+        freeReplyObject(redis_reply);
+        return;
+     }
 
-		                return;
-	                     }
+     if (redis_reply->integer == (int)0) {
+        // It could be that our global store id is not there now.
+        // Let us create one with an initial value of 0.
+        // Redis setnx is an atomic operation. It will succeed only for the very first operator that
+        // attempts to do this setting after a redis server is started fresh. If some other operator
+        // already raced us ahead and created this guid_key, then our attempt below will be safely rejected.
+        freeReplyObject(redis_reply);
+        cmd = string(REDIS_SETNX_CMD) + keyString + string(" ") + string("0");
+        redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+     }
 
-	                     if (redis_reply->type == REDIS_REPLY_ERROR) {
-                                cout << "Unable to connect to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
-		                dbError.set("Unable to authenticate to the Redis server. Error msg=" + std::string(redis_reply->str), DPS_AUTHENTICATION_ERROR);
-		                SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed during authentication. error=" << redis_reply->str << ", rc=" << DPS_AUTHENTICATION_ERROR, "RedisDBLayer");
-
-				// Since we got an authentication error on one of the servers, let us disconnect from the servers that we successfully connected to so far.
-				// Loop backwards.
-				for(int32_t cnt=idx; cnt >=0; cnt--) {
-			           if (redisPartitions[cnt].rdsc != NULL) {
-				      redisFree(redisPartitions[cnt].rdsc);
-				      redisPartitions[cnt].rdsc = NULL;
-				   }
-				}
-
-
-		                freeReplyObject(redis_reply);
-		                return; 
-	                     }                                 
-
-                             freeReplyObject(redis_reply);
-                          } // End of Redis authentication.
-
-                          cout << "Successfully connected to the Redis server " << targetServerName << " on port " << targetServerPort << endl;
-		  } // End of for loop.
-	  }
-
-	  // We have now made connection to one or more servers in a redis cluster.
-	  // Let us check if the global storeId key:value pair is already there in the cache.
-	  string keyString = string(DPS_AND_DL_GUID_KEY);
-	  int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
-	  std::string cmd = string(REDIS_EXISTS_CMD) + keyString;
-	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-
-	  // If we get a NULL reply, then it indicates a redis server connection error.
-	  if (redis_reply == NULL) {
-		// This is how we can detect that a wrong redis server name is configured by the user or
-		// not even a single redis server daemon being up and running.
-		// On such errors, redis context will carry an error string.
-		// When this error occurs, we can't reuse that redis context for further server commands. This is a serious error.
-		dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
-		SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed with an error " << DPS_CONNECTION_ERROR, "RedisDBLayer");
-		return;
-	  }
-
-	  if (redis_reply->type == REDIS_REPLY_ERROR) {
-		  dbError.set("Unable to check the existence of the dps GUID key. Error=" + string(redis_reply->str), DPS_KEY_EXISTENCE_CHECK_ERROR);
-		  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase, it failed. Error=" << string(redis_reply->str) << ", rc=" << DPS_KEY_EXISTENCE_CHECK_ERROR, "RedisDBLayer");
-		  freeReplyObject(redis_reply);
-		  return;
-	  }
-
-	  if (redis_reply->integer == (int)0) {
-		  // It could be that our global store id is not there now.
-		  // Let us create one with an initial value of 0.
-		  // Redis setnx is an atomic operation. It will succeed only for the very first operator that
-		  // attempts to do this setting after a redis server is started fresh. If some other operator
-		  // already raced us ahead and created this guid_key, then our attempt below will be safely rejected.
-		  freeReplyObject(redis_reply);
-		  cmd = string(REDIS_SETNX_CMD) + keyString + string(" ") + string("0");
-		  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-	  }
-
-	  freeReplyObject(redis_reply);
-	  SPLAPPTRC(L_DEBUG, "Inside connectToDatabase done", "RedisDBLayer");
+     freeReplyObject(redis_reply);
+     SPLAPPTRC(L_DEBUG, "Inside connectToDatabase done", "RedisDBLayer");
   }
 
   uint64_t RedisDBLayer::createStore(std::string const & name,

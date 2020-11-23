@@ -22,10 +22,11 @@ AERO_OBJ =
 AERO_LIB =
 COUCH_OBJ =  CouchbaseDBLayer.o
 REDIS_CLUSTER_OBJ = RedisClusterDBLayer.o
-      
-          
+REDIS_CLUSTER_PLUS_PLUS_OBJ = RedisClusterPlusPlusDBLayer.o
+
 REDIS_LIB = $(LIB)/libDPSRedis.so
 REDIS_CLUSTER_LIB = $(LIB)/libDPSRedisCluster.so
+REDIS_CLUSTER_PLUS_PLUS_LIB = $(LIB)/libDPSRedisClusterPlusPlus.so
 COUCH_LIB = $(LIB)/libDPSCouchbase.so
 HBASE_LIB = $(LIB)/libDPSHBase.so
 CASSANDRA_LIB = $(LIB)/libDPSCassandra.so
@@ -34,6 +35,7 @@ MONGO_LIB = $(LIB)/libDPSMongo.so
 MEMCACHED_LIB = $(LIB)/libDPSMemcached.so
 
 HELPER_LIBS = $(REDIS_CLUSTER_LIB)
+HELPER_LIBS += $(REDIS_CLUSTER_PLUS_PLUS_LIB)
 HELPER_LIBS += $(COUCH_LIB)
 HELPER_LIBS += $(REDIS_LIB)
 HELPER_LIBS += $(HBASE_LIB)
@@ -58,7 +60,7 @@ SPL_COMPILE_OPTIONS = $(shell $(SPL_PKGCFG) --cflags $(SPL_PKG))
 SPL_LINK_OPTIONS = $(shell $(SPL_PKGCFG) --libs $(SPL_PKG))
 
 CPPFLAGS = 
-CPPFLAGS += -O3 -Wall -c -fmessage-length=0 -fPIC -D_REENTRANT
+CPPFLAGS += -O3 -Wall -c -fmessage-length=0 -fPIC -D_REENTRANT 
 CPPFLAGS += -I include
 CPPFLAGS += -I nl/include
 CPPFLAGS += -isystem ext/include
@@ -91,7 +93,7 @@ all: check-streams $(DISTRIBUTED_PROCESS_STORE_LIB_STATIC) $(DISTRIBUTED_PROCESS
 check-streams:
 	@echo "Checking to see if STREAMS_INSTALL is set..."
 	test -d $(STREAMS_INSTALL) || false
- 
+
 $(DISTRIBUTED_PROCESS_STORE_LIB): $(DISTRIBUTED_PROCESS_STORE_OBJS)
 	mkdir -p $(LIB)
 	$(CXX) $(LDFLAGS) -o $@ $^
@@ -108,15 +110,20 @@ $(DISTRIBUTED_PROCESS_STORE_LIB_STATIC): $(DISTRIBUTED_PROCESS_STORE_OBJS)
 $(COUCH_LIB): $(COUCH_OBJ)
 	mkdir -p $(LIB)
 	$(CXX) $(LDFLAGS) -o $@ $^
-	
+
 $(REDIS_LIB): $(REDIS_OBJ)
 	mkdir -p $(LIB)
 	$(CXX) $(LDFLAGS) -o $@ $^
-	
+
 $(REDIS_CLUSTER_LIB): $(REDIS_CLUSTER_OBJ)
 	mkdir -p $(LIB)
 	$(CXX) $(LDFLAGS) -o $@ $^
-		
+
+$(REDIS_CLUSTER_PLUS_PLUS_LIB): CPPFLAGS+=-std=c++11
+$(REDIS_CLUSTER_PLUS_PLUS_LIB): $(REDIS_CLUSTER_PLUS_PLUS_OBJ)
+	mkdir -p $(LIB)
+	$(CXX) $(LDFLAGS) -o $@ $^
+
 $(HBASE_LIB): $(HBASE_OBJ)
 	mkdir -p $(LIB)
 	$(CXX) $(LDFLAGS) -o $@ $^
@@ -124,11 +131,11 @@ $(HBASE_LIB): $(HBASE_OBJ)
 $(CASSANDRA_LIB): $(CASSANDRA_OBJ)
 	mkdir -p $(LIB)
 	$(CXX) $(LDFLAGS) -o $@ $^
-	
+
 $(CLOUDANT_LIB): $(CLOUDANT_OBJ)
 	mkdir -p $(LIB)
 	$(CXX) $(LDFLAGS) -o $@ $^
-	
+
 $(MONGO_LIB): $(MONGO_OBJ)
 	mkdir -p $(LIB)
 	$(CXX) $(LDFLAGS) -o $@ $^
@@ -136,12 +143,13 @@ $(MONGO_LIB): $(MONGO_OBJ)
 $(MEMCACHED_LIB): $(MEMCACHED_OBJ)
 	mkdir -p $(LIB)
 	$(CXX) $(LDFLAGS) -o $@ $^
-	
+
 clean:
 	rm -f $(DISTRIBUTED_PROCESS_STORE_OBJS) 
 	rm -f $(DISTRIBUTED_PROCESS_STORE_LIB) 
 	rm -f $(REDIS_LIB) $(REDIS_OBJ)
 	rm -f $(REDIS_CLUSTER_LIB) $(REDIS_CLUSTER_OBJ)
+	rm -f $(REDIS_CLUSTER_PLUS_PLUS_LIB) $(REDIS_CLUSTER_PLUS_PLUS_OBJ)
 	rm -f $(MEMCACHED_LIB) $(MEMCACHED_OBJ)
 	rm -f $(CLOUDANT_LIB) $(CLOUDANT_OBJ)
 	rm -f $(CASSANDRA_LIB) $(CASSANDRA_OBJ)

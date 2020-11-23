@@ -1,6 +1,6 @@
 /*
  *  Licensed Materials - Property of IBM
- *  Copyright IBM Corp. 2011, 2016
+ *  Copyright IBM Corp. 2011, 2020
  *  US Government Users Restricted Rights - Use, duplication or
  *  disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
 */
@@ -2037,6 +2037,7 @@ composite RunNativeDataStoreCommands() {
 					mutable rstring cmd = "";
 					mutable uint64 err = 0ul;
 					mutable boolean res = true;
+                                        mutable rstring hashTag = "";
 					rstring dbProductName = dpsGetNoSqlDbProductName();
 									
 					if (dbProductName == "memcached" || dbProductName == "mongo" ||
@@ -2058,8 +2059,18 @@ composite RunNativeDataStoreCommands() {
 					// We will simply take your command string and run it. So, be sure of what
 					// command you are sending here.				
 					//					
-					if (dbProductName == "redis" || dbProductName == "redis-cluster") {
+					if (dbProductName == "redis" || dbProductName == "redis-cluster" || dbProductName == "redis-cluster-plus-plus") {
 						printStringLn("=== Start of the native data store command execution using Redis ===");
+
+                                                // If it is Redis cluster, let us use hash tags when running commands that use multiple keys. This is needed to avoid the CROSSSLOT error.
+                                                // https://stackoverflow.com/questions/38042629/redis-cross-slot-error
+                                                // https://redis.io/topics/cluster-spec#keys-hash-tags
+                                                if(dbProductName == "redis-cluster" || dbProductName == "redis-cluster-plus-plus") {
+                                                   hashTag = "{my_h_tag}";
+                                                } else {
+                                                   hashTag = "";
+                                                }
+
 						// Let us try some simple Redis native commands (one way calls that don't fetch anything from the DB)
 						// (You can't do get command using this technique. Similarly, no complex type keys or values.
 						//  In that case, please use the regular dps APIs.)
@@ -2269,6 +2280,7 @@ composite RunNativeDataStoreCommands() {
                                                 clearM(myCmdList);
                                                 redisResult = "";
                                                 appendM(myCmdList, "PING");
+                                                appendM(myCmdList, "Hello New York");
                    
                                                 myFlag = dpsRunDataStoreCommand(myCmdList, redisResult, err);
 
@@ -2279,19 +2291,20 @@ composite RunNativeDataStoreCommands() {
                                                 }
 
                                                 // Redis command: MSET one 1 two 2 three 3 four 4 'sixty two' 62 
-                                                // From your Redis command, add the distinct parts into a list<rstring>
+                                                // From your Redis command, add the distinct parts into a list<rstring>                                                
+                                                
                                                 clearM(myCmdList);
                                                 redisResult = "";
                                                 appendM(myCmdList, "MSET");
-                                                appendM(myCmdList, "one");
+                                                appendM(myCmdList, hashTag + "one");
                                                 appendM(myCmdList, "1");
-                                                appendM(myCmdList, "two");
+                                                appendM(myCmdList, hashTag + "two");
                                                 appendM(myCmdList, "2");
-                                                appendM(myCmdList, "three");
+                                                appendM(myCmdList, hashTag + "three");
                                                 appendM(myCmdList, "3");
-                                                appendM(myCmdList, "four");
+                                                appendM(myCmdList, hashTag + "four");
                                                 appendM(myCmdList, "4");
-                                                appendM(myCmdList, "sixty two");
+                                                appendM(myCmdList, hashTag + "sixty two");
                                                 appendM(myCmdList, "62");
                    
                                                 myFlag = dpsRunDataStoreCommand(myCmdList, redisResult, err);
@@ -2317,16 +2330,37 @@ composite RunNativeDataStoreCommands() {
                                                    printStringLn("Redis command Test13 [KEYS]-->dpsRunDataStoreCommand resultValue=" + (rstring)redisResult); 
                                                 }
 
+                                                // Redis command: MGET one two three four 'sixty two' 
+                                                // From your Redis command, add the distinct parts into a list<rstring>
+                                                clearM(myCmdList);
+                                                redisResult = "";
+                                                appendM(myCmdList, "MGET");
+                                                appendM(myCmdList, hashTag + "one");
+                                                appendM(myCmdList, hashTag + "two");
+                                                appendM(myCmdList, hashTag + "three");
+                                                appendM(myCmdList, hashTag + "four");
+                                                // This is a non-existing key for which there will be no result returned.
+                                                appendM(myCmdList, hashTag + "five");
+                                                appendM(myCmdList, hashTag + "sixty two");
+                   
+                                                myFlag = dpsRunDataStoreCommand(myCmdList, redisResult, err);
+
+                                                if (err != 0ul) {
+                                                   printStringLn("Redis command Test13b [MGET]-->dpsRunDataStoreCommand rc=" + (rstring)dpsGetLastStoreErrorCode() + ", msg=" + dpsGetLastStoreErrorString());
+                                                } else {
+                                                   printStringLn("Redis command Test13b [MGET]-->dpsRunDataStoreCommand resultValue=" + (rstring)redisResult); 
+                                                }
+
                                                 // Redis command: DEL one two three four 'sixty two' 
                                                 // From your Redis command, add the distinct parts into a list<rstring>
                                                 clearM(myCmdList);
                                                 redisResult = "";
                                                 appendM(myCmdList, "DEL");
-                                                appendM(myCmdList, "one");
-                                                appendM(myCmdList, "two");
-                                                appendM(myCmdList, "three");
-                                                appendM(myCmdList, "four");
-                                                appendM(myCmdList, "sixty two");
+                                                appendM(myCmdList, hashTag + "one");
+                                                appendM(myCmdList, hashTag + "two");
+                                                appendM(myCmdList, hashTag + "three");
+                                                appendM(myCmdList, hashTag + "four");
+                                                appendM(myCmdList, hashTag + "sixty two");
                    
                                                 myFlag = dpsRunDataStoreCommand(myCmdList, redisResult, err);
 

@@ -1,7 +1,7 @@
 include ../make.variable.include
 
 PKG_NAME := hiredis
-VERSION := 0.13.3
+VERSION := 1.0.0
 ARCHIVE := v$(VERSION).tar.gz
 ARCHIVE_INSTALL := $(PKG_NAME)-$(VERSION)-$(OS)-$(ARCH)-install-bin.tar.gz
 URL := https://github.com/redis/$(PKG_NAME)/archive/$(ARCHIVE)
@@ -16,8 +16,8 @@ all:
 	tar -C $(TARGETDIR) -xzvf $(ARCHIVE_INSTALL)
 
 $(ARCHIVE_INSTALL): $(PKG_DIR)/Makefile
-	$(MAKE) -C $(PKG_DIR)
-	$(MAKE) -C $(PKG_DIR) PREFIX=$(GEN_DIR) install
+	$(MAKE) -C $(PKG_DIR) USE_SSL=1
+	$(MAKE) -C $(PKG_DIR) USE_SSL=1 PREFIX=$(GEN_DIR) install
 	rm -f $(GEN_DIR)/lib/*.a
 	rm -rf $(GEN_DIR)/lib/pkgconfig
 	tar -C $(GEN_DIR) -czvf $(ARCHIVE_INSTALL) ./lib ./include

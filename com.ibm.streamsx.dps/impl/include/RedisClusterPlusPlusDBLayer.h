@@ -5,8 +5,8 @@
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 */
-#ifndef REDIS_DB_LAYER_H_
-#define REDIS_DB_LAYER_H_
+#ifndef REDIS_CLUSTER_PLUS_PLUS_DB_LAYER_H_
+#define REDIS_CLUSTER_PLUS_PLUS_DB_LAYER_H_
 /*
 =====================================================================
 Here is the copyright statement for our use of the hiredis APIs:
@@ -18,41 +18,32 @@ BSD license.
 Copyright (c) 2009-2011, Salvatore Sanfilippo <antirez at gmail dot com>
 Copyright (c) 2010-2011, Pieter Noordhuis <pcnoordhuis at gmail dot com>
 
-All rights reserved.
+hiredis-cluster-plus-plus include files provide wrappers on top of the hiredis library.
+This wrapper allows us to use the familiar hiredis APIs in the context of
+a Redis cluster (Version 6 and higher) to provide HA facility for automatic
+fail-over when a Redis instance or the entire machine crashes.
+In addition, it provides the TLS/SSL support for the redis-cluster.
+Please note that this hiredis-cluster-plus-plus wrapper supercedes the older 
+hiredis-cluster wrapper that we have in the DPS toolkit. If the Redis server
+version is v5 and lower, one may continue to use the older hiredis-cluster in DPS.
+If the Redis server version is v6 and higher, it is recommented to use the 
+hiredis-cluster-plus-plus in order to work with both non-TLS and TLS.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
+The redis-plus-plus wrapper carries the Apache 2.0 copyright as shown in the following line.
 
-* Redistributions of source code must retain the above copyright notice,
-  this list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-* Neither the name of Redis nor the names of its contributors may be used
-  to endorse or promote products derived from this software without specific
-  prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+A permissive license whose main conditions require preservation of copyright and license notices. 
+Contributors provide an express grant of patent rights. Licensed works, modifications, and larger 
+works may be distributed under different terms and without source code.
 =====================================================================
 */
 #include "DBLayer.h"
 
-#include "hiredis/hiredis.h"
-#include "hiredis/hiredis_ssl.h"
 #include <tr1/memory>
 #include <set>
 #include <vector>
+#include <sw/redis++/redis_cluster.h>
+
+using namespace sw::redis;
 
 namespace com {
 namespace ibm {
@@ -60,10 +51,10 @@ namespace streamsx {
 namespace store {
 namespace distributed
 {
-  class RedisDBLayer;
+  class RedisClusterPlusPlusDBLayer;
 
-  /// Class that implements the Iterator for Redis
-  class RedisDBLayerIterator : public DBLayer::Iterator
+  /// Class that implements the Iterator for Redis cluster
+  class RedisClusterPlusPlusDBLayerIterator : public DBLayer::Iterator
   {
   	  public:
 	  	  uint64_t store;
@@ -72,28 +63,18 @@ namespace distributed
   	  	  uint32_t sizeOfDataItemKeysVector;
   	  	  uint32_t currentIndex;
   	  	  bool hasData;
-  	  	  redisContext *rdsc;
-  	  	  redisReply *redis_reply;
-  	  	  RedisDBLayer *redisDBLayerPtr;
-
-  	  	  RedisDBLayerIterator();
-	  	  ~RedisDBLayerIterator();
+  	  	  RedisClusterPlusPlusDBLayer *redisClusterPlusPlusDBLayerPtr;
+ 
+  	  	  RedisClusterPlusPlusDBLayerIterator();
+	  	  ~RedisClusterPlusPlusDBLayerIterator();
 	  	  bool getNext(uint64_t store, unsigned char * & keyData, uint32_t & keySize,
 	  		unsigned char * & valueData, uint32_t & valueSize, PersistenceError & dbError);
   };
 
-  /// Class that implements the DBLayer for Redis
-  class RedisDBLayer : public DBLayer
+  /// Class that implements the DBLayer for Redis Cluster Plus Plus
+  class RedisClusterPlusPlusDBLayer : public DBLayer
   {
   private:
-	  redisReply *redis_reply;
-	  // We will store one or more redis server handles in this structure.
-	  typedef struct {
-		  redisContext *rdsc;
-	  } redisPartition;
-
-	  redisPartition redisPartitions[50];
-
 	  bool readStoreInformation(std::string const & storeIdString, PersistenceError & dbError,
 	  		  uint32_t & dataItemCnt, std::string & storeName,
 	  		  std::string & keySplTypeName, std::string & valueSplTypeName);
@@ -108,14 +89,14 @@ namespace distributed
 	  void releaseGeneralPurposeLock(std::string const & entityName);
 	  int32_t getRedisServerPartitionIndex(std::string const & key);
 
-  public:
-    int32_t redisPartitionCnt;
+  public: 
+    RedisCluster *redis_cluster = NULL;
 
     /// Constructor
-    RedisDBLayer();
+    RedisClusterPlusPlusDBLayer();
 
     /// Destructor            
-    ~RedisDBLayer();
+    ~RedisClusterPlusPlusDBLayer();
 
     // These are inherited from DBLayer, see DBLayer for descriptions
     void connectToDatabase(std::set<std::string> const & dbServers, PersistenceError & dbError);
@@ -158,7 +139,7 @@ namespace distributed
     bool isConnected();
     bool reconnect(std::set<std::string> & dbServers, PersistenceError & dbError);
 
-    RedisDBLayerIterator * newIterator(uint64_t store, PersistenceError & dbError);
+    RedisClusterPlusPlusDBLayerIterator * newIterator(uint64_t store, PersistenceError & dbError);
     void deleteIterator(uint64_t store, Iterator * iter, PersistenceError & dbError);
     bool storeIdExistsOrNot(std::string storeIdString, PersistenceError & dbError);
 	bool getDataItemFromStore(std::string const & storeIdString,
@@ -182,7 +163,8 @@ namespace distributed
     bool acquireLock(uint64_t lock, double leaseTime, double maxWaitTimeToAcquireLock, PersistenceError & lkError);
     bool removeLock(uint64_t lock, PersistenceError & lkError);
     uint32_t getPidForLock(std::string const & name, PersistenceError & lkError);
+    void persist(PersistenceError & dbError);
 
   };
 } } } } }
-#endif /* REDIS_DB_LAYER_H_ */
+#endif /* REDIS_CLUSTER_PLUS_PLUS_DB_LAYER_H_ */

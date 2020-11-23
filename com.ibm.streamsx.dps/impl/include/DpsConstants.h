@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2016
+# Copyright IBM Corp. 2011, 2020
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -93,6 +93,7 @@ interface with many different back-end in-memory stores.
 #define COUCHBASE_NO_SQL_DB_NAME									"couchbase"
 #define AEROSPIKE_NO_SQL_DB_NAME									"aerospike"
 #define REDIS_CLUSTER_NO_SQL_DB_NAME								"redis-cluster"
+#define REDIS_CLUSTER_PLUS_PLUS_NO_SQL_DB_NAME                                                  "redis-cluster-plus-plus"
 #define HTTP_GET													"GET"
 #define HTTP_PUT													"PUT"
 #define HTTP_POST													"POST"
@@ -228,5 +229,9 @@ interface with many different back-end in-memory stores.
 #define DL_LOCK_NOT_FOUND_ERROR										514
 #define DL_LOCK_REMOVAL_ERROR										515
 #define AEROSPIKE_GET_STORE_ID_ERROR								516
+#define REDIS_PLUS_PLUS_NO_ERROR 0
+#define REDIS_PLUS_PLUS_CONNECTION_ERROR 1
+#define REDIS_PLUS_PLUS_REPLY_ERROR 2
+#define REDIS_PLUS_PLUS_OTHER_ERROR 3
 
 #endif /* DPS_CONSTANTS_H_ */

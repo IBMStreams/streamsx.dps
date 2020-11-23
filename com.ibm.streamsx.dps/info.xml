@@ -5,7 +5,7 @@
     <info:description>The Distributed Process Store (DPS) toolkit enables multiple applications running processing elements (PEs) on one or more machines to share application specific state information. 
 The shared information is stored in an external data store. This allows non-fused SPL, C++ and Java operators running on different machines to share information. 
 The following external data stores are supported:
-* Redis® versions 2.8.2+, 3.0.x and 3.2.x.
+* Redis® versions 6.0 and higher.
 The toolkit consists of a set of native functions that provide access to shared state, and additional locking functionality to provide safe, concurrent access to the shared data.
 These functions can be used from anywhere inside a Streams application, whether it be SPL code, SPL functions, SPL native functions, C++ primitive operators.  They also have counterparts written in Java that can be used from a Java primitive operator.
 The actual state information is stored separately in the distributed back-end in-memory store which is transparent to the Streams application. 
@@ -25,12 +25,25 @@ In order to ensure safe access (i.e. store operations do not override each other
 
 # Notes for supported data stores
 
- * Redis 2.8.x: If you have a heavy workload of put/get requests, then using multiple Redis servers  may give scaling to improve the overall throughput. You can manually configure and start multiple instances of Redis to listen and run on different ports and/or machines.  The DPS toolkit will internally treat these Redis v2.8.x multiple instances as multiple shards and distribute the key-value pairs among those instances to improve performance with increased memory capacity. If you have multiple Redis servers configured, consider using the DPS Time To Live (TTL) APIs, discussed below. This will result in better scalability of your put/get requests than using the APIs that take the user created store id as a function argument. Choose the APIs according to your functional and scaling needs. 
- * Redis 3.0.x or 3.2.x: If you choose to use these versions to take advantage of the Redis built-in high availability and clustering, fail-over, replication and persistence features, it is important to note that, those new Redis 3.x features may impact the overall performance of reading from and writing data to the Redis cluster nodes.
- * Redis 3.2.x servers are by default configured to block connections from remote machines and remote IP addresses other than the loopback (127.0.0.1) address. See the comments in the `redis.conf` configuration file for more information. This restriction means that if Streams is running on a machine different from the Redis server, you will need to reconfigure and restart the Redis server to accept remote connections.  Make the following changes in your redis configuration file:
+ * Redis standalone (non-cluster): If you have a heavy workload of put/get requests, then using multiple Redis servers may give scaling to improve the overall throughput. You can manually configure and start multiple instances of Redis to listen and run on different ports and/or machines. The DPS toolkit will internally treat such multiple Redis non-cluster multiple instances as multiple shards and distribute the key-value pairs among those instances to improve performance with increased memory capacity. If you have multiple Redis servers configured, consider using the DPS Time To Live (TTL) APIs, discussed below. This will result in better scalability of your put/get requests than using the APIs that take the user created store id as a function argument. Choose the APIs according to your functional and scaling needs. 
+ * Redis Cluster: If you choose to use v6.0 or higher to take advantage of the Redis built-in high availability and clustering, fail-over, replication and persistence features, it is important to note that the cluster features may impact the overall performance of reading from and writing data to the Redis cluster nodes.
+ * Redis servers are by default configured to block connections from remote machines and remote IP addresses other than the loopback (127.0.0.1) address. See the comments in the `redis.conf` configuration file for more information. This restriction means that if Streams is running on a machine different from the Redis server, you will need to reconfigure and restart the Redis server to accept remote connections.  Make the following changes in your redis configuration file:
    * Comment out the line `bind 127.0.0.1`
    * Make sure `protected-mode` is set to `no`.   
    * Restart Redis, making sure to specify the path to the modified configuration file.
+
+* Redis server v6.0 and higher support TLS/SSL. To use the Redis TLS/SSL feature, it is necessary to have openssl and openssl-devel installed on all the IBM Streams machines. In particular, libssl.so and libcrypto.so files should be available on the Linux system directories (e-g: /lib64/libssl.so and /lib64/libcrypto.so.)
+
+* To successfully build this toolkit, your IBM Streams application development machine should have the following RPMs installed.
+
+curl
+curl-devel
+lua
+lua-devel
+openldap-devel
+openssl-devel
+cyrus-sasl
+cyrus-sasl-devel
 
 # Toolkit overview
 
@@ -77,6 +90,10 @@ This is achieved using a trust based cooperative locking scheme to gain exclusiv
 To create applications that use the DPS Toolkit, you'll need to:
 1.  Install IBM InfoSphere Streams.  Configure the product environment variables by entering the following command: 
       source product-installation-root-directory/4.2.0.0/bin/streamsprofile.sh
+
+    Download the most recent version of the DPS toolkit from here and extract it in your IBM Streams development machine.
+    https://github.com/IBMStreams/streamsx.dps    
+
 2.  Ensure that all of the following additional RPMs required by the DPS toolkit are present on your system: 
  * curl
  * curl-devel
@@ -84,12 +101,15 @@ To create applications that use the DPS Toolkit, you'll need to:
  * lua-devel
  * openssl-devel
  * openldap-devel
+ * cyrus-sasl
+ * cyrus-sasl-devel
  * ibverbs
  * ibverbs-devel 
 3. Install and configure an external key-value data store that is supported by DPS.
-4. Configure the DPS toolkit to connect to the data store from step 3.  Copy the DPS toolkit sample configuration file from `STREAMS_INSTALL/samples/com.ibm.streamsx.dps/DPSUsageFromSPL/etc/no-sql-kv-store-servers.cfg` to `your-project-directory/etc/no-sql-kv-store-servers.cfg` and edit the file as follows:
+4. Configure the DPS toolkit to connect to the data store from step 3.  Copy the DPS toolkit sample configuration file from `&lt;YOUR_DPS_TOOLKIT_DIRECTORY>/samples/advanced/01_using_no_sql_db_in_spl_custom_and_cpp_primitive_operators/etc/no-sql-kv-store-servers.cfg` to `your-project-directory/etc/no-sql-kv-store-servers.cfg` and edit the file as follows:
  * For Redis in non-cluster mode: `redis` should be the first line in the configuration file. Then specify the Redis server/IP address and port number separated by a colon, e.g. `Machine1:7002`.  Each additional server should be specified on a new line.  If you prefer to use the Unix domain socket instead of TCP, you can simply specify `unixsocket` instead of a server name. If you decide to use a unix domain socket, you must also ensure that your redis.conf file on the server side is configured properly for a unix domain socket pointing to `/tmp/redis.sock` file.      
- * For Redis v3.x in cluster mode: `redis-cluster` should be the first line in the file, followed by the server name or IP address and a port number for one of the master Redis nodes that is active in your Redis cluster. For example: `Machine1:30001`.
+ * For Redis in cluster mode: `redis-cluster-plus-plus` should be the first line in the file, followed by the server name or IP address and a port number for one of the master Redis nodes that is active in your Redis cluster. For example: `Machine1:30001`.
+ * It is suggested that you read the commentary section at the top of that configuration file to understand various options available for configuring your chosen no-sql database.
  * Each time you create a new SPL project, copy the configuration file from the example provided in the DPS toolkit to the /etc directory inside of your SPL project directory.  Make any configuration changes needed to the file, based on your application's needs. 
  * See the sample configuration file for additional examples.
 # Using the toolkit in SPL applications
@@ -210,12 +230,12 @@ The following example shows how to check for errors, after a function call, in t
 
 
 # Additional Examples
-To specifically learn how to call the DPS APIs from SPL native functions, C++ and Java primitive operators, see the samples included in `&lt;STREAMS_INSTALL>/samples/com.ibm.streamsx.dps`. 
+To specifically learn how to call the DPS APIs from SPL native functions, C++ and Java primitive operators, see the samples included in `&lt;STREAMS_INSTALL>/samples/com.ibm.streamsx.dps` or in `&lt;YOUR_DPS_TOOLKIT_DIRECTORY>/samples` directory. The `advanced` sub-directory there contains examples that showcase bulk of the available DPS APIs.
 
 # Reference information
 [../../javadoc/dps/index.html| DPS Java API Reference]
   </info:description>
-    <info:version>4.1.1</info:version>
+    <info:version>4.1.2</info:version>
     <info:requiredProductVersion>4.2.0.0</info:requiredProductVersion>
   </info:identity>
   <info:dependencies/>

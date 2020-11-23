@@ -8,6 +8,7 @@ PACKAGES += couchbase
 PACKAGES += curl
 PACKAGES += hiredis
 PACKAGES += hiredis-cluster
+PACKAGES += redis-plus-plus
 PACKAGES += json-c
 PACKAGES += memcached
 PACKAGES += mongo-c

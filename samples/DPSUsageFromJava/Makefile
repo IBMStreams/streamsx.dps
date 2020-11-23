@@ -22,10 +22,14 @@
 #                                                                  
 # end_generated_IBM_copyright_prolog                               
 
-DPS_TOOLKIT_HOME ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.dps
+# Since the DPS toolkit version you are using could be more
+# recent than the one in the IBM Streams installation directory,
+# you may want to ensure that the following DPS toolkit path is correct.
+DPS_TOOLKIT_HOME ?= $(HOME)/streamsx.dps/com.ibm.streamsx.dps
 
-# the dps-helper is copied from the toolkit to the impl/lib direcrory of the application
-# to ensure it is included in the SAB file
+# The dps-helper is copied from the DPS toolkit directory to the 
+# impl/java/lib directory of this application to ensure it is 
+# included in the SAB file.
 DPS_HELPER_JAR = $(DPS_TOOLKIT_HOME)/impl/java/lib/dps-helper.jar
 
 SPLC_FLAGS ?= -a -t $(DPS_TOOLKIT_HOME)
@@ -40,8 +44,8 @@ distributed: java
 	$(SPLC) $(SPLC_FLAGS) -M $(SPL_MAIN_COMPOSITE) $(SPL_CMD_ARGS) --output-directory=./output/JavaDPSDemo/Distributed
 
 java: $(JAVA_CLASS_FILES)
-	mkdir -p impl/lib
-	cp $(DPS_HELPER_JAR) impl/lib
+	mkdir -p impl/java/lib
+	cp $(DPS_HELPER_JAR) impl/java/lib
 	JAVA_HOME=$(STREAMS_INSTALL)/java ant
 
 clean: 
