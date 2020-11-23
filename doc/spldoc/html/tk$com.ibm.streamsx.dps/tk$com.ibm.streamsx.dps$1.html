@@ -22,7 +22,7 @@
 <div class="body refbody">
 <div class="section">
 <p class="p">
-<a class="xref" href="../toolkits/toolkits.html">Streams DPS Toolkit</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.dps.html">com.ibm.streamsx.dps 4.1.1</a> &gt; Developing and running applications that use the DPS Toolkit</p>
+<a class="xref" href="../toolkits/toolkits.html">Streams DPS Toolkit</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.dps.html">com.ibm.streamsx.dps 4.1.2</a> &gt; Developing and running applications that use the DPS Toolkit</p>
 
 </div>
 
@@ -33,11 +33,15 @@
 <li class="li">  Install IBM InfoSphere Streams.  Configure the product environment variables by entering the following command: 
 <pre class="pre codeblock">
   source product-installation-root-directory/4.2.0.0/bin/streamsprofile.sh
+
+Download the most recent version of the DPS toolkit from here and extract it in your IBM Streams development machine.
+https://github.com/IBMStreams/streamsx.dps    
 </pre>
 
 </li>
 
-<li class="li">  Ensure that all of the following additional RPMs required by the DPS toolkit are present on your system: 
+<li class="li">
+<div class="p">  Ensure that all of the following additional RPMs required by the DPS toolkit are present on your system: 
 <ul class="ul">
 <li class="li"> curl</li>
 
@@ -51,20 +55,28 @@
 
 <li class="li"> openldap-devel</li>
 
+<li class="li"> cyrus-sasl</li>
+
+<li class="li"> cyrus-sasl-devel</li>
+
 <li class="li"> ibverbs</li>
 
 <li class="li"> ibverbs-devel </li>
 
 </ul>
+
+</div>
 </li>
 
 <li class="li"> Install and configure an external key-value data store that is supported by DPS.</li>
 
-<li class="li"> Configure the DPS toolkit to connect to the data store from step 3.  Copy the DPS toolkit sample configuration file from <tt class="ph tt">STREAMS_INSTALL/samples/com.ibm.streamsx.dps/DPSUsageFromSPL/etc/no-sql-kv-store-servers.cfg</tt> to <tt class="ph tt">your-project-directory/etc/no-sql-kv-store-servers.cfg</tt> and edit the file as follows:
+<li class="li"> Configure the DPS toolkit to connect to the data store from step 3.  Copy the DPS toolkit sample configuration file from <tt class="ph tt">&lt;YOUR_DPS_TOOLKIT_DIRECTORY&gt;/samples/advanced/01_using_no_sql_db_in_spl_custom_and_cpp_primitive_operators/etc/no-sql-kv-store-servers.cfg</tt> to <tt class="ph tt">your-project-directory/etc/no-sql-kv-store-servers.cfg</tt> and edit the file as follows:
 <ul class="ul">
 <li class="li"> For Redis in non-cluster mode: <tt class="ph tt">redis</tt> should be the first line in the configuration file. Then specify the Redis server/IP address and port number separated by a colon, e.g. <tt class="ph tt">Machine1:7002</tt>.  Each additional server should be specified on a new line.  If you prefer to use the Unix domain socket instead of TCP, you can simply specify <tt class="ph tt">unixsocket</tt> instead of a server name. If you decide to use a unix domain socket, you must also ensure that your redis.conf file on the server side is configured properly for a unix domain socket pointing to <tt class="ph tt">/tmp/redis.sock</tt> file.      </li>
 
-<li class="li"> For Redis v3.x in cluster mode: <tt class="ph tt">redis-cluster</tt> should be the first line in the file, followed by the server name or IP address and a port number for one of the master Redis nodes that is active in your Redis cluster. For example: <tt class="ph tt">Machine1:30001</tt>.</li>
+<li class="li"> For Redis in cluster mode: <tt class="ph tt">redis-cluster-plus-plus</tt> should be the first line in the file, followed by the server name or IP address and a port number for one of the master Redis nodes that is active in your Redis cluster. For example: <tt class="ph tt">Machine1:30001</tt>.</li>
+
+<li class="li"> It is suggested that you read the commentary section at the top of that configuration file to understand various options available for configuring your chosen no-sql database.</li>
 
 <li class="li"> Each time you create a new SPL project, copy the configuration file from the example provided in the DPS toolkit to the /etc directory inside of your SPL project directory.  Make any configuration changes needed to the file, based on your application's needs. </li>
 
@@ -246,7 +258,7 @@ if (err != 0ul) {
 <div class="section"><h2 class="title sectiontitle">Additional Examples
 </h2>
 
-<p class="p">To specifically learn how to call the DPS APIs from SPL native functions, C++ and Java primitive operators, see the samples included in <tt class="ph tt">&lt;STREAMS_INSTALL&gt;/samples/com.ibm.streamsx.dps</tt>. 
+<p class="p">To specifically learn how to call the DPS APIs from SPL native functions, C++ and Java primitive operators, see the samples included in <tt class="ph tt">&lt;STREAMS_INSTALL&gt;/samples/com.ibm.streamsx.dps</tt> or in <tt class="ph tt">&lt;YOUR_DPS_TOOLKIT_DIRECTORY&gt;/samples</tt> directory. The <tt class="ph tt">advanced</tt> sub-directory there contains examples that showcase bulk of the available DPS APIs.
 </p>
 
 </div>
