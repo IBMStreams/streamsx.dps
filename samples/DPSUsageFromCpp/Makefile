@@ -31,7 +31,7 @@
 # present in the DPS toolkit's impl directory, it is necessary to
 # export the following. This will get used inside the C++ operator's
 # impl/bin/archLevel file.
-export DPS_TOOLKIT_HOME=$(HOME)/streamsx.dps/com.ibm.streamsx.dps
+export DPS_TOOLKIT_HOME?=$(HOME)/streamsx.dps/com.ibm.streamsx.dps
 
 SPLC_FLAGS ?= -a -t $(DPS_TOOLKIT_HOME)
 SPLC = $(STREAMS_INSTALL)/bin/sc
