@@ -21,6 +21,11 @@ DPS toolkit for the purpose of sharing application state in a distributed manner
 <li>Redis-Cluster   [New cluster feature is available in Redis version 3 and above]</li>
 </ol>
 
+This toolkit evolved from the early research work done at the IBM.T.J.Watson Research Center, Yorktown Heights, New York. The links below highlight the origins of this asset.
+
+[Technical Article](https://www.ibm.com/developerworks/library/bd-streamsmemcached/)
+[Podcast](http://public.dhe.ibm.com/software/dw/podcast/twodw/twodw20140127.mp3)
+
 ## Documentation ##
 
 For an API description see the [GitHub pages](http://ibmstreams.github.io/streamsx.dps) for this toolkit.
