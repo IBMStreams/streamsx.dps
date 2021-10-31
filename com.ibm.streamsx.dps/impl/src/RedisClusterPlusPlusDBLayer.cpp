@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2020
+# Copyright IBM Corp. 2011, 2021
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -5088,9 +5088,13 @@ namespace distributed
         exceptionType = REDIS_PLUS_PLUS_OTHER_ERROR;
      }
 
+     // Under normal working conditions of the Redis server(s),
+     // the Redis command executed above shouldn't have raised
+     // any exception.
+     //
      // Did we encounter a redis-cluster server connection error?
-     if (exceptionType == REDIS_PLUS_PLUS_CONNECTION_ERROR) {
-        SPLAPPTRC(L_ERROR, "Inside isConnected: Unable to connect to the redis-cluster server(s). Failed with an exception. Error=" << exceptionString << ". rc=" << DPS_CONNECTION_ERROR, "RedisClusterPlusPlusDBLayer");
+     if (exceptionType != REDIS_PLUS_PLUS_NO_ERROR) {
+        SPLAPPTRC(L_ERROR, "Inside isConnected: Unable to execute a get command. Possible issue connecting to the redis-cluster server(s). Failed with an exception type " << exceptionType << ". Error=" << exceptionString << ". rc=" << DPS_CONNECTION_ERROR << ". Application code may call the DPS reconnect API and then retry the failed operation.", "RedisClusterPlusPlusDBLayer");
         // Connection error.
         return(false);
      } else {
