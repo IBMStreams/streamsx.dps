@@ -23,7 +23,7 @@ DPS toolkit for the purpose of sharing application state in a distributed manner
 
 This toolkit evolved from the early research work done at the IBM.T.J.Watson Research Center, Yorktown Heights, New York. The links below highlight the origins of this asset.
 
-[Technical Article](https://files.meetup.com/9505932/bd-streamsmemcached-pdf.pdf)
+[Technical Positioning](dps-technical-positioning.pdf)
 
 [Podcast](http://public.dhe.ibm.com/software/dw/podcast/twodw/twodw20140127.mp3)
 
