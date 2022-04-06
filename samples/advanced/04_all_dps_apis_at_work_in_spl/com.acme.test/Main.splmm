@@ -1,6 +1,6 @@
 /*
  *  Licensed Materials - Property of IBM
- *  Copyright IBM Corp. 2011, 2021
+ *  Copyright IBM Corp. 2011, 2022
  *  US Government Users Restricted Rights - Use, duplication or
  *  disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
 */
@@ -32,6 +32,10 @@ native function APIs to create/read/update/delete data items on one or more stor
 multiple writers and multiple readers for the same store. It is important to note that a Streams application 
 designer/developer should carefully address how different parts of his/her application will access the store 
 simultaneously i.e. who puts what, who gets what and at what frequency from where etc.
+
+Note
+----
+When you submit this application in IBM Streams in distributed mode, it is better to use the streamtool command line option -C fusionScheme=legacy which will make every major block of code below to run in its own PE. Otherwise, they will all run in a single PE and it will become hard to verify the results.
 */
 composite Main {
     graph
@@ -1111,6 +1115,57 @@ composite GeneralTest()
 							// Get rid of this store.
 							dpsRemoveStore(s, err);
 						}
+					}
+
+                                        // Let us do a quick run to show how to obtain all the keys in a given store.
+                                        type RuleInstanceKey_t = int32 RuleId, rstring NotifyByValue;
+                                        mutable RuleInstanceKey_t dummyRuleInstanceKey = (RuleInstanceKey_t){};
+
+					s = dpsCreateOrGetStore("My_Rules_Store", dummyRuleInstanceKey, dummyRstring, err);
+					if (err != 0ul) {
+						printStringLn("Unexpected error in dpsCreateOrGetStore(My_Rules_Store): rc = " + (rstring)dpsGetLastStoreErrorCode() + 
+							", msg = " + dpsGetLastStoreErrorString());
+					} else {					
+						// Let us add a several thousands of entries in that store.
+                                                mutable int32 cnt = 0;
+
+                                                while(++cnt <= 20000) {
+                                                   dummyRuleInstanceKey.RuleId = cnt;
+                                                   dummyRuleInstanceKey.NotifyByValue = "V_" + (rstring)cnt;
+                                                   rstring valueStr = "Test";
+                                                   dpsPut(s, dummyRuleInstanceKey, valueStr, err);
+
+                                                   if(err != 0ul) {
+						      printStringLn("Unexpected error in dpsPut(My_Rules_Store): rc = " + (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString() + ", cnt=" + (rstring)cnt);
+                                                      break; 
+                                                   }
+                                                }
+
+                                                // Let us now get all the keys from the store we populated above.
+                                                mutable list<RuleInstanceKey_t> allKeys = [];
+                                                _timeNow = getTimestamp();
+					        _timeInNanoSecondsBeforeExecution =  ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
+                                                dpsGetAllKeys(s, allKeys, err);
+					        _timeNow = getTimestamp();
+					        _timeInNanoSecondsAfterExecution = ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
+					        _totalExecutionTime = _timeInNanoSecondsAfterExecution - _timeInNanoSecondsBeforeExecution;
+
+						if (err != 0ul) {
+						   printStringLn("Unexpected error in dpsGetAllKeys(s, allKeys): rc = " + (rstring)dpsGetLastStoreErrorCode() + 
+						      ", msg = " + dpsGetLastStoreErrorString());
+						} else {
+                                                   printStringLn("dpsGetAllKeys fetched " + (rstring)spl.collection::size(allKeys) + " keys in " + (rstring)_totalExecutionTime + " nanoseconds.");
+                                                   
+                                                   // If needed, you can uncomment and use the following block of code to print all the key fetched from the store.
+                                                   /*
+                                                   for(RuleInstanceKey_t key in allKeys) {
+                                                      printStringLn((rstring)key);
+                                                   }
+                                                   */
+                                                }
+						
+						// Since we serialized the entire store into a blob, we can get rid of this store.
+						dpsRemoveStore(s, err);
 					}
 
                     // Signal the next operator to read and write using the two presidential stores we created above.

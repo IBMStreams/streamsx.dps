@@ -285,6 +285,10 @@ namespace store {
     /// @return true if connection is active or false if connection is inactive.
     virtual bool reconnect(std::set<std::string> & dbServers, PersistenceError & dbError) = 0;
 
+    /// Get all the keys present in a given store.
+    /// @return a list containing all the keys of a given data type.
+    virtual void getAllKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, PersistenceError & dbError) = 0;
+
     /// A store iterator
     class Iterator
     {

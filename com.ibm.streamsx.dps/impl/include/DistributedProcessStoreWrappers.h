@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2014
+# Copyright IBM Corp. 2011, 2022
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -299,7 +299,17 @@ namespace distributed
   {       
     return DistributedProcessStore::getGlobalStore().endIteration(store, iterator, err);  
   } 
-  
+
+  /// Get all the keys in a given store.
+  /// @param store store handle
+  /// @param List (vector) of a specific key type
+  /// @param err store error code
+  template<class T1>                 
+  void dpsGetAllKeys(SPL::uint64 store, SPL::list<T1> & keys, SPL::uint64 & err)
+  {
+    return DistributedProcessStore::getGlobalStore().getAllKeysHelper(store, keys, err);
+  }           
+
   /// Serialize the items from the serialized store
   /// @param store store handle
   /// @param data blob to serialize into

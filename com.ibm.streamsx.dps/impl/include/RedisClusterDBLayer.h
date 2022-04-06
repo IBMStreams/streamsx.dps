@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2015
+# Copyright IBM Corp. 2011, 2022
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -181,6 +181,7 @@ namespace distributed
 		std::string const & baseUrl, std::string const & apiEndpoint, std::string const & queryParams,
 		std::string const & jsonRequest, std::string & jsonResponse, PersistenceError & dbError);
         bool runDataStoreCommand(std::vector<std::string> const & cmdList, std::string & resultValue, PersistenceError & dbError);
+    void getAllKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, PersistenceError & dbError);
 
 	// Lock related methods.
     uint64_t createOrGetLock(std::string const & name, PersistenceError & lkError);

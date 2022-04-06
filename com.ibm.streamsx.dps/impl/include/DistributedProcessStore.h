@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2014
+# Copyright IBM Corp. 2011, 2022
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -217,6 +217,13 @@ namespace distributed
     /// @param iterator the iterator
     /// @param err PersistentStore error code
     void endIteration(SPL::uint64 store, SPL::uint64 iterator, SPL::uint64 & err);
+
+  /// Get all the keys in a given store.
+  /// @param store store handle
+  /// @param List (vector) of a specific key type
+  /// @param err store error code
+  template<class T1>                 
+  void getAllKeysHelper(SPL::uint64 store, SPL::list<T1> & keys, SPL::uint64 & err);
 
     /// Serialize the items from the serialized store
     /// @param store store handle
@@ -857,6 +864,52 @@ namespace distributed
         free(valueData);
       return res;
     }
+
+  /// Get all the keys in a given store.
+  /// @param store store handle
+  /// @param List (vector) of a specific key type
+  /// @param err store error code
+  template<class T1>                 
+  void DistributedProcessStore::getAllKeysHelper(SPL::uint64 store, SPL::list<T1> & keys, SPL::uint64 & err) {
+    dbError_->reset();
+    std::vector<unsigned char *> keysBuffer;
+    std::vector<uint32_t> keysSize;
+    // Call the underlying store implementation function to get all the keys in a given store.
+    db_->getAllKeys(store, keysBuffer, keysSize, *dbError_);
+    err = dbError_->getErrorCode();
+
+    if(err != 0) {
+       // We got an error. Return now without populating anything in the
+       // user provided list (vector). We will free any memory allocated
+       // for the partial set of keys returned if any.
+       for (unsigned int i = 0; i < keysBuffer.size(); i++) {
+          if(keysSize.at(i) > 0) {
+             // We must free the buffer allocated by the underlying implementation that we called above.
+             free(keysBuffer.at(i));
+          }
+       } // End of for loop.
+
+       return;
+    }
+
+    // We got all the keys.
+    // Let us convert it to the proper key type and store them in
+    // the user provided list (vector).
+    keys.clear();
+
+    // Populate the user provided list (vector) with the store keys.
+    for (unsigned int i = 0; i < keysBuffer.size(); i++) {
+    	SPL::NativeByteBuffer nbf_key(keysBuffer.at(i), keysSize.at(i));
+        T1 tempKey;
+    	nbf_key >> tempKey;
+        keys.push_back(tempKey);
+
+        if(keysSize.at(i) > 0) {
+           // We must free the buffer allocated by the underlying implementation that we called above.
+           free(keysBuffer.at(i));
+        }
+    } // End of for loop.
+  }
 
   template<class T1, class T2>
   void DistributedProcessStore::serialize(SPL::uint64 store, SPL::blob & data, SPL::uint64 & err)

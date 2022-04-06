@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2014
+# Copyright IBM Corp. 2011, 2022
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -212,6 +212,7 @@ namespace distributed
     bool acquireLock(uint64_t lock, double leaseTime, double maxWaitTimeToAcquireLock, PersistenceError & lkError);
     bool removeLock(uint64_t lock, PersistenceError & lkError);
     uint32_t getPidForLock(std::string const & name, PersistenceError & lkError);
+    void getAllKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, PersistenceError & dbError);
 
   };
 } } } } }

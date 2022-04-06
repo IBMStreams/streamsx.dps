@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2021
+# Copyright IBM Corp. 2011, 2022
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -3670,6 +3670,147 @@ namespace distributed
         SPLAPPTRC(L_ERROR, "Inside releaseGeneralPurposeLock, it failed to delete a lock. Error=" << exceptionString << ". rc=" << DPS_CONNECTION_ERROR, "RedisClusterPlusPlusDBLayer");
      }
   } // End of releaseGeneralPurposeLock.
+
+    // Senthil added this on Apr/06/2022.
+    // This method will get all the keys from the given store and
+    // populate them in the caller provided list (vector).
+    // Be aware of the time it can take to fetch all the keys in a store
+    // that has several tens of thousands of keys. In such cases, the caller
+    // has to maintain calm until we return back here.
+    void RedisClusterPlusPlusDBLayer::getAllKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, PersistenceError & dbError) {
+	  SPLAPPTRC(L_DEBUG, "Inside getAllKeys for store id " << store, "RedisClusterPlusPlusDBLayer");
+
+        // In the caller provided list (vector), we will return back the unsigned char * pointer for every key found in the store. Clear that vector now.
+        keysBuffer.clear();
+        // In the caller provided list (vector), we will return back the uint32_t size of every key found in the store. Clear that vector now.
+        keysSize.clear();
+
+	  std::ostringstream storeId;
+	  storeId << store;
+	  string storeIdString = storeId.str();
+	  string data_item_key = "";
+
+	  // Ensure that a store exists for the given store id.
+	  if (storeIdExistsOrNot(storeIdString, dbError) == false) {
+             if (dbError.hasError() == true) {
+	        SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterPlusPlusDBLayer");
+             } else {
+	        dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
+	        SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisClusterPlusPlusDBLayer");
+             }
+
+             return;
+	  }
+
+	  // Ensure that this store is not empty at this time.
+	  if (size(store, dbError) <= 0) {
+	     dbError.set("Store is empty for the StoreId " + storeIdString + ".", DPS_STORE_EMPTY_ERROR);
+	     SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_STORE_EMPTY_ERROR, "RedisClusterPlusPlusDBLayer");
+	     return;
+	  }
+    
+
+        // Let us get the available data item keys from this store.
+        string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
+        std::vector<std::string> keys;
+        string exceptionString = "";
+        int exceptionType = REDIS_PLUS_PLUS_NO_ERROR;
+
+        try {
+           redis_cluster->hkeys(keyString, std::back_inserter(keys));
+        } catch (const ReplyError &ex) {
+           // WRONGTYPE Operation against a key holding the wrong kind of value
+           exceptionString = ex.what();
+           // Command execution error.
+           exceptionType = REDIS_PLUS_PLUS_REPLY_ERROR;
+        } catch (const TimeoutError &ex) {
+           // Reading or writing timeout
+           exceptionString = ex.what();
+           // Connectivity related error.
+           exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;        
+        } catch (const ClosedError &ex) {
+           // Connection has been closed.
+           exceptionString = ex.what();
+           // Connectivity related error.
+           exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
+        } catch (const IoError &ex) {
+           // I/O error on the connection.
+           exceptionString = ex.what();
+           // Connectivity related error.
+           exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
+        } catch (const Error &ex) {
+           // Other errors
+           exceptionString = ex.what();
+           // Connectivity related error.
+           exceptionType = REDIS_PLUS_PLUS_OTHER_ERROR;
+        }
+
+        // Did we encounter a redis-cluster server connection error?
+        if (exceptionType == REDIS_PLUS_PLUS_CONNECTION_ERROR) {
+           // This is how we can detect that a wrong redis-cluster server name is configured by the user or
+           // not even a single redis-cluster server daemon being up and running.
+           // This is a serious error.
+           dbError.set(string("getNext: Unable to connect to the redis-cluster server(s).") +
+              string(" Got an exception for REDIS_HKEYS_CMD: ") + exceptionString + 
+              " Application code may call the DPS reconnect API and then retry the failed operation. ", 
+              DPS_CONNECTION_ERROR);
+           SPLAPPTRC(L_ERROR, "Inside getAllKeys, it failed with a Redis connection error for REDIS_HKEYS_CMD. Exception: " << exceptionString << ". Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterPlusPlusDBLayer");
+           return;
+        }
+
+        // Did we encounter a redis reply error?
+        if (exceptionType == REDIS_PLUS_PLUS_REPLY_ERROR || 
+           exceptionType == REDIS_PLUS_PLUS_OTHER_ERROR) {
+           // Unable to get data item keys from the store.
+           dbError.set("Unable to get data item keys for the StoreId " + storeIdString + ". Error=" + exceptionString, DPS_GET_STORE_DATA_ITEM_KEYS_ERROR);
+           SPLAPPTRC(L_ERROR, "Inside getAllKeys, it failed to get data item keys from the StoreId " << storeIdString << ". Error=" << exceptionString << ". rc=" << DPS_GET_STORE_DATA_ITEM_KEYS_ERROR, "RedisClusterPlusPlusDBLayer");
+           return;
+        }
+
+	// We have the data item keys returned in array now.
+	// Let us insert them into the caller provided list (vector) that will hold the data item keys for this store.
+        for(unsigned int i=0; i < keys.size(); i++) {
+           data_item_key = keys[i];
+	   // Every dps store will have three mandatory reserved data item keys for internal use.
+	   // Let us not add them to the caller provided list (vector).
+	   if (data_item_key.compare(REDIS_STORE_ID_TO_STORE_NAME_KEY) == 0) {
+	      continue; // Skip this one.
+	   } else if (data_item_key.compare(REDIS_SPL_TYPE_NAME_OF_KEY) == 0) {
+	      continue; // Skip this one.
+	   } else if (data_item_key.compare(REDIS_SPL_TYPE_NAME_OF_VALUE) == 0) {
+	      continue; // Skip this one.
+	   }
+
+	  // In order to support spaces in data item keys, we base64 encoded them before storing it in Redis.
+	  // Let us base64 decode it now to get the original data item key.
+	  string base64_decoded_data_item_key;
+	  base64_decode(data_item_key, base64_decoded_data_item_key);
+	  data_item_key = base64_decoded_data_item_key;
+	  uint32_t keySize = data_item_key.length();
+	  // Allocate memory for this key and copy it to that buffer.
+	  unsigned char * keyData = (unsigned char *) malloc(keySize);
+
+	  if (keyData == NULL) {
+	     // This error will occur very rarely.
+	     // If it happens, we will handle it.
+             // We will not return any useful data to the caller.
+             keysBuffer.clear();
+             keysSize.clear();
+
+             dbError.set("Unable to allocate memory for the keyData while doing the next data item iteration for the StoreId " +
+                storeIdString + ".", DPS_STORE_ITERATION_MALLOC_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_STORE_ITERATION_MALLOC_ERROR, "RedisClusterPlusPlusDBLayerr");
+	     return;
+	  }
+
+	  // Copy the raw key data into the allocated buffer.
+	  memcpy(keyData, data_item_key.data(), keySize);
+	  // We are done. We expect the caller to free the keyData and valueData buffers.
+          // Let us append the key and the key size to the user provided lists.
+	  keysBuffer.push_back(keyData);
+          keysSize.push_back(keySize);	  
+        } // End of for loop.
+    } // End of getAllKeys method.
 
   RedisClusterPlusPlusDBLayerIterator::RedisClusterPlusPlusDBLayerIterator() {
 

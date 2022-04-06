@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2015
+# Copyright IBM Corp. 2011, 2022
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -3467,6 +3467,20 @@ namespace distributed
 	  lcb_destroy(instance);
 	  return;
   }
+
+    // Senthil added this on Apr/06/2022.
+    // This method will get all the keys from the given store and
+    // populate them in the caller provided list (vector).
+    // Be aware of the time it can take to fetch all the keys in a store
+    // that has several tens of thousands of keys. In such cases, the caller
+    // has to maintain calm until we return back here.
+    void CouchbaseDBLayer::getAllKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, PersistenceError & dbError) {
+	  SPLAPPTRC(L_DEBUG, "Inside getAllKeys for store id " << store, "CouchbaseDBLayer");
+
+       // Not implemented at this time. Simply return.
+       return;
+    } // End of getAllKeys method.
+
 
   CouchbaseDBLayerIterator::CouchbaseDBLayerIterator() {
 

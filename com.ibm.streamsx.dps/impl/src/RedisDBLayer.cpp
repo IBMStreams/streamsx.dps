@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2020
+# Copyright IBM Corp. 2011, 2022
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -2823,6 +2823,133 @@ namespace distributed
 	  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 	  freeReplyObject(redis_reply);
   }
+
+    // Senthil added this on Apr/06/2022.
+    // This method will get all the keys from the given store and
+    // populate them in the caller provided list (vector).
+    // Be aware of the time it can take to fetch all the keys in a store
+    // that has several tens of thousands of keys. In such cases, the caller
+    // has to maintain calm until we return back here.
+    void RedisDBLayer::getAllKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, PersistenceError & dbError) {
+	  SPLAPPTRC(L_DEBUG, "Inside getAllKeys for store id " << store, "RedisDBLayer");
+
+        // In the caller provided list (vector), we will return back the unsigned char * pointer for every key found in the store. Clear that vector now.
+        keysBuffer.clear();
+        // In the caller provided list (vector), we will return back the uint32_t size of every key found in the store. Clear that vector now.
+        keysSize.clear();
+
+	  std::ostringstream storeId;
+	  storeId << store;
+	  string storeIdString = storeId.str();
+	  string cmd = "";
+	  string data_item_key = "";
+
+	  // Ensure that a store exists for the given store id.
+	  if (storeIdExistsOrNot(storeIdString, dbError) == false) {
+             if (dbError.hasError() == true) {
+	        SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
+             } else {
+	        dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
+	        SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisDBLayer");
+             }
+
+             return;
+	  }
+
+	  // Ensure that this store is not empty at this time.
+	  if (size(store, dbError) <= 0) {
+	     dbError.set("Store is empty for the StoreId " + storeIdString + ".", DPS_STORE_EMPTY_ERROR);
+	     SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_STORE_EMPTY_ERROR, "RedisDBLayer");
+	     return;
+	  }
+    
+
+        // Let us get the available data item keys from this store.
+        cmd = string(REDIS_HKEYS_CMD) + string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
+        string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
+
+	int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
+
+        // Return now if there is no valid connection to the Redis server.
+        if (redisPartitions[partitionIdx].rdsc == NULL) {
+           dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
+           SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed. There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+            return;
+        }
+
+        redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+
+        if (redis_reply == NULL) {
+	   dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+	   return;
+	}
+
+	if (redis_reply->type == REDIS_REPLY_ERROR) {
+	   // Unable to get data item keys from the store.
+	   dbError.set("Unable to get data item keys for the StoreId " + storeIdString +
+	   ". " + std::string(redis_reply->str), DPS_GET_STORE_DATA_ITEM_KEYS_ERROR);
+	   SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_GET_STORE_DATA_ITEM_KEYS_ERROR, "RedisDBLayer");
+	   freeReplyObject(redis_reply);
+	   return;
+	}
+
+	if (redis_reply->type != REDIS_REPLY_ARRAY) {
+	   // Unable to get data item keys from the store in an array format.
+	   dbError.set("Unable to get data item keys in an array format for the StoreId " + storeIdString +
+	   ". " + std::string(redis_reply->str), DPS_GET_STORE_DATA_ITEM_KEYS_AS_AN_ARRAY_ERROR);
+	   SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_GET_STORE_DATA_ITEM_KEYS_AS_AN_ARRAY_ERROR, "RedisDBLayer");
+	   freeReplyObject(this->redis_reply);
+	   return;
+	}
+
+	// We have the data item keys returned in array now.
+	// Let us insert them into the caller provided list (vector) that will hold the data item keys for this store.
+	for (unsigned int j = 0; j < redis_reply->elements; j++) {
+	   data_item_key = string(redis_reply->element[j]->str);
+
+	   // Every dps store will have three mandatory reserved data item keys for internal use.
+	   // Let us not add them to the iteration object's member variable.
+	   if (data_item_key.compare(REDIS_STORE_ID_TO_STORE_NAME_KEY) == 0) {
+	      continue; // Skip this one.
+	   } else if (data_item_key.compare(REDIS_SPL_TYPE_NAME_OF_KEY) == 0) {
+	      continue; // Skip this one.
+	   } else if (data_item_key.compare(REDIS_SPL_TYPE_NAME_OF_VALUE) == 0) {
+	      continue; // Skip this one.
+	   }
+
+	  // In order to support spaces in data item keys, we base64 encoded them before storing it in Redis.
+	  // Let us base64 decode it now to get the original data item key.
+	  string base64_decoded_data_item_key;
+	  base64_decode(data_item_key, base64_decoded_data_item_key);
+	  data_item_key = base64_decoded_data_item_key;
+	  uint32_t keySize = data_item_key.length();
+	  // Allocate memory for this key and copy it to that buffer.
+	  unsigned char * keyData = (unsigned char *) malloc(keySize);
+
+	  if (keyData == NULL) {
+	     // This error will occur very rarely.
+	     // If it happens, we will handle it.
+             freeReplyObject(redis_reply);
+             // We will not return any useful data to the caller.
+             keysBuffer.clear();
+             keysSize.clear();
+
+             dbError.set("Unable to allocate memory for the keyData while doing the next data item iteration for the StoreId " +
+                storeIdString + ".", DPS_STORE_ITERATION_MALLOC_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_STORE_ITERATION_MALLOC_ERROR, "RedisDBLayerr");
+	     return;
+	  }
+
+	  // Copy the raw key data into the allocated buffer.
+	  memcpy(keyData, data_item_key.data(), keySize);
+	  // We are done. We expect the caller to free the keyData and valueData buffers.
+          // Let us append the key and the key size to the user provided lists.
+	  keysBuffer.push_back(keyData);
+          keysSize.push_back(keySize);	
+        } // End of for loop.
+
+	freeReplyObject(redis_reply);
+    } // End of getAllKeys method.
 
   RedisDBLayerIterator::RedisDBLayerIterator() {
 

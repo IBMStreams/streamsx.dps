@@ -434,6 +434,14 @@ it does safety checks and is therefore slower.</description>
         <prototype>public stateful void dpsEndIteration(uint64 store, uint64 iterator, mutable uint64 err)</prototype>
       </function>
       <function>
+        <description>This function can be called to get all the keys present in a given store.
+@param store the handle of the store.
+@param keys a user provided mutable list variable. This list must be suitable for storing the data type of the keys.
+@param err Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise. 
+</description>
+        <prototype>&lt;any T1> public stateful void dpsGetAllKeys(uint64 store, mutable list&lt;T1&gt; keys, mutable uint64 err)</prototype>
+      </function>
+      <function>
         <description> This function serializes all the key-value pairs in a given store id into a blob. The blob can be used to recreate all the key-value pairs into another store. This is a useful technique for copying an entire store into a different store.  See `dpsDeserialize()` for a detailed example on how to use the serialization functions to copy a store.
 @param store the handle of the store to serialize.
 @param data a mutable blob that will contain all the key-value pairs in the store once the serialization is complete.

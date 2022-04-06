@@ -4,13 +4,13 @@
  <info:identity>
    <info:name>04_all_dps_apis_at_work_in_spl</info:name>
    <info:description></info:description>
-   <info:version>1.0.3</info:version>
+   <info:version>1.0.4</info:version>
    <info:requiredProductVersion>4.2.0.0</info:requiredProductVersion>
  </info:identity>
  <info:dependencies>
    <info:toolkit>
      <common:name>com.ibm.streamsx.dps</common:name>
-     <common:version>[3.0.1,9.0.0)</common:version>
+     <common:version>[4.1.4,9.0.0)</common:version>
    </info:toolkit>
  </info:dependencies>
 </info:toolkitInfoModel>
