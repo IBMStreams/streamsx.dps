@@ -67,7 +67,8 @@ composite Main {
 	// suitable one for such data stores based on eventual consistency put/get as well disk based put/get (HBase, Mongo, Couchbase).
 	// Before running this test for those slow data stores, please refer to the commentary at the top of
 	// this composite to reduce the test count in order to obtain reasonable results.
-        () as Sink2 = LockTest() {}
+        // You can uncomment the line below if you want to do that particular test.
+        ///// () as Sink2 = LockTest() {}
 		
         // Do 100K writes and 100K reads and time it.
         // Please be aware this high volume test will finish in a decent time for memcached, Redis, and Aerospike.
@@ -75,7 +76,8 @@ composite Main {
         // hence it may be a long wait before this test completes when you use those data stores.
 	// Before running this test for those slow data stores, please refer to the commentary at the top of
 	// this composite to reduce the test count in order to obtain reasonable results.
-        () as Sink3 = ReadWritePerformanceTest() {}
+        // You can uncomment the line below if you want to do that particular test.
+        ///// () as Sink3 = ReadWritePerformanceTest() {}
         
         // Users can directly execute native back-end data store commands that are of 
         // fire and forget nature (one way calls and not request/response calls).
@@ -1117,19 +1119,24 @@ composite GeneralTest()
 						}
 					}
 
-                                        // Let us do a quick run to show how to obtain all the keys in a given store.
+                                        // <<<<<<< BEGIN DPS BULK getKeys API TEST >>>>>>>
+                                        // Let us do a quick run to show how to obtain multiple keys in a given store.
+                                        printStringLn("");
+                                        printStringLn("");
+                                        printStringLn("<<<<<<< BEGIN DPS BULK getKeys API TEST >>>>>>>"); 
                                         type RuleInstanceKey_t = int32 RuleId, rstring NotifyByValue;
                                         mutable RuleInstanceKey_t dummyRuleInstanceKey = (RuleInstanceKey_t){};
 
 					s = dpsCreateOrGetStore("My_Rules_Store", dummyRuleInstanceKey, dummyRstring, err);
 					if (err != 0ul) {
-						printStringLn("Unexpected error in dpsCreateOrGetStore(My_Rules_Store): rc = " + (rstring)dpsGetLastStoreErrorCode() + 
-							", msg = " + dpsGetLastStoreErrorString());
+						printStringLn("Unexpected error in dpsCreateOrGetStore(My_Rules_Store): rc = " + (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
 					} else {					
-						// Let us add a several thousands of entries in that store.
+						// Let us add several thousands of entries in that store.
                                                 mutable int32 cnt = 0;
+                                                _timeNow = getTimestamp();
+					        _timeInNanoSecondsBeforeExecution =  ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
 
-                                                while(++cnt <= 20000) {
+                                                while(++cnt <= 60000) {
                                                    dummyRuleInstanceKey.RuleId = cnt;
                                                    dummyRuleInstanceKey.NotifyByValue = "V_" + (rstring)cnt;
                                                    rstring valueStr = "Test";
@@ -1139,34 +1146,175 @@ composite GeneralTest()
 						      printStringLn("Unexpected error in dpsPut(My_Rules_Store): rc = " + (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString() + ", cnt=" + (rstring)cnt);
                                                       break; 
                                                    }
-                                                }
+                                                } // End of while loop.
 
-                                                // Let us now get all the keys from the store we populated above.
-                                                mutable list<RuleInstanceKey_t> allKeys = [];
+
+					        _timeNow = getTimestamp();
+					        _timeInNanoSecondsAfterExecution = ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
+					        _totalExecutionTime = _timeInNanoSecondsAfterExecution - _timeInNanoSecondsBeforeExecution;
+
+                                                printStringLn("dpsPut for " + (rstring)(cnt-1) + " keys took " + (rstring)_totalExecutionTime + " nanoseconds.");
+
+                                                // Let us now get multiple keys from the store we populated above in multiple blocks.
+                                                mutable list<RuleInstanceKey_t> keys = [];
+                                                // Stay in a loop and read multiple keys in 5 different blocks.
+                                                // Block1: 15K keys, Block2: 18K keys, Block3: 21K keys,
+                                                // Block4: 24K keys, Block5: 27K keys
+                                                list<int32> numberOfKeysNeeded = [15000, 18000, 21000, 24000, 27000];
+                                                mutable int32 keyStartPosition = 0;
+
+                                                for(int32 myLoopCnt in range(5)) {                                                  
+                                                   _timeNow = getTimestamp();
+					           _timeInNanoSecondsBeforeExecution =  ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
+                                                   dpsGetKeys(s, keys, keyStartPosition, numberOfKeysNeeded[myLoopCnt], "", "", err);
+					           _timeNow = getTimestamp();
+					           _timeInNanoSecondsAfterExecution = ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
+					           _totalExecutionTime = _timeInNanoSecondsAfterExecution - _timeInNanoSecondsBeforeExecution;
+
+						   if (err != 0ul) {
+                                                      printStringLn("");
+                                                      printStringLn("");
+						      printStringLn("Unexpected error in dpsGetKeys(s, keys): rc = " + (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
+						   } else {
+                                                      printStringLn("");
+                                                      printStringLn("");
+                                                      int32 keysFetched = spl.collection::size(keys);
+                                                      printStringLn("Result for Bulk Get " + (rstring)(myLoopCnt + 1) + ": keyStartPosition=" + (rstring)keyStartPosition + ", numberOfKeysNeeded=" + (rstring)numberOfKeysNeeded[myLoopCnt] + ". dpsGetKeys fetched " + (rstring)keysFetched + " keys in " + (rstring)_totalExecutionTime + " nanoseconds.");
+                                                   
+                                                      // Just for sanity test, we will print the very first and last key in the fetched block.
+                                                      if(keysFetched > 0) {
+                                                         printStringLn("Key " + (rstring)keyStartPosition +  " = " + (rstring)keys[0]);
+                                                         printStringLn("Key " + (rstring)(keyStartPosition + keysFetched - 1) + " = " + (rstring)keys[keysFetched-1]);
+                                                      }
+
+                                                      // Change the key start position to the next block.
+                                                      keyStartPosition += numberOfKeysNeeded[myLoopCnt];
+                                                   }
+                                                } // End of for loop to read multiple keys in 5 different blocks.
+						
+
+                                                // Let us now give the number of keys needed as 0 and see if it fetches a maximum of 50000 keys.
                                                 _timeNow = getTimestamp();
 					        _timeInNanoSecondsBeforeExecution =  ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
-                                                dpsGetAllKeys(s, allKeys, err);
+                                                dpsGetKeys(s, keys, 0, 0, "", "", err);
 					        _timeNow = getTimestamp();
 					        _timeInNanoSecondsAfterExecution = ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
 					        _totalExecutionTime = _timeInNanoSecondsAfterExecution - _timeInNanoSecondsBeforeExecution;
 
 						if (err != 0ul) {
-						   printStringLn("Unexpected error in dpsGetAllKeys(s, allKeys): rc = " + (rstring)dpsGetLastStoreErrorCode() + 
-						      ", msg = " + dpsGetLastStoreErrorString());
+                                                   printStringLn("");
+                                                   printStringLn("");
+						   printStringLn("Unexpected error in dpsGetKeys(s, keys) for 50K keys: rc = " + (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
 						} else {
-                                                   printStringLn("dpsGetAllKeys fetched " + (rstring)spl.collection::size(allKeys) + " keys in " + (rstring)_totalExecutionTime + " nanoseconds.");
+                                                   printStringLn("");
+                                                   printStringLn("");
+                                                   int32 keysFetched = spl.collection::size(keys);
+                                                   printStringLn("Result for Bulk Get of 50K keys : keyStartPosition=0, numberOfKeysNeeded=0. dpsGetKeys fetched " + (rstring)keysFetched + " keys in " + (rstring)_totalExecutionTime + " nanoseconds.");
                                                    
-                                                   // If needed, you can uncomment and use the following block of code to print all the key fetched from the store.
-                                                   /*
-                                                   for(RuleInstanceKey_t key in allKeys) {
-                                                      printStringLn((rstring)key);
+                                                   // Just for sanity test, we will print the very first and last key in the fetched block.
+                                                   if(keysFetched > 0) {
+                                                      printStringLn("Key 0 = " + (rstring)keys[0]);
+                                                      printStringLn("Key " + (rstring)(keysFetched - 1) + " = " + (rstring)keys[keysFetched-1]);
                                                    }
-                                                   */
                                                 }
-						
-						// Since we serialized the entire store into a blob, we can get rid of this store.
+
+                                                // Let us now delete 15K keys in the middle of our 60K keys and 
+                                                // make sure we can get back the remaining 45K keys.
+                                                _timeNow = getTimestamp();
+					        _timeInNanoSecondsBeforeExecution =  ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
+                                                
+                                                for(int32 removeCnt in range(35000, 50000)) {
+                                                   dummyRuleInstanceKey.RuleId = removeCnt;
+                                                   dummyRuleInstanceKey.NotifyByValue = "V_" + (rstring)removeCnt;
+
+                                                   dpsRemove(s, dummyRuleInstanceKey, err);
+                                                }
+
+					        _timeNow = getTimestamp();
+					        _timeInNanoSecondsAfterExecution = ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
+					        _totalExecutionTime = _timeInNanoSecondsAfterExecution - _timeInNanoSecondsBeforeExecution;
+
+						if (err != 0ul) {
+                                                   printStringLn("");
+                                                   printStringLn("");
+						   printStringLn("Unexpected error in dpsRemove(s, key): rc = " + (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
+						} else {
+                                                   printStringLn("");
+                                                   printStringLn("");
+                                                   printStringLn("Removed 15000 store keys in " + (rstring)_totalExecutionTime + " nanoseconds.");
+                                                }
+
+                                                // Let us get all the remaining 45K keys and ensure that the
+                                                // very first and last key are still intact with their ordering.
+                                                _timeNow = getTimestamp();
+					        _timeInNanoSecondsBeforeExecution =  ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
+                                                dpsGetKeys(s, keys, 0, 0, "", "", err);
+					        _timeNow = getTimestamp();
+					        _timeInNanoSecondsAfterExecution = ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
+					        _totalExecutionTime = _timeInNanoSecondsAfterExecution - _timeInNanoSecondsBeforeExecution;
+
+						if (err != 0ul) {
+                                                   printStringLn("");
+                                                   printStringLn("");
+						   printStringLn("Unexpected error in dpsGetKeys(s, keys) for 45K keys: rc = " + (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
+						} else {
+                                                   printStringLn("");
+                                                   printStringLn("");
+                                                   int32 keysFetched = spl.collection::size(keys);
+                                                   printStringLn("Result for Bulk Get of 45K keys : keyStartPosition=0, numberOfKeysNeeded=0. dpsGetKeys fetched " + (rstring)keysFetched + " keys in " + (rstring)_totalExecutionTime + " nanoseconds.");
+                                                   
+                                                   // Just for sanity test, we will print the very first and last key in the fetched block.
+                                                   if(keysFetched > 0) {
+                                                      printStringLn("Key 0 = " + (rstring)keys[0]);
+                                                      printStringLn("Key " + (rstring)(keysFetched - 1) + " = " + (rstring)keys[keysFetched-1]);
+                                                   }
+                                                }
+                                                
+                                                _timeNow = getTimestamp();
+					        _timeInNanoSecondsBeforeExecution =  ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
+
+						// This test is fully done. We can get rid of this store.
 						dpsRemoveStore(s, err);
+
+					        _timeNow = getTimestamp();
+					        _timeInNanoSecondsAfterExecution = ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
+					        _totalExecutionTime = _timeInNanoSecondsAfterExecution - _timeInNanoSecondsBeforeExecution;
+
+						if (err != 0ul) {
+                                                   printStringLn("");
+                                                   printStringLn("");
+						   printStringLn("Unexpected error in dpsRemoveStore(s): rc = " + (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString());
+						} else {
+                                                   printStringLn("");
+                                                   printStringLn("");
+
+                                                   printStringLn("dpsRemoveStore(s) completed in " + (rstring)_totalExecutionTime + " nanoseconds.");
+                                                }
+
+                                                // As a final test for the bulk getKeys test, let us try to
+                                                // get the keys of the store that we removed above and ensure that
+                                                // we get back zero keys.
+                                                _timeNow = getTimestamp();
+					        _timeInNanoSecondsBeforeExecution =  ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
+                                                dpsGetKeys(s, keys, 0, 0, "", "", err);
+					        _timeNow = getTimestamp();
+					        _timeInNanoSecondsAfterExecution = ((getSeconds(_timeNow) * (int64)1000000000) + (int64)getNanoseconds(_timeNow));
+					        _totalExecutionTime = _timeInNanoSecondsAfterExecution - _timeInNanoSecondsBeforeExecution;
+
+						if (spl.collection::size(keys) == 0) {
+                                                   printStringLn("");
+                                                   printStringLn("");
+						   printStringLn("We got the correct expected zero keys by calling dpsGetKeys(s, keys) on a non-existing store: rc = " + (rstring)dpsGetLastStoreErrorCode() + ", msg = " + dpsGetLastStoreErrorString() + ". It took " + (rstring)_totalExecutionTime + " nanoseconds.");
+						} else {
+                                                   printStringLn("");
+                                                   printStringLn("");
+                                                   printStringLn("We got a wrong result from getKeys returning keys for a non-existing store. It took " + (rstring)_totalExecutionTime + " nanoseconds.");
+                                                }
 					}
+
+                                        printStringLn("");
+                                        printStringLn("<<<<<<< END DPS BULK getKeys API TEST >>>>>>>"); 
+                                        // <<<<<<< END DPS BULK getKeys API TEST >>>>>>>
 
                     // Signal the next operator to read and write using the two presidential stores we created above.
                     mutable NextBeat _beat = {};

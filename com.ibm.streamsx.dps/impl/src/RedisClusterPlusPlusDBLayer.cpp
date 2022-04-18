@@ -74,6 +74,7 @@ paragraph.
 
 #include <iostream>
 #include <unistd.h>
+#include <random>
 #include <sys/utsname.h>
 #include <sstream>
 #include <chrono>
@@ -604,16 +605,21 @@ namespace distributed
      2) Create "Store Contents Hash": '1' + 'store id' => 'Redis Hash'                                                                                            
         This hash will always have the following three metadata entries:                                                                                       
         * a) dps_name_of_this_store ==> 'store name'                                                                                                     		   
-        * b) dps_spl_type_name_of_key ==> 'spl type name for this store's key'                                                                                      
-        * c) dps_spl_type_name_of_value ==> 'spl type name for this store's value'                                                                                  
-     3) In addition, we will also create and delete custom locks for modifying store contents in (2) above: '4' + 'store id' + 'dps_lock' => 1                   
+        * b) dps_spl_type_name_of_key ==> 'spl type name for this store's key'  
+        * c) dps_spl_type_name_of_value ==> 'spl type name for this store's value'
 
-     4) Create a root entry called "Lock Name":  '5' + 'lock name' ==> 'lock id'    [This lock is used for performing store commands in a transaction block.]    
+     3) Create "Store Ordered Keys Set: '101' + 'store id' => 'Redis Sorted Set' 
+         (This is used for storing all the store keys in sorted order. It will be used in getting bulk keys for a given key range.)
 
-     5) Create "Lock Info":  '6' + 'lock id' ==> 'lock use count' + '_' + 'lock expiration time expressed as elapsed seconds since the epoch' + '_' + 'lock name' 
+     4) In addition, we will also create and delete custom locks for modifying store contents in (2) above: '4' + 'store id' + 'dps_lock' => 1                   
 
-     6) In addition, we will also create and delete user-defined locks: '7' + 'lock id' + 'dl_lock' => 1                                                          
-     7) We will also allow general purpose locks to be created by any entity for sundry use:  '501' + 'entity name' + 'generic_lock' => 1                         
+     5) Create a root entry called "Lock Name":  '5' + 'lock name' ==> 'lock id'    [This lock is used for performing store commands in a transaction block.]    
+
+     6) Create "Lock Info":  '6' + 'lock id' ==> 'lock use count' + '_' + 'lock expiration time expressed as elapsed seconds since the epoch' + '_' + 'lock name' 
+
+     7) In addition, we will also create and delete user-defined locks: '7' + 'lock id' + 'dl_lock' => 1 
+
+     8) We will also allow general purpose locks to be created by any entity for sundry use:  '501' + 'entity name' + 'generic_lock' => 1                         
      */
 
      //
@@ -1267,6 +1273,66 @@ namespace distributed
         return(false);
      }
 
+     // Apr/16/2022
+     // We may have a Redis Sorted Set associated with this store being removed. That set is used for bulk APIs. We can remove it now as the store itself is gone now.
+     string keyString = string(DPS_STORE_ORDERED_KEYS_SET_TYPE ) + storeIdString;
+     exceptionString = "";
+     exceptionType = REDIS_PLUS_PLUS_NO_ERROR;
+     
+     try {
+        redis_cluster->del(keyString);
+     } catch (const ReplyError &ex) {
+        // WRONGTYPE Operation against a key holding the wrong kind of value
+        exceptionString = ex.what();
+        // Command execution error.
+        exceptionType = REDIS_PLUS_PLUS_REPLY_ERROR;
+     } catch (const TimeoutError &ex) {
+        // Reading or writing timeout
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;        
+     } catch (const ClosedError &ex) {
+        // Connection has been closed.
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
+     } catch (const IoError &ex) {
+        // I/O error on the connection.
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
+     } catch (const Error &ex) {
+        // Other errors
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_OTHER_ERROR;
+     }
+
+     // Did we encounter a redis-cluster server connection error?
+     if (exceptionType == REDIS_PLUS_PLUS_CONNECTION_ERROR) {
+        // This is how we can detect that a wrong redis-cluster server name is configured by the user or
+        // not even a single redis-cluster server daemon being up and running.
+        // This is a serious error.
+        dbError.set(string("Unable to connect to the redis-cluster server(s).") +
+           string(" Got an exception for REDIS_DEL_CMD3: ") + exceptionString + 
+           " Application code may call the DPS reconnect API and then retry the failed operation. ", 
+           DPS_CONNECTION_ERROR);
+        SPLAPPTRC(L_ERROR, "Inside removeStore, it failed for store id " << storeIdString << " with a store name " << storeName << " with a Redis connection error for REDIS_DEL_CMD3. Exception: " << exceptionString << ". Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterPlusPlusDBLayer");
+        releaseStoreLock(storeIdString);
+        return(false);
+     }
+
+     // Did we encounter a redis reply error?
+     if (exceptionType == REDIS_PLUS_PLUS_REPLY_ERROR || 
+        exceptionType == REDIS_PLUS_PLUS_OTHER_ERROR) {
+        dbError.set("Unable to delete a store name sorted set with an id " + storeIdString + 
+           " with a store name " + storeName + 
+           ". Error=" + exceptionString, DPS_STORE_REMOVAL_ERROR);
+        SPLAPPTRC(L_ERROR, "Inside removeStore, it failed to delete a store name sorted set with an id " << storeIdString << " with a store name " << storeName << ". Error=" << exceptionString << ". rc=" << DPS_STORE_REMOVAL_ERROR, "RedisClusterPlusPlusDBLayer");
+        releaseStoreLock(storeIdString);
+        return(false);
+     }
+
      // Life of this store ended completely with no trace left behind.
      releaseStoreLock(storeIdString);
      return(true);
@@ -1360,6 +1426,75 @@ namespace distributed
         dbError.set("Unable to store a data item in the store id " + storeIdString + 
            ". Error=" + exceptionString, DPS_DATA_ITEM_WRITE_ERROR);
         SPLAPPTRC(L_ERROR, "Inside put, it failed for store id " << storeIdString << ". Error=" << exceptionString << ". rc=" << DPS_DATA_ITEM_WRITE_ERROR, "RedisClusterPlusPlusDBLayer");
+        return(false);
+     }
+
+     // Apr/15/2022.
+     // We will also add the key we stored above in a Redis sorted set. That will be useful for
+     // implementing bulk APIs (donw in later part of this source file) to get a range of keys.
+     // This action is performed on the Store Ordered Keys Set that takes the following format.
+     // '101' + 'store id' => 'Redis SortedSet'  
+     keyString = string(DPS_STORE_ORDERED_KEYS_SET_TYPE ) + storeIdString;
+   
+     // We will add the key involved in this put to this store's sorted set.
+     // NX flag in this command means that only add new elements. Don't update already existing elements.
+     // All the keys in our store's sorted set will have a random scoreto make the sorting work faster.
+     //
+     // Generate a random number by using the C++11 supported APIs.
+     std::default_random_engine generator;
+     // Random number range is as shown here.
+     std::uniform_int_distribution<int> distribution(1, 5000000);
+     int randomScore = distribution(generator);;
+
+     try {
+        redis_cluster->zadd(keyString, 
+           base64_encoded_data_item_key, randomScore, UpdateType::NOT_EXIST);
+     } catch (const ReplyError &ex) {
+        // WRONGTYPE Operation against a key holding the wrong kind of value
+        exceptionString = ex.what();
+        // Command execution error.
+        exceptionType = REDIS_PLUS_PLUS_REPLY_ERROR;
+     } catch (const TimeoutError &ex) {
+        // Reading or writing timeout
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;        
+     } catch (const ClosedError &ex) {
+        // Connection has been closed.
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
+     } catch (const IoError &ex) {
+        // I/O error on the connection.
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
+     } catch (const Error &ex) {
+        // Other errors
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_OTHER_ERROR;
+     }
+
+     // Did we encounter a redis-cluster server connection error?
+     if (exceptionType == REDIS_PLUS_PLUS_CONNECTION_ERROR) {
+        // This is how we can detect that a wrong redis-cluster server name is configured by the user or
+        // not even a single redis-cluster server daemon being up and running.
+        // This is a serious error.
+        dbError.set(string("Unable to connect to the redis-cluster server(s).") +
+           string(" Got an exception for REDIS_ZADD_CMD: ") + exceptionString + 
+           " Application code may call the DPS reconnect API and then retry the failed operation. ", 
+           DPS_CONNECTION_ERROR);
+        SPLAPPTRC(L_ERROR, "Inside put, it failed for store id " << storeIdString << " with a Redis connection error for REDIS_ZADD_CMD. Exception: " << exceptionString << ". Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterPlusPlusDBLayer");
+        return(false);
+     }
+
+     // Did we encounter a redis reply error?
+     if (exceptionType == REDIS_PLUS_PLUS_REPLY_ERROR || 
+        exceptionType == REDIS_PLUS_PLUS_OTHER_ERROR) {
+        dbError.set("Unable to add a key in store's sorted set for the store id " + storeIdString + 
+           ". Error=" + exceptionString, DPS_DATA_ITEM_WRITE_ERROR);
+        SPLAPPTRC(L_ERROR, "Inside put, it failed for store id " << storeIdString << " while adding a key in store's sorted set. Error=" << exceptionString << ". rc=" << DPS_DATA_ITEM_WRITE_ERROR, "RedisClusterPlusPlusDBLayer");
         return(false);
      }
 
@@ -1468,6 +1603,77 @@ namespace distributed
         dbError.set("Unable to store a data item in the store id " + storeIdString + 
            ". Error=" + exceptionString, DPS_DATA_ITEM_WRITE_ERROR);
         SPLAPPTRC(L_ERROR, "Inside put, it failed for store id " << storeIdString << ". Error=" << exceptionString << ". rc=" << DPS_DATA_ITEM_WRITE_ERROR, "RedisClusterPlusPlusDBLayer");
+        releaseStoreLock(storeIdString);
+        return(false);
+     }
+
+     // Apr/15/2022.
+     // We will also add the key we stored above in a Redis sorted set. That will be useful for
+     // implementing bulk APIs (donw in later part of this source file) to get a range of keys.
+     // This action is performed on the Store Ordered Keys Set that takes the following format.
+     // '101' + 'store id' => 'Redis SortedSet'  
+     keyString = string(DPS_STORE_ORDERED_KEYS_SET_TYPE ) + storeIdString;
+   
+     // We will add the key involved in this put to this store's sorted set.
+     // NX flag in this command means that only add new elements. Don't update already existing elements.
+     // All the keys in our store's sorted set will have a random scoreto make the sorting work faster.
+     //
+     // Generate a random number by using the C++11 supported APIs.
+     std::default_random_engine generator;
+     // Random number range is as shown here.
+     std::uniform_int_distribution<int> distribution(1, 5000000);
+     int randomScore = distribution(generator);;
+
+     try {
+        redis_cluster->zadd(keyString, 
+           base64_encoded_data_item_key, randomScore, UpdateType::NOT_EXIST);
+     } catch (const ReplyError &ex) {
+        // WRONGTYPE Operation against a key holding the wrong kind of value
+        exceptionString = ex.what();
+        // Command execution error.
+        exceptionType = REDIS_PLUS_PLUS_REPLY_ERROR;
+     } catch (const TimeoutError &ex) {
+        // Reading or writing timeout
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;        
+     } catch (const ClosedError &ex) {
+        // Connection has been closed.
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
+     } catch (const IoError &ex) {
+        // I/O error on the connection.
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
+     } catch (const Error &ex) {
+        // Other errors
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_OTHER_ERROR;
+     }
+
+     // Did we encounter a redis-cluster server connection error?
+     if (exceptionType == REDIS_PLUS_PLUS_CONNECTION_ERROR) {
+        // This is how we can detect that a wrong redis-cluster server name is configured by the user or
+        // not even a single redis-cluster server daemon being up and running.
+        // This is a serious error.
+        dbError.set(string("Unable to connect to the redis-cluster server(s).") +
+           string(" Got an exception for REDIS_ZADD_CMD: ") + exceptionString + 
+           " Application code may call the DPS reconnect API and then retry the failed operation. ", 
+           DPS_CONNECTION_ERROR);
+        SPLAPPTRC(L_ERROR, "Inside putSafe, it failed for store id " << storeIdString << " with a Redis connection error for REDIS_ZADD_CMD. Exception: " << exceptionString << ". Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterPlusPlusDBLayer");
+        releaseStoreLock(storeIdString);
+        return(false);
+     }
+
+     // Did we encounter a redis reply error?
+     if (exceptionType == REDIS_PLUS_PLUS_REPLY_ERROR || 
+        exceptionType == REDIS_PLUS_PLUS_OTHER_ERROR) {
+        dbError.set("Unable to add a key in store's sorted set for the store id " + storeIdString + 
+           ". Error=" + exceptionString, DPS_DATA_ITEM_WRITE_ERROR);
+        SPLAPPTRC(L_ERROR, "Inside putSafe, it failed for store id " << storeIdString << " while adding a key in store's sorted set. Error=" << exceptionString << ". rc=" << DPS_DATA_ITEM_WRITE_ERROR, "RedisClusterPlusPlusDBLayer");
         releaseStoreLock(storeIdString);
         return(false);
      }
@@ -1875,6 +2081,69 @@ namespace distributed
         releaseStoreLock(storeIdString);
         return(false);
      }
+
+     // Apr/16/2022
+     // I recently added support for bulk APIs. For that, I had to use a sorted set and keep all the
+     // store keys in sorted order. Since we removed a store key above, it is necessary to remove that
+     // same key from the Redis sorted set as well. Let us do that now.
+     keyString = string(DPS_STORE_ORDERED_KEYS_SET_TYPE ) + storeIdString;
+     exceptionString = "";
+     exceptionType = REDIS_PLUS_PLUS_NO_ERROR;
+
+     try {
+        redis_cluster->zrem(keyString, base64_encoded_data_item_key);
+     } catch (const ReplyError &ex) {
+        // WRONGTYPE Operation against a key holding the wrong kind of value
+        exceptionString = ex.what();
+        // Command execution error.
+        exceptionType = REDIS_PLUS_PLUS_REPLY_ERROR;
+     } catch (const TimeoutError &ex) {
+        // Reading or writing timeout
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;        
+     } catch (const ClosedError &ex) {
+        // Connection has been closed.
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
+     } catch (const IoError &ex) {
+        // I/O error on the connection.
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
+     } catch (const Error &ex) {
+        // Other errors
+        exceptionString = ex.what();
+        // Connectivity related error.
+        exceptionType = REDIS_PLUS_PLUS_OTHER_ERROR;
+     }
+
+     // Did we encounter a redis-cluster server connection error?
+     if (exceptionType == REDIS_PLUS_PLUS_CONNECTION_ERROR) {
+        // This is how we can detect that a wrong redis-cluster server name is configured by the user or
+        // not even a single redis-cluster server daemon being up and running.
+        // This is a serious error.
+        dbError.set(string("Unable to connect to the redis-cluster server(s).") +
+           string(" Got an exception for REDIS_ZREM_CMD: ") + exceptionString + 
+           " Application code may call the DPS reconnect API and then retry the failed operation. ", 
+           DPS_CONNECTION_ERROR);
+        SPLAPPTRC(L_ERROR, "Inside remove, it failed with a Redis connection error for REDIS_ZREM_CMD. Exception: " << exceptionString << ". Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterPlusPlusDBLayer");
+        releaseStoreLock(storeIdString);
+        return(false);
+     }
+
+     // Did we encounter a redis reply error?
+     if (exceptionType == REDIS_PLUS_PLUS_REPLY_ERROR || 
+        exceptionType == REDIS_PLUS_PLUS_OTHER_ERROR) {
+        dbError.set("Unable to remove the requested Sorted Set member for the store id " + storeIdString + ". Error=" + exceptionString, DPS_DATA_ITEM_DELETE_ERROR);
+        SPLAPPTRC(L_ERROR, "Inside remove, it failed while removing the requested Sorted Set member for the store id " << storeIdString << ". Error=" << exceptionString << ". rc=" << DPS_DATA_ITEM_DELETE_ERROR, "RedisClusterPlusPlusDBLayer");
+        releaseStoreLock(storeIdString);
+        return(false);
+     }
+
+     // At this point, ZREM should have done its work irrespective of whether the requested sorted set member is present or not.
+     // No need to check for confirmation of ZREM.
 
      // All done. An existing data item in the given store has been removed.
      releaseStoreLock(storeIdString);
@@ -3672,145 +3941,151 @@ namespace distributed
   } // End of releaseGeneralPurposeLock.
 
     // Senthil added this on Apr/06/2022.
-    // This method will get all the keys from the given store and
+    // This method will get multiple keys from the given store and
     // populate them in the caller provided list (vector).
     // Be aware of the time it can take to fetch all the keys in a store
     // that has several tens of thousands of keys. In such cases, the caller
     // has to maintain calm until we return back here.
-    void RedisClusterPlusPlusDBLayer::getAllKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, PersistenceError & dbError) {
-	  SPLAPPTRC(L_DEBUG, "Inside getAllKeys for store id " << store, "RedisClusterPlusPlusDBLayer");
-
-        // In the caller provided list (vector), we will return back the unsigned char * pointer for every key found in the store. Clear that vector now.
-        keysBuffer.clear();
-        // In the caller provided list (vector), we will return back the uint32_t size of every key found in the store. Clear that vector now.
-        keysSize.clear();
+    //
+    /// Get multiple keys present in a given store.
+    /// @param store The handle of the store.
+    /// @param keys User provided mutable list variable. This list must be suitable for storing multiple keys found in a given store and it must be made of a given store's key data type.
+    /// @param keyStartPosition User can indicate a start position from where keys should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
+    /// @param numberOfKeysNeeded User can indicate the total number of keys to be returned as available from the given key start position. It must be greater than or equal to 0 and less than or equal to 50000. If it is set to 0, then all the available keys upto a maximum of 50000 keys from the given key start position will be returned.
+    /// @param err Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise. 
+    ///
+    void RedisClusterPlusPlusDBLayer::getKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, int32_t keyStartPosition, int32_t numberOfKeysNeeded, PersistenceError & dbError) {
+	  SPLAPPTRC(L_DEBUG, "Inside getKeys for store id " << store, "RedisClusterPlusPlusDBLayer");
 
 	  std::ostringstream storeId;
 	  storeId << store;
 	  string storeIdString = storeId.str();
 	  string data_item_key = "";
 
-	  // Ensure that a store exists for the given store id.
-	  if (storeIdExistsOrNot(storeIdString, dbError) == false) {
-             if (dbError.hasError() == true) {
-	        SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisClusterPlusPlusDBLayer");
-             } else {
-	        dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
-	        SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisClusterPlusPlusDBLayer");
-             }
+          // Before doing anything here, let us validate the user given values for start position and number of keys needed.
+          if(keyStartPosition < 0) {
+             dbError.set("A negative value was given for key start position. Error location: Get Keys.", DPS_NEGATIVE_KEY_START_POS_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside getKeys, it failed for store " << storeIdString << ". A negative value was given for key start position." << DPS_NEGATIVE_KEY_START_POS_ERROR, "RedisClusterPlusPlusDBLayer");
+             return;             
+          }
 
+          // User can provide the numberOfKeysNeeded from 0 to 50000. Validate that.
+          if(numberOfKeysNeeded < 0 || numberOfKeysNeeded > 50000) {
+             dbError.set("Invalid value given for number of keys needed. Valid range is from 0 to 50000. Error location: Get Keys.", DPS_INVALID_NUM_KEYS_NEEDED_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside getKeys, it failed for store " << storeIdString << ". Invalid value given for number of keys needed. Valid range is from 0 to 50000. " << DPS_INVALID_NUM_KEYS_NEEDED_ERROR, "RedisClusterPlusPlusDBLayer");
+             return;             
+          }
+
+          int keyEndPosition = 0;
+
+          // If user specified a value of 0 for number of keys needed, we will set it to a
+          // block of 50000 keys to be returned back.
+          if(numberOfKeysNeeded == 0) {
+             // Sorted set is zero based. So, one less than 50000.
+             keyEndPosition = keyStartPosition + 49999;
+          } else {
+             // Sorted set is zero based. So, one less than what the user asked for.
+             keyEndPosition = keyStartPosition + numberOfKeysNeeded - 1;
+          }
+
+          // In the caller provided list (vector), we will return back the unsigned char * pointer for every key found in the store. Clear that vector now.
+          keysBuffer.clear();
+          // In the caller provided list (vector), we will return back the uint32_t size of every key found in the store. Clear that vector now.
+          keysSize.clear();
+
+          // For getting the keys in bulk, we have a Redis Sorted Set for every store that contains 
+          // all the keys preent in the store. It is keeping them in sorted order. That will help us
+          // to deterministically return the keys to the caller based on a given range.
+          // We will do it on a best effort basis to achieve good performande by skipping the
+          // store existence check, store empty check etc.
+          string keyString = string(DPS_STORE_ORDERED_KEYS_SET_TYPE ) + storeIdString;
+          std::vector<std::string> keys;
+          string exceptionString = "";
+          int exceptionType = REDIS_PLUS_PLUS_NO_ERROR;
+
+          try {
+             redis_cluster->zrange(keyString, keyStartPosition, keyEndPosition, std::back_inserter(keys));
+          } catch (const ReplyError &ex) {
+             // WRONGTYPE Operation against a key holding the wrong kind of value
+             exceptionString = ex.what();
+             // Command execution error.
+             exceptionType = REDIS_PLUS_PLUS_REPLY_ERROR;
+          } catch (const TimeoutError &ex) {
+             // Reading or writing timeout
+             exceptionString = ex.what();
+             // Connectivity related error.
+             exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;        
+          } catch (const ClosedError &ex) {
+             // Connection has been closed.
+             exceptionString = ex.what();
+             // Connectivity related error.
+             exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
+          } catch (const IoError &ex) {
+             // I/O error on the connection.
+             exceptionString = ex.what();
+             // Connectivity related error.
+             exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
+          } catch (const Error &ex) {
+             // Other errors
+             exceptionString = ex.what();
+             // Connectivity related error.
+             exceptionType = REDIS_PLUS_PLUS_OTHER_ERROR;
+          }
+
+          // Did we encounter a redis-cluster server connection error?
+          if (exceptionType == REDIS_PLUS_PLUS_CONNECTION_ERROR) {
+             // This is how we can detect that a wrong redis-cluster server name is configured by the user or
+             // not even a single redis-cluster server daemon being up and running.
+             // This is a serious error.
+             dbError.set(string("getKeys: Unable to connect to the redis-cluster server(s).") +
+                string(" Got an exception for REDIS_ZRANGE_CMD: ") + exceptionString + 
+                " Application code may call the DPS reconnect API and then retry the failed operation. ", 
+                DPS_CONNECTION_ERROR);
+             SPLAPPTRC(L_ERROR, "Inside getKeys, it failed with a Redis connection error for REDIS_ZRANGE_CMD. Exception: " << exceptionString << ". Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterPlusPlusDBLayer");
              return;
-	  }
+          }
 
-	  // Ensure that this store is not empty at this time.
-	  if (size(store, dbError) <= 0) {
-	     dbError.set("Store is empty for the StoreId " + storeIdString + ".", DPS_STORE_EMPTY_ERROR);
-	     SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_STORE_EMPTY_ERROR, "RedisClusterPlusPlusDBLayer");
-	     return;
-	  }
-    
+          // Did we encounter a redis reply error?
+          if (exceptionType == REDIS_PLUS_PLUS_REPLY_ERROR || 
+             exceptionType == REDIS_PLUS_PLUS_OTHER_ERROR) {
+             // Unable to get data item keys from the store.
+             dbError.set("Unable to get keys via ZRANGE for the StoreId " + storeIdString + ". Error=" + exceptionString, DPS_GET_STORE_DATA_ITEM_KEYS_ERROR);
+             SPLAPPTRC(L_ERROR, "Inside getKeys, ZRANGE failed to get keys from the StoreId " << storeIdString << ". Error=" << exceptionString << ". rc=" << DPS_GET_STORE_DATA_ITEM_KEYS_ERROR, "RedisClusterPlusPlusDBLayer");
+             return;
+          }
 
-        // Let us get the available data item keys from this store.
-        string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
-        std::vector<std::string> keys;
-        string exceptionString = "";
-        int exceptionType = REDIS_PLUS_PLUS_NO_ERROR;
+	  // We have the data item keys returned in array now.
+	  // Let us insert them into the caller provided list (vector) that will hold the data item keys for this store.
+          for(unsigned int i=0; i < keys.size(); i++) {
+             data_item_key = keys[i];
+	     // In order to support spaces in data item keys, we base64 encoded them before storing it in Redis.
+	     // Let us base64 decode it now to get the original data item key.
+	     string base64_decoded_data_item_key;
+	     base64_decode(data_item_key, base64_decoded_data_item_key);
+	     data_item_key = base64_decoded_data_item_key;
+	     uint32_t keySize = data_item_key.length();
+	     // Allocate memory for this key and copy it to that buffer.
+	     unsigned char * keyData = (unsigned char *) malloc(keySize);
 
-        try {
-           redis_cluster->hkeys(keyString, std::back_inserter(keys));
-        } catch (const ReplyError &ex) {
-           // WRONGTYPE Operation against a key holding the wrong kind of value
-           exceptionString = ex.what();
-           // Command execution error.
-           exceptionType = REDIS_PLUS_PLUS_REPLY_ERROR;
-        } catch (const TimeoutError &ex) {
-           // Reading or writing timeout
-           exceptionString = ex.what();
-           // Connectivity related error.
-           exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;        
-        } catch (const ClosedError &ex) {
-           // Connection has been closed.
-           exceptionString = ex.what();
-           // Connectivity related error.
-           exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
-        } catch (const IoError &ex) {
-           // I/O error on the connection.
-           exceptionString = ex.what();
-           // Connectivity related error.
-           exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
-        } catch (const Error &ex) {
-           // Other errors
-           exceptionString = ex.what();
-           // Connectivity related error.
-           exceptionType = REDIS_PLUS_PLUS_OTHER_ERROR;
-        }
+	     if (keyData == NULL) {
+	        // This error will occur very rarely.
+	        // If it happens, we will handle it.
+                // We will leave any partially filled data in the user provided list.
+                // On detection the db error flag, caller should take the necessary steps to
+                // free the allocated memory for the partially filled data in that list.
+                dbError.set("Unable to allocate memory for the keyData while fetching bulk keys in getKeys for the StoreId " + storeIdString + ".", DPS_STORE_ITERATION_MALLOC_ERROR);
+                SPLAPPTRC(L_DEBUG, "Inside getKeys, it failed for store id " << storeIdString << ". " << DPS_STORE_ITERATION_MALLOC_ERROR, "RedisClusterPlusPlusDBLayerr");
+	        return;
+	     }
 
-        // Did we encounter a redis-cluster server connection error?
-        if (exceptionType == REDIS_PLUS_PLUS_CONNECTION_ERROR) {
-           // This is how we can detect that a wrong redis-cluster server name is configured by the user or
-           // not even a single redis-cluster server daemon being up and running.
-           // This is a serious error.
-           dbError.set(string("getNext: Unable to connect to the redis-cluster server(s).") +
-              string(" Got an exception for REDIS_HKEYS_CMD: ") + exceptionString + 
-              " Application code may call the DPS reconnect API and then retry the failed operation. ", 
-              DPS_CONNECTION_ERROR);
-           SPLAPPTRC(L_ERROR, "Inside getAllKeys, it failed with a Redis connection error for REDIS_HKEYS_CMD. Exception: " << exceptionString << ". Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterPlusPlusDBLayer");
-           return;
-        }
-
-        // Did we encounter a redis reply error?
-        if (exceptionType == REDIS_PLUS_PLUS_REPLY_ERROR || 
-           exceptionType == REDIS_PLUS_PLUS_OTHER_ERROR) {
-           // Unable to get data item keys from the store.
-           dbError.set("Unable to get data item keys for the StoreId " + storeIdString + ". Error=" + exceptionString, DPS_GET_STORE_DATA_ITEM_KEYS_ERROR);
-           SPLAPPTRC(L_ERROR, "Inside getAllKeys, it failed to get data item keys from the StoreId " << storeIdString << ". Error=" << exceptionString << ". rc=" << DPS_GET_STORE_DATA_ITEM_KEYS_ERROR, "RedisClusterPlusPlusDBLayer");
-           return;
-        }
-
-	// We have the data item keys returned in array now.
-	// Let us insert them into the caller provided list (vector) that will hold the data item keys for this store.
-        for(unsigned int i=0; i < keys.size(); i++) {
-           data_item_key = keys[i];
-	   // Every dps store will have three mandatory reserved data item keys for internal use.
-	   // Let us not add them to the caller provided list (vector).
-	   if (data_item_key.compare(REDIS_STORE_ID_TO_STORE_NAME_KEY) == 0) {
-	      continue; // Skip this one.
-	   } else if (data_item_key.compare(REDIS_SPL_TYPE_NAME_OF_KEY) == 0) {
-	      continue; // Skip this one.
-	   } else if (data_item_key.compare(REDIS_SPL_TYPE_NAME_OF_VALUE) == 0) {
-	      continue; // Skip this one.
-	   }
-
-	  // In order to support spaces in data item keys, we base64 encoded them before storing it in Redis.
-	  // Let us base64 decode it now to get the original data item key.
-	  string base64_decoded_data_item_key;
-	  base64_decode(data_item_key, base64_decoded_data_item_key);
-	  data_item_key = base64_decoded_data_item_key;
-	  uint32_t keySize = data_item_key.length();
-	  // Allocate memory for this key and copy it to that buffer.
-	  unsigned char * keyData = (unsigned char *) malloc(keySize);
-
-	  if (keyData == NULL) {
-	     // This error will occur very rarely.
-	     // If it happens, we will handle it.
-             // We will not return any useful data to the caller.
-             keysBuffer.clear();
-             keysSize.clear();
-
-             dbError.set("Unable to allocate memory for the keyData while doing the next data item iteration for the StoreId " +
-                storeIdString + ".", DPS_STORE_ITERATION_MALLOC_ERROR);
-             SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_STORE_ITERATION_MALLOC_ERROR, "RedisClusterPlusPlusDBLayerr");
-	     return;
-	  }
-
-	  // Copy the raw key data into the allocated buffer.
-	  memcpy(keyData, data_item_key.data(), keySize);
-	  // We are done. We expect the caller to free the keyData and valueData buffers.
-          // Let us append the key and the key size to the user provided lists.
-	  keysBuffer.push_back(keyData);
-          keysSize.push_back(keySize);	  
-        } // End of for loop.
-    } // End of getAllKeys method.
+	     // Copy the raw key data into the allocated buffer.
+	     memcpy(keyData, data_item_key.data(), keySize);
+	     // We are done. We expect the caller to free the keyData and valueData buffers.
+             // Let us append the key and the key size to the user provided lists.
+	     keysBuffer.push_back(keyData);
+             keysSize.push_back(keySize);	  
+          } // End of for loop.
+    } // End of getKeys method.
 
   RedisClusterPlusPlusDBLayerIterator::RedisClusterPlusPlusDBLayerIterator() {
 

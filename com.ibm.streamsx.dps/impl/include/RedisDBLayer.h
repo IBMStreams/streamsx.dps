@@ -110,7 +110,7 @@ namespace distributed
 
   public:
     int32_t redisPartitionCnt;
-
+    
     /// Constructor
     RedisDBLayer();
 
@@ -175,7 +175,7 @@ namespace distributed
 		std::string const & baseUrl, std::string const & apiEndpoint, std::string const & queryParams,
 		std::string const & jsonRequest, std::string & jsonResponse, PersistenceError & dbError);
         bool runDataStoreCommand(std::vector<std::string> const & cmdList, std::string & resultValue, PersistenceError & dbError);
-    void getAllKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, PersistenceError & dbError);
+   void getKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, int32_t keyStartPosition, int32_t numberOfKeysNeeded, PersistenceError & dbError);
 
 	// Lock related methods.
     uint64_t createOrGetLock(std::string const & name, PersistenceError & lkError);

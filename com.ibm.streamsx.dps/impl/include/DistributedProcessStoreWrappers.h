@@ -300,14 +300,19 @@ namespace distributed
     return DistributedProcessStore::getGlobalStore().endIteration(store, iterator, err);  
   } 
 
-  /// Get all the keys in a given store.
-  /// @param store store handle
-  /// @param List (vector) of a specific key type
-  /// @param err store error code
-  template<class T1>                 
-  void dpsGetAllKeys(SPL::uint64 store, SPL::list<T1> & keys, SPL::uint64 & err)
+  /// Get multiple keys present in a given store.
+  /// @param store The handle of the store.
+  /// @param keys User provided mutable list variable. This list must be suitable for storing multiple keys found in a given store and it must be made of a given store's key data type.
+  /// @param keyStartPosition User can indicate a start position from where keys should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
+  /// @param numberOfKeysNeeded User can indicate the total number of keys to be returned as available from the given key start position. It must be greater than or equal to 0 and less than or equal to 50000. If it is set to 0, then all the available keys upto a maximum of 50000 keys from the given key start position will be returned.
+  /// @param keyExpression User can provide an expression made of the attributes from the key's data type. This expression will be evaluated in determining which matching keys to be returned. [This feature is not implemented at this time.]
+  /// @param valueExpression User can provide an expression made of the attributes from the value's data type. This expression will be evaluated in determining which matching keys to be returned. [This feature is not implemented at this time.]
+  /// @param err Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise. 
+  ///
+  template<class T1>
+  void dpsGetKeys(SPL::uint64 store, SPL::list<T1> & keys, SPL::int32 const & keyStartPosition, SPL::int32 const & numberOfKeysNeeded, SPL::rstring const & keyExpression, SPL::rstring const & valueExpression, SPL::uint64 & err)
   {
-    return DistributedProcessStore::getGlobalStore().getAllKeysHelper(store, keys, err);
+    return DistributedProcessStore::getGlobalStore().getKeys(store, keys, keyStartPosition, numberOfKeysNeeded, keyExpression, valueExpression, err);
   }           
 
   /// Serialize the items from the serialized store

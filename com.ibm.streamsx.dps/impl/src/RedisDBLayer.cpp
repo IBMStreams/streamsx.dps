@@ -83,6 +83,7 @@ paragraph.
 #include <SPL/Runtime/Type/SPLType.h>
 #include <SPL/Runtime/Function/TimeFunctions.h>
 #include <SPL/Runtime/Function/UtilFunctions.h>
+#include <SPL/Runtime/Function/MathFunctions.h>
 
 #include <iostream>
 #include <unistd.h>
@@ -765,20 +766,24 @@ namespace distributed
 			/*
 			We secured a guid. We can now create this store. Layout for a distributed process store (dps) looks like this.
 			****************************************************************************************************************************************************************
-			* 1) Create a root entry called "Store Name":  '0' + 'store name' => 'store id'                                                                                *
-			* 2) Create "Store Contents Hash": '1' + 'store id' => 'Redis Hash'                                                                                            *
-			*       This hash will always have the following three metadata entries:                                                                                       *
-			*       dps_name_of_this_store ==> 'store name'                                                                                                     		   *
-			*       dps_spl_type_name_of_key ==> 'spl type name for this store's key'                                                                                      *
-			*       dps_spl_type_name_of_value ==> 'spl type name for this store's value'                                                                                  *
-			* 3) In addition, we will also create and delete custom locks for modifying store contents in  (2) above: '4' + 'store id' + 'dps_lock' => 1                   *
-			*                                                                                                                                                              *
-			*                                                                                                                                                              *
-			* 4) Create a root entry called "Lock Name":  '5' + 'lock name' ==> 'lock id'    [This lock is used for performing store commands in a transaction block.]     *
-			* 5) Create "Lock Info":  '6' + 'lock id' ==> 'lock use count' + '_' + 'lock expiration time expressed as elapsed seconds since the epoch' + '_' + 'lock name' *
-			* 6) In addition, we will also create and delete user-defined locks: '7' + 'lock id' + 'dl_lock' => 1                                                          *
-			*                                                                                                                                                              *
-			* 7) We will also allow general purpose locks to be created by any entity for sundry use:  '501' + 'entity name' + 'generic_lock' => 1                         *
+			* 1) Create a root entry called "Store Name":  '0' + 'store name' => 'store id'                                                                                     *
+			* 2) Create "Store Contents Hash": '1' + 'store id' => 'Redis Hash'                                                                                                 *
+			*       This hash will always have the following three metadata entries:                                                                                            *
+			*       dps_name_of_this_store ==> 'store name'                                                                                                     		    *
+			*       dps_spl_type_name_of_key ==> 'spl type name for this store's key'                                                                                           *
+			*       dps_spl_type_name_of_value ==> 'spl type name for this store's value'                                                                                       *
+                        * 3) Create "Store Ordered Keys Set: '101' + 'store id' => 'Redis Sorted Set' 
+                        *    (This is used for storing all the store keys in sorted order. This will be used in getting bulk keys for a given key range.)
+                        *
+			* 4) In addition, we will also create and delete custom locks for modifying store contents in  (2) above: '4' + 'store id' + 'dps_lock' => 1                        *
+			*                                                                                                                                                                   *
+			*                                                                                                                                                                   *
+			* 5) Create a root entry called "Lock Name":  '5' + 'lock name' ==> 'lock id'    [This lock is used for performing store commands in a transaction block.]          *
+			* 6) Create "Lock Info":  '6' + 'lock id' ==> 'lock use count' + '_' + 'lock expiration time expressed as elapsed seconds since the epoch' + '_' + 'lock name' 
+                        *
+			* 7) In addition, we will also create and delete user-defined locks: '7' + 'lock id' + 'dl_lock' => 1                                                               *
+			*                                                                                                                                                                   *
+			* 8) We will also allow general purpose locks to be created by any entity for sundry use:  '501' + 'entity name' + 'generic_lock' => 1                              *
 			****************************************************************************************************************************************************************
 			*/
 			//
@@ -906,7 +911,7 @@ namespace distributed
 
 	freeReplyObject(redis_reply);
 	releaseGeneralPurposeLock(base64_encoded_name);
-    return 0;
+        return 0;
   }
 
   uint64_t RedisDBLayer::createOrGetStore(std::string const & name,
@@ -1068,14 +1073,31 @@ namespace distributed
 
 	cmd = string(REDIS_DEL_CMD) + storeContentsHashKey;
 	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-	freeReplyObject(redis_reply);
+
+        if(redis_reply != NULL) {
+	   freeReplyObject(redis_reply);
+        }
 
 	// Finally, delete the StoreName key now.
 	string storeNameKey = string(DPS_STORE_NAME_TYPE) + storeName;
 	partitionIdx = getRedisServerPartitionIndex(storeNameKey);
 	cmd = string(REDIS_DEL_CMD) + storeNameKey;
 	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-	freeReplyObject(redis_reply);
+
+        if(redis_reply != NULL) {
+	   freeReplyObject(redis_reply);
+        }
+
+        // Apr/16/2022
+        // We may have a Redis Sorted Set associated with this store being removed. That set is used for bulk APIs. We can remove it now as the store itself is gone now.
+	string keyString = string(DPS_STORE_ORDERED_KEYS_SET_TYPE ) + storeIdString;
+	partitionIdx = getRedisServerPartitionIndex(keyString);
+	cmd = string(REDIS_DEL_CMD) + keyString;
+	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+
+        if(redis_reply != NULL) {
+	   freeReplyObject(redis_reply);
+        }
 
 	// Life of this store ended completely with no trace left behind.
 	releaseStoreLock(storeIdString);
@@ -1142,6 +1164,51 @@ namespace distributed
 		// Problem in storing a data item in the cache.
 		dbError.set("Unable to store a data item in the store id " + storeIdString + ". " + std::string(redis_reply->str), DPS_DATA_ITEM_WRITE_ERROR);
 		SPLAPPTRC(L_DEBUG, "Inside put, it failed for store id " << storeIdString << ". " << DPS_DATA_ITEM_WRITE_ERROR, "RedisDBLayer");
+		freeReplyObject(redis_reply);
+		return(false);
+	}
+
+	freeReplyObject(redis_reply);
+
+        // Apr/15/2022.
+        // We will also add the key we stored above in a Redis sorted set. That will be useful for
+        // implementing bulk APIs (donw in later part of this source file) to get a range of keys.
+	// This action is performed on the Store Ordered Keys Set that takes the following format.
+	// '101' + 'store id' => 'Redis SortedSet'  
+	keyString = string(DPS_STORE_ORDERED_KEYS_SET_TYPE ) + storeIdString;
+	partitionIdx = getRedisServerPartitionIndex(keyString);
+
+        // Return now if there is no valid connection to the Redis server.
+        if (redisPartitions[partitionIdx].rdsc == NULL) {
+           dbError.set("There is no valid connection to the Redis server at this time. Error location: Store key in SortedSet.", DPS_CONNECTION_ERROR);
+           SPLAPPTRC(L_DEBUG, "Inside put, it failed for store " << storeIdString << ". There is no valid connection to the Redis server at this time. Error location: Store key in SortedSet" << DPS_CONNECTION_ERROR, "RedisDBLayer");
+           return(false);
+        }
+        
+        // We will add the key involved in this put to this store's sorted set.
+        // NX flag in this command means that only add new elements. Don't update already existing elements.
+        // All the keys in our store's sorted set will have a random scoreto make the sorting work faster.
+        //
+        // Generate a random number between 0 and 1.
+        SPL::float64 randomNumber = SPL::Functions::Math::random();
+	std::ostringstream randomScore;
+	randomScore << randomNumber;
+
+	cmd = string(REDIS_ZADD_CMD) + keyString + string(" ") +
+	   string("NX") + string(" ") + randomScore.str() + 
+           string(" ") + base64_encoded_data_item_key;
+	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+
+	if (redis_reply == NULL) {
+		dbError.set("Unable to connect to the redis server(s). Error location: Store key in SortedSet. " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside put, it failed for store " << storeIdString << ". Error location: Store key in SortedSet. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+		return(false);
+	}
+
+	if (redis_reply->type == REDIS_REPLY_ERROR) {
+		// Problem in storing a data item in the cache.
+		dbError.set("Unable to store a data item in the store id " + storeIdString + ". Error location: Store key in SortedSet. " + std::string(redis_reply->str), DPS_DATA_ITEM_WRITE_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside put, it failed for store id " << storeIdString << ". Error location: Store key in SortedSet. " << DPS_DATA_ITEM_WRITE_ERROR, "RedisDBLayer");
 		freeReplyObject(redis_reply);
 		return(false);
 	}
@@ -1225,6 +1292,52 @@ namespace distributed
 		SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed for store id " << storeIdString << ". " << DPS_DATA_ITEM_WRITE_ERROR, "RedisDBLayer");
 		freeReplyObject(redis_reply);
 		releaseStoreLock(storeIdString);
+		return(false);
+	}
+
+        // Apr/15/2022.
+        // We will also add the key we stored above in a Redis sorted set. That will be useful for
+        // implementing bulk APIs (donw in later part of this source file) to get a range of keys.
+	// This action is performed on the Store Ordered Keys Set that takes the following format.
+	// '101' + 'store id' => 'Redis SortedSet'  
+	keyString = string(DPS_STORE_ORDERED_KEYS_SET_TYPE ) + storeIdString;
+	partitionIdx = getRedisServerPartitionIndex(keyString);
+
+        // Return now if there is no valid connection to the Redis server.
+        if (redisPartitions[partitionIdx].rdsc == NULL) {
+           dbError.set("There is no valid connection to the Redis server at this time. Error location: Store key in SortedSet.", DPS_CONNECTION_ERROR);
+           SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed for store " << storeIdString << ". There is no valid connection to the Redis server at this time. Error location: Store key in SortedSet" << DPS_CONNECTION_ERROR, "RedisDBLayer");
+           releaseStoreLock(storeIdString);
+           return(false);
+        }
+        
+        // We will add the key involved in this put to this store's sorted set.
+        // NX flag in this command means that only add new elements. Don't update already existing elements.
+        // All the keys in our store's sorted set will have a random scoreto make the sorting work faster.
+        //
+        // Generate a random number between 0 and 1.
+        SPL::float64 randomNumber = SPL::Functions::Math::random();
+	std::ostringstream randomScore;
+	randomScore << randomNumber;
+
+	cmd = string(REDIS_ZADD_CMD) + keyString + string(" ") +
+	   string("NX") + string(" ") + randomScore.str() + 
+           string(" ") + base64_encoded_data_item_key;
+	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+
+	if (redis_reply == NULL) {
+		dbError.set("Unable to connect to the redis server(s). Error location: Store key in SortedSet. " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed for store " << storeIdString << ". Error location: Store key in SortedSet. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+                releaseStoreLock(storeIdString);
+		return(false);
+	}
+
+	if (redis_reply->type == REDIS_REPLY_ERROR) {
+		// Problem in storing a data item in the cache.
+		dbError.set("Unable to store a data item in the store id " + storeIdString + ". Error location: Store key in SortedSet. " + std::string(redis_reply->str), DPS_DATA_ITEM_WRITE_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside putSafe, it failed for store id " << storeIdString << ". Error location: Store key in SortedSet. " << DPS_DATA_ITEM_WRITE_ERROR, "RedisDBLayer");
+		freeReplyObject(redis_reply);
+                releaseStoreLock(storeIdString);
 		return(false);
 	}
 
@@ -1607,6 +1720,36 @@ namespace distributed
 		releaseStoreLock(storeIdString);
 		return(false);
 	}
+
+	freeReplyObject(redis_reply);
+
+        // Apr/16/2022
+        // I recently added support for bulk APIs. For that, I had to use a sorted set and keep all the
+        // store keys in sorted order. Since we removed a store key above, it is necessary to remove that
+        // same key from the Redis sorted set as well. Let us do that now.
+        keyString = string(DPS_STORE_ORDERED_KEYS_SET_TYPE ) + storeIdString;
+	partitionIdx = getRedisServerPartitionIndex(keyString);
+	cmd = string(REDIS_ZREM_CMD) + keyString + string(" ") + base64_encoded_data_item_key;;
+	redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+
+	if (redis_reply == NULL) {
+		dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside remove, it failed for store id " << storeIdString << " in ZREM. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+		releaseStoreLock(storeIdString);
+		return(false);
+	}
+
+	if (redis_reply->type == REDIS_REPLY_ERROR) {
+		// Problem in deleting the requested member in the Redis Sorted Set.
+		dbError.set("Redis reply error while removing the requested Sorted Set member for the store id " + storeIdString + " via ZREM. " + std::string(redis_reply->str), DPS_DATA_ITEM_DELETE_ERROR);
+		SPLAPPTRC(L_DEBUG, "Inside remove, it failed with Redis reply error for store id " << storeIdString << " in ZREM. " << DPS_DATA_ITEM_DELETE_ERROR, "RedisDBLayer");
+		freeReplyObject(redis_reply);
+		releaseStoreLock(storeIdString);
+		return(false);
+	}
+
+        // At this point, ZREM should have done its work irrespective of whether the requested sorted set member is present or not.
+        // No need to check for confirmation of ZREM.
 
 	// All done. An existing data item in the given store has been removed.
 	freeReplyObject(redis_reply);
@@ -2825,18 +2968,21 @@ namespace distributed
   }
 
     // Senthil added this on Apr/06/2022.
-    // This method will get all the keys from the given store and
+    // This method will get multiple keys from the given store and
     // populate them in the caller provided list (vector).
     // Be aware of the time it can take to fetch all the keys in a store
     // that has several tens of thousands of keys. In such cases, the caller
     // has to maintain calm until we return back here.
-    void RedisDBLayer::getAllKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, PersistenceError & dbError) {
-	  SPLAPPTRC(L_DEBUG, "Inside getAllKeys for store id " << store, "RedisDBLayer");
-
-        // In the caller provided list (vector), we will return back the unsigned char * pointer for every key found in the store. Clear that vector now.
-        keysBuffer.clear();
-        // In the caller provided list (vector), we will return back the uint32_t size of every key found in the store. Clear that vector now.
-        keysSize.clear();
+    //
+    /// Get multiple keys present in a given store.
+    /// @param store The handle of the store.
+    /// @param keys User provided mutable list variable. This list must be suitable for storing multiple keys found in a given store and it must be made of a given store's key data type.
+    /// @param keyStartPosition User can indicate a start position from where keys should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
+    /// @param numberOfKeysNeeded User can indicate the total number of keys to be returned as available from the given key start position. It must be greater than or equal to 0 and less than or equal to 50000. If it is set to 0, then all the available keys upto a maximum of 50000 keys from the given key start position will be returned.
+    /// @param err Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise. 
+    ///
+   void RedisDBLayer::getKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, int32_t keyStartPosition, int32_t numberOfKeysNeeded, PersistenceError & dbError) {
+	  SPLAPPTRC(L_DEBUG, "Inside getKeys for store id " << store, "RedisDBLayer");
 
 	  std::ostringstream storeId;
 	  storeId << store;
@@ -2844,60 +2990,81 @@ namespace distributed
 	  string cmd = "";
 	  string data_item_key = "";
 
-	  // Ensure that a store exists for the given store id.
-	  if (storeIdExistsOrNot(storeIdString, dbError) == false) {
-             if (dbError.hasError() == true) {
-	        SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed to check for the existence of store id " << storeIdString << ". " << dbError.getErrorCode(), "RedisDBLayer");
-             } else {
-	        dbError.set("No store exists for the StoreId " + storeIdString + ".", DPS_INVALID_STORE_ID_ERROR);
-	        SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_INVALID_STORE_ID_ERROR, "RedisDBLayer");
-             }
+          // Before doing anything here, let us validate the user given values for start position and number of keys needed.
+          if(keyStartPosition < 0) {
+             dbError.set("A negative value was given for key start position. Error location: Get Keys.", DPS_NEGATIVE_KEY_START_POS_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside getKeys, it failed for store " << storeIdString << ". A negative value was given for key start position." << DPS_NEGATIVE_KEY_START_POS_ERROR, "RedisDBLayer");
+             return;             
+          }
 
+          // User can provide the numberOfKeysNeeded from 0 to 50000. Validate that.
+          if(numberOfKeysNeeded < 0 || numberOfKeysNeeded > 50000) {
+             dbError.set("Invalid value given for number of keys needed. Valid range is from 0 to 50000. Error location: Get Keys.", DPS_INVALID_NUM_KEYS_NEEDED_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside getKeys, it failed for store " << storeIdString << ". Invalid value given for number of keys needed. Valid range is from 0 to 50000. " << DPS_INVALID_NUM_KEYS_NEEDED_ERROR, "RedisDBLayer");
+             return;             
+          }
+
+          int keyEndPosition = 0;
+
+          // If user specified a value of 0 for number of keys needed, we will set it to a
+          // block of 50000 keys to be returned back.
+          if(numberOfKeysNeeded == 0) {
+             // Sorted set is zero based. So, one less than 50000.
+             keyEndPosition = keyStartPosition + 49999;
+          } else {
+             // Sorted set is zero based. So, one less than what the user asked for.
+             keyEndPosition = keyStartPosition + numberOfKeysNeeded - 1;
+          }
+
+          std::ostringstream ksp;
+          ksp << keyStartPosition;
+          std::ostringstream kep;
+          kep << keyEndPosition;
+
+          // In the caller provided list (vector), we will return back the unsigned char * pointer for every key found in the store. Clear that vector now.
+          keysBuffer.clear();
+          // In the caller provided list (vector), we will return back the uint32_t size of every key found in the store. Clear that vector now.
+          keysSize.clear();
+
+          // For getting the keys in bulk, we have a Redis Sorted Set for every store that contains 
+          // all the keys preent in the store. It is keeping them in sorted order. That will help us
+          // to deterministically return the keys to the caller based on a given range.
+          // We will do it on a best effort basis to achieve good performande by skipping the
+          // store existence check, store empty check etc.
+          string keyString = string(DPS_STORE_ORDERED_KEYS_SET_TYPE ) + storeIdString;
+	  int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
+
+          // Return now if there is no valid connection to the Redis server.
+          if (redisPartitions[partitionIdx].rdsc == NULL) {
+             dbError.set("There is no valid connection to the Redis server at this time. Error location: Get Keys.", DPS_CONNECTION_ERROR);
+             SPLAPPTRC(L_DEBUG, "Inside getKeys, it failed for store " << storeIdString << ". There is no valid connection to the Redis server at this time." << DPS_CONNECTION_ERROR, "RedisDBLayer");
              return;
-	  }
+          }
 
-	  // Ensure that this store is not empty at this time.
-	  if (size(store, dbError) <= 0) {
-	     dbError.set("Store is empty for the StoreId " + storeIdString + ".", DPS_STORE_EMPTY_ERROR);
-	     SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_STORE_EMPTY_ERROR, "RedisDBLayer");
-	     return;
-	  }
-    
-
-        // Let us get the available data item keys from this store.
-        cmd = string(REDIS_HKEYS_CMD) + string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
-        string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
-
-	int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
-
-        // Return now if there is no valid connection to the Redis server.
-        if (redisPartitions[partitionIdx].rdsc == NULL) {
-           dbError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
-           SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed. There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
-            return;
-        }
-
-        redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+          // Let us get the available keys from this store's sorted set.
+          cmd = string(REDIS_ZRANGE_CMD) + keyString + string(" ") + 
+              ksp.str() + string(" ") + kep.str();
+          redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 
         if (redis_reply == NULL) {
-	   dbError.set("Unable to connect to the redis server(s). " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
+	   dbError.set("Unable to connect to the redis server(s). Error location: ZRANGE command. " + std::string(redisPartitions[partitionIdx].rdsc->errstr), DPS_CONNECTION_ERROR);
 	   return;
 	}
 
 	if (redis_reply->type == REDIS_REPLY_ERROR) {
-	   // Unable to get data item keys from the store.
-	   dbError.set("Unable to get data item keys for the StoreId " + storeIdString +
+	   // Unable to get keys for the store.
+	   dbError.set("Unable to get bulk keys via ZRANGE for the StoreId " + storeIdString +
 	   ". " + std::string(redis_reply->str), DPS_GET_STORE_DATA_ITEM_KEYS_ERROR);
-	   SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_GET_STORE_DATA_ITEM_KEYS_ERROR, "RedisDBLayer");
+	   SPLAPPTRC(L_DEBUG, "Inside getKeys, ZRANGE failed for store id " << storeIdString << ". " << DPS_GET_STORE_DATA_ITEM_KEYS_ERROR, "RedisDBLayer");
 	   freeReplyObject(redis_reply);
 	   return;
 	}
 
 	if (redis_reply->type != REDIS_REPLY_ARRAY) {
 	   // Unable to get data item keys from the store in an array format.
-	   dbError.set("Unable to get data item keys in an array format for the StoreId " + storeIdString +
+	   dbError.set("Unable to get bulk keys via ZRANGE in an array format for the StoreId " + storeIdString +
 	   ". " + std::string(redis_reply->str), DPS_GET_STORE_DATA_ITEM_KEYS_AS_AN_ARRAY_ERROR);
-	   SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_GET_STORE_DATA_ITEM_KEYS_AS_AN_ARRAY_ERROR, "RedisDBLayer");
+	   SPLAPPTRC(L_DEBUG, "Inside getKeys, ZRANGE failed for store id " << storeIdString << ". " << DPS_GET_STORE_DATA_ITEM_KEYS_AS_AN_ARRAY_ERROR, "RedisDBLayer");
 	   freeReplyObject(this->redis_reply);
 	   return;
 	}
@@ -2906,16 +3073,6 @@ namespace distributed
 	// Let us insert them into the caller provided list (vector) that will hold the data item keys for this store.
 	for (unsigned int j = 0; j < redis_reply->elements; j++) {
 	   data_item_key = string(redis_reply->element[j]->str);
-
-	   // Every dps store will have three mandatory reserved data item keys for internal use.
-	   // Let us not add them to the iteration object's member variable.
-	   if (data_item_key.compare(REDIS_STORE_ID_TO_STORE_NAME_KEY) == 0) {
-	      continue; // Skip this one.
-	   } else if (data_item_key.compare(REDIS_SPL_TYPE_NAME_OF_KEY) == 0) {
-	      continue; // Skip this one.
-	   } else if (data_item_key.compare(REDIS_SPL_TYPE_NAME_OF_VALUE) == 0) {
-	      continue; // Skip this one.
-	   }
 
 	  // In order to support spaces in data item keys, we base64 encoded them before storing it in Redis.
 	  // Let us base64 decode it now to get the original data item key.
@@ -2930,13 +3087,12 @@ namespace distributed
 	     // This error will occur very rarely.
 	     // If it happens, we will handle it.
              freeReplyObject(redis_reply);
-             // We will not return any useful data to the caller.
-             keysBuffer.clear();
-             keysSize.clear();
-
-             dbError.set("Unable to allocate memory for the keyData while doing the next data item iteration for the StoreId " +
+             // We will leave any partially filled data in the user provided list.
+             // On detection the db error flag, caller should take the necessary steps to
+             // free the allocated memory for the partially filled data in that list.
+             dbError.set("Unable to allocate memory for the keyData while fetching bulk keys in getKeys for the StoreId " +
                 storeIdString + ".", DPS_STORE_ITERATION_MALLOC_ERROR);
-             SPLAPPTRC(L_DEBUG, "Inside getAllKeys, it failed for store id " << storeIdString << ". " << DPS_STORE_ITERATION_MALLOC_ERROR, "RedisDBLayerr");
+             SPLAPPTRC(L_DEBUG, "Inside getKeys, memory allocation failed for store id " << storeIdString << ". " << DPS_STORE_ITERATION_MALLOC_ERROR, "RedisDBLayerr");
 	     return;
 	  }
 
@@ -2949,7 +3105,7 @@ namespace distributed
         } // End of for loop.
 
 	freeReplyObject(redis_reply);
-    } // End of getAllKeys method.
+    } // End of getKeys method.
 
   RedisDBLayerIterator::RedisDBLayerIterator() {
 

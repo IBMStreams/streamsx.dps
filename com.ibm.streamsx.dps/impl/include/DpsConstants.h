@@ -23,9 +23,10 @@ interface with many different back-end in-memory stores.
 #define DPS_STORE_ID_TRACKER_SET									"dps_store_id_tracker" // Used in Aerospike
 #define DPS_STORE_NAME_TYPE											"0"
 #define DPS_STORE_INFO_TYPE											"1" // Used in memcached
-#define DPS_STORE_CONTENTS_HASH_TYPE								"1" // Used in Redis
-#define DPS_STORE_CATALOG_TYPE										"2" // Used only in memcached
-#define DPS_STORE_DATA_ITEM_TYPE									"3"
+#define DPS_STORE_CONTENTS_HASH_TYPE								                "1" // Used in Redis
+#define DPS_STORE_CATALOG_TYPE										        "2" // Used only in memcached
+#define DPS_STORE_DATA_ITEM_TYPE									        "3"
+#define DPS_STORE_ORDERED_KEYS_SET_TYPE                                                                         "101" // Used in Redis
 #define DPS_STORE_LOCK_TYPE											"4"
 #define DL_LOCK_NAME_TYPE											"5"
 #define DL_LOCK_INFO_TYPE											"6"
@@ -77,6 +78,9 @@ interface with many different back-end in-memory stores.
 #define REDIS_HLEN_CMD												"hlen "
 #define REDIS_HKEYS_CMD												"hkeys "
 #define REDIS_AUTH_CMD                                                                                          "auth "
+#define REDIS_ZADD_CMD                                                                                          "zadd "
+#define REDIS_ZREM_CMD                                                                                          "zrem "
+#define REDIS_ZRANGE_CMD                                                                                        "zrange "
 #define CASSANDRA_DPS_KEYSPACE										"com_ibm_streamsx_dps"
 #define CASSANDRA_DPS_MAIN_TABLE									"t1"
 #define HBASE_DPS_MAIN_TABLE										"dps_t1"
@@ -212,6 +216,8 @@ interface with many different back-end in-memory stores.
 #define DPS_STORE_FATAL_ERROR										156
 #define DPS_STORE_UNKNOWN_STATE_ERROR								157
 #define DPS_AUTHENTICATION_ERROR                                                                158
+#define DPS_NEGATIVE_KEY_START_POS_ERROR                                                        159
+#define DPS_INVALID_NUM_KEYS_NEEDED_ERROR                                                       160
 
 #define DL_CONNECTION_ERROR											501
 #define DL_GET_LOCK_ID_ERROR										502

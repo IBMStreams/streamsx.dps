@@ -2088,17 +2088,17 @@ namespace distributed
   }
 
     // Senthil added this on Apr/06/2022.
-    // This method will get all the keys from the given store and
+    // This method will get multiple keys from the given store and
     // populate them in the caller provided list (vector).
-    // Be aware of the time it can take to fetch all the keys in a store
+    // Be aware of the time it can take to fetch multiple keys in a store
     // that has several tens of thousands of keys. In such cases, the caller
-    // has to maintain calm until we return back here.
-    void MongoDBLayer::getAllKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, PersistenceError & dbError) {
-	  SPLAPPTRC(L_DEBUG, "Inside getAllKeys for store id " << store, "MongoDBLayer");
+    // has to maintain calm until we return back from here.
+   void MongoDBLayer::getKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, int32_t keyStartPosition, int32_t numberOfKeysNeeded, PersistenceError & dbError) {
+	  SPLAPPTRC(L_DEBUG, "Inside getKeys for store id " << store, "MongoDBLayer");
 
        // Not implemented at this time. Simply return.
        return;
-    } // End of getAllKeys method.
+    } // End of getKeys method.
 
 
   MongoDBLayerIterator::MongoDBLayerIterator() {

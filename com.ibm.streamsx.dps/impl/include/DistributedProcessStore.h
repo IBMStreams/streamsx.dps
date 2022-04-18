@@ -218,12 +218,17 @@ namespace distributed
     /// @param err PersistentStore error code
     void endIteration(SPL::uint64 store, SPL::uint64 iterator, SPL::uint64 & err);
 
-  /// Get all the keys in a given store.
-  /// @param store store handle
-  /// @param List (vector) of a specific key type
-  /// @param err store error code
-  template<class T1>                 
-  void getAllKeysHelper(SPL::uint64 store, SPL::list<T1> & keys, SPL::uint64 & err);
+  /// Get multiple keys present in a given store.
+  /// @param store The handle of the store.
+  /// @param keys User provided mutable list variable. This list must be suitable for storing multiple keys found in a given store and it must be made of a given store's key data type.
+  /// @param keyStartPosition User can indicate a start position from where keys should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
+  /// @param numberOfKeysNeeded User can indicate the total number of keys to be returned as available from the given key start position. It must be greater than or equal to 0 and less than or equal to 50000. If it is set to 0, then all the available keys upto a maximum of 50000 keys from the given key start position will be returned.
+  /// @param keyExpression User can provide an expression made of the attributes from the key's data type. This expression will be evaluated in determining which matching keys to be returned. [This feature is not implemented at this time.]
+  /// @param valueExpression User can provide an expression made of the attributes from the value's data type. This expression will be evaluated in determining which matching keys to be returned. [This feature is not implemented at this time.]
+  /// @param err Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise. 
+  ///
+  template<class T1> 
+  void getKeys(SPL::uint64 store, SPL::list<T1> & keys, SPL::int32 const & keyStartPosition, SPL::int32 const & numberOfKeysNeeded, SPL::rstring const & keyExpression, SPL::rstring const & valueExpression, SPL::uint64 & err);
 
     /// Serialize the items from the serialized store
     /// @param store store handle
@@ -865,17 +870,24 @@ namespace distributed
       return res;
     }
 
-  /// Get all the keys in a given store.
-  /// @param store store handle
-  /// @param List (vector) of a specific key type
-  /// @param err store error code
+  /// Get multiple keys present in a given store.
+  /// @param store The handle of the store.
+  /// @param keys User provided mutable list variable. This list must be suitable for storing multiple keys found in a given store and it must be made of a given store's key data type.
+  /// @param keyStartPosition User can indicate a start position from where keys should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
+  /// @param numberOfKeysNeeded User can indicate the total number of keys to be returned as available from the given key start position. It must be greater than or equal to 0 and less than or equal to 50000. If it is set to 0, then all the available keys upto a maximum of 50000 keys from the given key start position will be returned.
+  /// @param keyExpression User can provide an expression made of the attributes from the key's data type. This expression will be evaluated in determining which matching keys to be returned. [This feature is not implemented at this time.]
+  /// @param valueExpression User can provide an expression made of the attributes from the value's data type. This expression will be evaluated in determining which matching keys to be returned. [This feature is not implemented at this time.]
+  /// @param err Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise. 
+  ///
   template<class T1>                 
-  void DistributedProcessStore::getAllKeysHelper(SPL::uint64 store, SPL::list<T1> & keys, SPL::uint64 & err) {
+  void DistributedProcessStore::getKeys(SPL::uint64 store, SPL::list<T1> & keys, SPL::int32 const & keyStartPosition, SPL::int32 const & numberOfKeysNeeded, SPL::rstring const & keyExpression, SPL::rstring const & valueExpression, SPL::uint64 & err) {
     dbError_->reset();
     std::vector<unsigned char *> keysBuffer;
     std::vector<uint32_t> keysSize;
-    // Call the underlying store implementation function to get all the keys in a given store.
-    db_->getAllKeys(store, keysBuffer, keysSize, *dbError_);
+    // Clear the user provided list now.
+    keys.clear();
+    // Call the underlying store implementation function to get multiple keys in a given store.
+    db_->getKeys(store, keysBuffer, keysSize, keyStartPosition, numberOfKeysNeeded, *dbError_);
     err = dbError_->getErrorCode();
 
     if(err != 0) {
@@ -892,11 +904,10 @@ namespace distributed
        return;
     }
 
-    // We got all the keys.
+    // We got multiple keys.
     // Let us convert it to the proper key type and store them in
     // the user provided list (vector).
-    keys.clear();
-
+    //
     // Populate the user provided list (vector) with the store keys.
     for (unsigned int i = 0; i < keysBuffer.size(); i++) {
     	SPL::NativeByteBuffer nbf_key(keysBuffer.at(i), keysSize.at(i));
