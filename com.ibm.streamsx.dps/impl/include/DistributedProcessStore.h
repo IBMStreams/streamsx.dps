@@ -230,6 +230,27 @@ namespace distributed
   template<class T1> 
   void getKeys(SPL::uint64 store, SPL::list<T1> & keys, SPL::int32 const & keyStartPosition, SPL::int32 const & numberOfKeysNeeded, SPL::rstring const & keyExpression, SPL::rstring const & valueExpression, SPL::uint64 & err);
 
+  /// This function can be called to get values for a given list of multiple keys present in a given store.
+  /// @param store The handle of the store.
+  /// @param keys User provided list variable that contains keys for which values need to be fetched.
+  /// @param values User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the key appeared in the user provided keys list. Before using the individual values from this list, it is recommended to make sure that a given value fetch worked with no errors.
+  /// @param errors User provided mutable list variable in which the individual success or failure value fetch result codes will be returned. This list must be of type uint64. Each list element will be 0 if no error occurs and a non-zero error code otherwise. Such value fetch result codes will be available in this list at the same index where the key appears in the user provided keys list. If a given result code doesn't indicate a successful value fetch, it is better to skip the corresponding element at the same index in the mutable values list.
+  /// 
+  template<class T1, class T2>
+  bool getValues(SPL::uint64 store, SPL::list<T1> const & keys, SPL::list<T2> & values, SPL::list<SPL::uint64> & errors);
+
+  /// This function can be called to get multiple Key/Value (KV) pairs present in a given store.
+  /// @param store The handle of the store.
+  /// @param keys User provided mutable list variable in which the keys found in the store will be returned. This list must be suitable for storing multiple keys found in a given store and it must be made of a given store's key data type.
+  /// @param values User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the corresponding key appears in the keys list. Before using the individual values from this list, it is recommended to make sure that a given value fetch worked with no errors.
+  /// @param keyStartPosition User can indicate a start position from where the K/V pairs should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
+  /// @param numberOfPairsNeeded User can indicate the total number of K/V pairs to be returned as available from the given key start position. It must be greater than or equal to 0 and less than or equal to 50000. If it is set to 0, then all the available K/V pairs upto a maximum of 50000 pairs from the given key start position will be returned.
+  /// @param errors User provided mutable list variable in which the individual success or failure value fetch result codes will be returned. This list must be of type uint64. Each list element will be 0 if no error occurs and a non-zero error code otherwise. Such value fetch result codes will be available in this list at the same index where the key appears in the keys list. If a given result code doesn't indicate a successful value fetch, it is better to skip the corresponding element at the same index in the mutable values list.
+  /// @return It returns true if value fetch worked for all the keys with no errors. Else, it returns false to indicate that value fetch encountered error for one or more keys.
+  ///
+  template<class T1, class T2>
+  bool getKVPairs(SPL::uint64 store, SPL::list<T1> & keys, SPL::list<T2> & values, SPL::int32 const & keyStartPosition, SPL::int32 const & numberOfPairsNeeded, SPL::list<SPL::uint64> & errors);
+
     /// Serialize the items from the serialized store
     /// @param store store handle
     /// @param data blob to serialize into
@@ -912,6 +933,7 @@ namespace distributed
     for (unsigned int i = 0; i < keysBuffer.size(); i++) {
     	SPL::NativeByteBuffer nbf_key(keysBuffer.at(i), keysSize.at(i));
         T1 tempKey;
+        // Deserialize the obtained keys from their NBF format to their native SPL type. 
     	nbf_key >> tempKey;
         keys.push_back(tempKey);
 
@@ -920,7 +942,102 @@ namespace distributed
            free(keysBuffer.at(i));
         }
     } // End of for loop.
-  }
+  } // End of getKeys method.
+
+  /// This function can be called to get values for a given list of multiple keys present in a given store.
+  /// @param store The handle of the store.
+  /// @param keys User provided list variable that contains keys for which values need to be fetched.
+  /// @param values User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the key appeared in the user provided keys list. Before using the individual values from this list, it is recommended to make sure that a given value fetch worked with no errors.
+  /// @param errors User provided mutable list variable in which the individual success or failure value fetch result codes will be returned. This list must be of type uint64. Each list element will be 0 if no error occurs and a non-zero error code otherwise. Such value fetch result codes will be available in this list at the same index where the key appears in the user provided keys list. If a given result code doesn't indicate a successful value fetch, it is better to skip the corresponding element at the same index in the mutable values list.
+  /// 
+  template<class T1, class T2>
+  bool DistributedProcessStore::getValues(SPL::uint64 store, SPL::list<T1> const & keys, SPL::list<T2> & values, SPL::list<SPL::uint64> & errors) {
+    dbError_->reset();
+    bool resultStatus = true;
+
+    // Clear the user provided mutable lists now.
+    values.clear();
+    errors.clear();
+
+    // Create a string form of the store id.
+    std::ostringstream storeId;
+    storeId << store;
+    std::string storeIdString = storeId.str();
+
+    // Populate the key buffer with the serialized key.
+    // i.e. Serialize it from the native SPL type to NBF format.
+    // Then, call the method in the underlying DB implementation layer for every key that we have.
+    for(int i=0; i<keys.size(); i++) {
+       SPL::NativeByteBuffer key_nbf;
+       key_nbf << keys.at(i);
+       char const * keyData = (char const *)key_nbf.getPtr();
+       uint32_t keySize = key_nbf.getSerializedDataSize();
+
+       unsigned char * valueData;
+       uint32_t valueSize = 0; 
+       uint64_t error = 0;
+       db_->getValue(storeIdString, keyData, keySize, valueData, valueSize, error);
+
+       // Collect the results in the user provided list.
+       T2 tempValue;
+
+       if(error == 0) {
+          SPL::NativeByteBuffer value_nbf(valueData, valueSize);
+          value_nbf >> tempValue;
+       } else {
+          // At least one error seen while fetching the value for a key.
+          resultStatus = false;
+       }
+
+       values.push_back(tempValue);
+       errors.push_back(error);
+
+       // We must free the memory allocated in the DB layer.
+       if(valueSize > 0) {
+          free(valueData);
+       }
+    } // End of for loop.
+
+    return(resultStatus);
+  } // End of getValues method.
+
+  /// This function can be called to get multiple Key/Value (KV) pairs present in a given store.
+  /// @param store The handle of the store.
+  /// @param keys User provided mutable list variable in which the keys found in the store will be returned. This list must be suitable for storing multiple keys found in a given store and it must be made of a given store's key data type.
+  /// @param values User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the corresponding key appears in the keys list. Before using the individual values from this list, it is recommended to make sure that a given value fetch worked with no errors.
+  /// @param keyStartPosition User can indicate a start position from where the K/V pairs should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
+  /// @param numberOfPairsNeeded User can indicate the total number of K/V pairs to be returned as available from the given key start position. It must be greater than or equal to 0 and less than or equal to 50000. If it is set to 0, then all the available K/V pairs upto a maximum of 50000 pairs from the given key start position will be returned.
+  /// @param errors User provided mutable list variable in which the individual success or failure value fetch result codes will be returned. This list must be of type uint64. Each list element will be 0 if no error occurs and a non-zero error code otherwise. Such value fetch result codes will be available in this list at the same index where the key appears in the keys list. If a given result code doesn't indicate a successful value fetch, it is better to skip the corresponding element at the same index in the mutable values list.
+  /// @return It returns true if value fetch worked for all the keys with no errors. Else, it returns false to indicate that value fetch encountered error for one or more keys.
+  ///
+  template<class T1, class T2>
+  bool DistributedProcessStore::getKVPairs(SPL::uint64 store, SPL::list<T1> & keys, SPL::list<T2> & values, SPL::int32 const & keyStartPosition, SPL::int32 const & numberOfPairsNeeded, SPL::list<SPL::uint64> & errors) {
+    // The logic in this method is going to be a combination of the two previous methods shown above.
+    // We have to first get the keys and then the values for those keys.
+    dbError_->reset();
+    bool resultStatus = true;
+    uint64_t error = 0;
+    std::string keyExpression = "";
+    std::string valueExpression = "";
+
+    // Clear the user provided mutable lists now.
+    keys.clear();
+    values.clear();
+    errors.clear();
+
+    // Let us first get the keys available in the user specified range.
+    getKeys(store, keys, keyStartPosition, numberOfPairsNeeded, keyExpression, valueExpression, error);
+
+    // If we encountered an error in getting the keys, we can return back from here.
+    if(error != 0) {
+       resultStatus = false;
+       return(resultStatus);
+    }
+
+    // We got the keys. Let us now get the values stored for those keys.
+    resultStatus = getValues(store, keys, values, errors);
+    return(resultStatus);
+  } // End of getKVPairs method.
 
   template<class T1, class T2>
   void DistributedProcessStore::serialize(SPL::uint64 store, SPL::blob & data, SPL::uint64 & err)

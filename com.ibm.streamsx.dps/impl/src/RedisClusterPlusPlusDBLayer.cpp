@@ -4087,6 +4087,118 @@ namespace distributed
           } // End of for loop.
     } // End of getKeys method.
 
+    // Senthil added this on Apr/18/2022.
+    // This method will get the value for a given key from the given store without
+    // performing any checks for the existence of store, key etc. This is a slightly 
+    // faster version of the get method above. 
+    ///
+    /// @param store The handle of the store given in a string form.
+    /// @param key User provided key for which a value needs to be fetched.
+    /// @param keySixe  Size of the buffer holding the key.
+    /// @param value Buffer pointer where the fetched value will be made available for the caller.
+    /// @param valueSize Size of the buffer holding the value.
+    /// @param error Error code from the get operation if any will be made available for the caller.
+    /// 
+    void RedisClusterPlusPlusDBLayer::getValue(std::string const & storeIdString, char const * & key, uint32_t const & keySize, unsigned char * & value, uint32_t & valueSize, uint64_t & error) {
+       SPLAPPTRC(L_DEBUG, "Inside getValue for store id " << storeIdString, "RedisClusterPlusPlusDBLayer");
+
+       // This method will skip all the safety checks such as store existence, key existence etc.
+       // If store safety is needed, the caller of this API can do their own DPS locks at the application level.
+       // They can also check for key existence before sending that key to be used here for a value fetch.
+       
+       string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
+       value = NULL; 
+       valueSize = 0;
+
+       string exceptionString = "";
+       int exceptionType = REDIS_PLUS_PLUS_NO_ERROR;
+       string data_item_value = "";
+
+       // In our Redis dps implementation, data item keys can have space characters.
+       // Original NBF serialized key is stored in Redis as a base64 encoded string.
+       // So, to query, we will have to pass a base64 encoded key.
+       string base64_encoded_data_item_key;
+       base64_encode(string(key, keySize), base64_encoded_data_item_key);
+
+       // Fetch the data item now.
+       try {
+          auto my_value = redis_cluster->hget(keyString, base64_encoded_data_item_key);
+
+          if(my_value) {
+             data_item_value = *my_value;
+          }
+       } catch (const ReplyError &ex) {
+          // WRONGTYPE Operation against a key holding the wrong kind of value
+          exceptionString = ex.what();
+          // Command execution error.
+          exceptionType = REDIS_PLUS_PLUS_REPLY_ERROR;
+       } catch (const TimeoutError &ex) {
+          // Reading or writing timeout
+          exceptionString = ex.what();
+          // Connectivity related error.
+          exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;        
+       } catch (const ClosedError &ex) {
+          // Connection has been closed.
+          exceptionString = ex.what();
+          // Connectivity related error.
+          exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
+       } catch (const IoError &ex) {
+          // I/O error on the connection.
+          exceptionString = ex.what();
+          // Connectivity related error.
+          exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
+       } catch (const Error &ex) {
+          // Other errors
+          exceptionString = ex.what();
+          // Connectivity related error.
+          exceptionType = REDIS_PLUS_PLUS_OTHER_ERROR;
+       }
+
+       // Did we encounter a redis-cluster server connection error?
+       if (exceptionType == REDIS_PLUS_PLUS_CONNECTION_ERROR) {
+          // This is how we can detect that a wrong redis-cluster server name is configured by the user or
+          // not even a single redis-cluster server daemon being up and running.
+          // This is a serious error.
+          SPLAPPTRC(L_DEBUG, "Inside getValue #1: It failed with a Redis connection error for REDIS_HGET_CMD. Exception: " << exceptionString << ". Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterPlusPlusDBLayer");
+          error = DPS_CONNECTION_ERROR;
+          return;
+       }
+
+       // Did we encounter a redis reply error?
+       if (exceptionType == REDIS_PLUS_PLUS_REPLY_ERROR || 
+          exceptionType == REDIS_PLUS_PLUS_OTHER_ERROR) {
+          SPLAPPTRC(L_DEBUG, "Inside getValue #2: It failed to get a data item from the StoreId " << storeIdString << ". Error=" << exceptionString << ". rc=" << DPS_DATA_ITEM_READ_ERROR, "RedisClusterPlusPlusDBLayer");
+          error = DPS_REDIS_REPLY_NULL_ERROR;
+          return;
+       }
+
+       // Data item value read from the store will be in this format: 'value'
+       valueSize = data_item_value.length();
+
+       if (valueSize > 0) {
+          // We can allocate memory for the exact length of the data item value.
+          value = (unsigned char *) malloc(valueSize);
+
+          if (value == NULL) {
+             valueSize = 0;
+             error = DPS_GET_DATA_ITEM_MALLOC_ERROR;
+             // Unable to allocate memory to transfer the data item value.
+             SPLAPPTRC(L_DEBUG, "Inside getValue #5: Unable to allocate memory to copy the data item value for the StoreId " << storeIdString << ".", "RedisClusterPlusPlusDBLayer");
+          } else {
+             // We expect the caller of this method to free the value pointer.
+             memcpy(value, data_item_value.c_str(), valueSize);
+             error = 0;
+          }
+       } else {
+          // We got a zero length data item value.
+          // This is not very useful and it should never happen.
+          // We will raise an error for this.
+          valueSize = 0;
+          error = DPS_EMPTY_DATA_ITEM_VALUE_FOUND_ERROR; 
+          SPLAPPTRC(L_DEBUG, "Inside getValue #3: Found an empty data item value for the StoreId " << storeIdString << ".", "RedisClusterPlusPlusDBLayer");
+       } // End of if (valueSize > 0)
+    } // End of getValue method.
+
   RedisClusterPlusPlusDBLayerIterator::RedisClusterPlusPlusDBLayerIterator() {
 
   }

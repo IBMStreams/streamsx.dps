@@ -204,6 +204,7 @@ namespace distributed
     bool removeLock(uint64_t lock, PersistenceError & lkError);
     uint32_t getPidForLock(std::string const & name, PersistenceError & lkError);
    void getKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, int32_t keyStartPosition, int32_t numberOfKeysNeeded, PersistenceError & dbError);
+    void getValue(std::string const & storeIdString, char const * & key, uint32_t const & keySize, unsigned char * & value, uint32_t & valueSize, uint64_t & error);
 
   };
 } } } } }

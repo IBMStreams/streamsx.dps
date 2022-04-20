@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2020
+# Copyright IBM Corp. 2011, 2022
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -218,8 +218,11 @@ interface with many different back-end in-memory stores.
 #define DPS_AUTHENTICATION_ERROR                                                                158
 #define DPS_NEGATIVE_KEY_START_POS_ERROR                                                        159
 #define DPS_INVALID_NUM_KEYS_NEEDED_ERROR                                                       160
+#define DPS_REDIS_REPLY_NULL_ERROR                                                              161
+#define DPS_REDIS_REPLY_NIL_ERROR                                                               162
+#define DPS_EMPTY_DATA_ITEM_VALUE_FOUND_ERROR                                                   163
 
-#define DL_CONNECTION_ERROR											501
+#define DL_CONNECTION_ERROR										501
 #define DL_GET_LOCK_ID_ERROR										502
 #define DL_GUID_CREATION_ERROR										503
 #define DL_LOCK_NAME_CREATION_ERROR									504

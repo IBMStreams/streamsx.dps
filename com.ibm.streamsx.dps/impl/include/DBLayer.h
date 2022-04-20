@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2014
+# Copyright IBM Corp. 2011, 2022
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -288,6 +288,10 @@ namespace store {
     /// Get multiple keys present in a given store.
     /// @return a list containing multiple keys of a given data type.
     virtual void getKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, int32_t keyStartPosition, int32_t numberOfKeysNeeded, PersistenceError & dbError) = 0;
+
+    /// Get value for a given key present in a given store.
+    /// @return a value for a given key of a given data type.
+    virtual void getValue(std::string const & storeIdString, char const * & key, uint32_t const & keySize, unsigned char * & value, uint32_t & valueSize, uint64_t & error) = 0;
 
     /// A store iterator
     class Iterator

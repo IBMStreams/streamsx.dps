@@ -433,6 +433,7 @@ it does safety checks and is therefore slower.</description>
 </description>
         <prototype>public stateful void dpsEndIteration(uint64 store, uint64 iterator, mutable uint64 err)</prototype>
       </function>
+
       <function>
         <description>This function can be called to get multiple keys present in a given store.
 @param store The handle of the store.
@@ -445,6 +446,31 @@ it does safety checks and is therefore slower.</description>
 </description>
         <prototype>&lt;any T1> public stateful void dpsGetKeys(uint64 store, mutable list&lt;T1&gt; keys, int32 keyStartPosition, int32 numberOfKeysNeeded, rstring keyExpression, rstring valueExpression, mutable uint64 err)</prototype>
       </function>
+
+      <function>
+        <description>This function can be called to get values for a given list of multiple keys present in a given store.
+@param store The handle of the store.
+@param keys User provided list variable that contains keys for which values need to be fetched.
+@param values User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the key appears in the user provided keys list. Before using the individual values from this list, it is recommended to make sure that a given value fetch worked with no errors.
+@param errors User provided mutable list variable in which the individual success or failure value fetch result codes will be returned. This list must be of type uint64. Each list element will be 0 if no error occurs and a non-zero error code otherwise. Such value fetch result codes will be available in this list at the same index where the key appears in the user provided keys list. If a given result code doesn't indicate a successful value fetch, it is better to skip the corresponding element at the same index in the mutable values list.
+@return It returns true if value fetch worked for all given keys with no errors. Else, it returns false to indicate that value fetch encountered error for one or more keys.
+</description>
+        <prototype>&lt;any T1, any T2> public stateful boolean dpsGetValues(uint64 store, list&lt;T1&gt; keys, mutable list&lt;T2&gt; values, mutable list&lt;uint64&gt; errors)</prototype>
+      </function>
+
+      <function>
+        <description>This function can be called to get multiple Key/Value (KV) pairs present in a given store.
+@param store The handle of the store.
+@param keys User provided mutable list variable in which the keys found in the store will be returned. This list must be suitable for storing multiple keys found in a given store and it must be made of a given store's key data type.
+@param values User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the corresponding key appears in the keys list. Before using the individual values from this list, it is recommended to make sure that a given value fetch worked with no errors.
+@param keyStartPosition User can indicate a start position from where the K/V pairs should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
+@param numberOfPairsNeeded User can indicate the total number of K/V pairs to be returned as available from the given key start position. It must be greater than or equal to 0 and less than or equal to 50000. If it is set to 0, then all the available K/V pairs upto a maximum of 50000 pairs from the given key start position will be returned.
+@param errors User provided mutable list variable in which the individual success or failure value fetch result codes will be returned. This list must be of type uint64. Each list element will be 0 if no error occurs and a non-zero error code otherwise. Such value fetch result codes will be available in this list at the same index where the key appears in the keys list. If a given result code doesn't indicate a successful value fetch, it is better to skip the corresponding element at the same index in the mutable values list.
+@return It returns true if value fetch worked for all the keys with no errors. Else, it returns false to indicate that value fetch encountered error for one or more keys.
+</description>
+        <prototype>&lt;any T1, any T2> public stateful boolean dpsGetKVPairs(uint64 store, mutable list&lt;T1&gt; keys, mutable list&lt;T2&gt; values, int32 keyStartPosition, int32 numberOfPairsNeeded, mutable list&lt;uint64&gt; errors)</prototype>
+      </function>
+
       <function>
         <description> This function serializes all the key-value pairs in a given store id into a blob. The blob can be used to recreate all the key-value pairs into another store. This is a useful technique for copying an entire store into a different store.  See `dpsDeserialize()` for a detailed example on how to use the serialization functions to copy a store.
 @param store the handle of the store to serialize.

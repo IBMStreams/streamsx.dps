@@ -2433,6 +2433,18 @@ namespace distributed
        return;
     } // End of getKeys method.
 
+    // Senthil added this on Apr/18/2022.
+    // This method will get the value for a given key from the given store without
+    // performing any checks for the existence of store, key etc. This is a slightly 
+    // faster version of the get method above. 
+    void CassandraDBLayer::getValue(std::string const & storeIdString, char const * & key, uint32_t const & keySize, unsigned char * & value, uint32_t & valueSize, uint64_t & error) {
+       SPLAPPTRC(L_DEBUG, "Inside getValue for store id " << storeIdString, "CassandraDBLayer");
+
+       // Not implemented at this time. Simply return.
+       return;
+    }
+
+
   CassandraDBLayerIterator::CassandraDBLayerIterator() {
 
   }

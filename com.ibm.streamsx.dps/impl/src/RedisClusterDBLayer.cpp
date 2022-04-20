@@ -2740,11 +2740,22 @@ namespace distributed
     // that has several tens of thousands of keys. In such cases, the caller
     // has to maintain calm until we return back from here.
    void RedisClusterDBLayer::getKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, int32_t keyStartPosition, int32_t numberOfKeysNeeded, PersistenceError & dbError) {
-	  SPLAPPTRC(L_DEBUG, "Inside getKeys for store id " << store, "RedisDBLayer");
+	  SPLAPPTRC(L_DEBUG, "Inside getKeys for store id " << store, "RedisClusterDBLayer");
 
        // Not implemented at this time. Simply return.
        return;
     } // End of getKeys method.
+
+    // Senthil added this on Apr/18/2022.
+    // This method will get the value for a given key from the given store without
+    // performing any checks for the existence of store, key etc. This is a slightly 
+    // faster version of the get method above. 
+    void RedisClusterDBLayer::getValue(std::string const & storeIdString, char const * & key, uint32_t const & keySize, unsigned char * & value, uint32_t & valueSize, uint64_t & error) {
+       SPLAPPTRC(L_DEBUG, "Inside getValue for store id " << storeIdString, "RedisClusterDBLayer");
+
+       // Not implemented at this time. Simply return.
+       return;
+    }
 
   RedisClusterDBLayerIterator::RedisClusterDBLayerIterator() {
 

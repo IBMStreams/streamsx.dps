@@ -3107,6 +3107,97 @@ namespace distributed
 	freeReplyObject(redis_reply);
     } // End of getKeys method.
 
+    // Senthil added this on Apr/18/2022.
+    // This method will get the value for a given key from the given store without
+    // performing any checks for the existence of store, key etc. This is a slightly 
+    // faster version of the get method above. 
+    ///
+    /// @param store The handle of the store given in a string form.
+    /// @param key User provided key for which a value needs to be fetched.
+    /// @param keySixe  Size of the buffer holding the key.
+    /// @param value Buffer pointer where the fetched value will be made available for the caller.
+    /// @param valueSize Size of the buffer holding the value.
+    /// @param error Error code from the get operation if any will be made available for the caller.
+    /// 
+    void RedisDBLayer::getValue(std::string const & storeIdString, char const * & key, uint32_t const & keySize, unsigned char * & value, uint32_t & valueSize, uint64_t & error) {
+       SPLAPPTRC(L_DEBUG, "Inside getValue for store id " << storeIdString, "RedisDBLayer");
+
+       // This method will skip all the safety checks such as store existence, key existence etc.
+       // If store safety is needed, the caller of this API can do their own DPS locks at the application level.
+       // They can also check for key existence before sending that key to be used here for a value fetch.
+       
+       string keyString = string(DPS_STORE_CONTENTS_HASH_TYPE) + storeIdString;
+       int32_t partitionIdx = getRedisServerPartitionIndex(keyString);
+       value = NULL; 
+       valueSize = 0;
+
+       // Return now if there is no valid connection to the Redis server.
+       if (redisPartitions[partitionIdx].rdsc == NULL) {
+          error = DPS_CONNECTION_ERROR;
+          SPLAPPTRC(L_DEBUG, "Inside getValue #1: It failed for store " << storeIdString << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+          return;
+       }
+
+       // In our Redis dps implementation, data item keys can have space characters.
+       // Original NBF serialized key is stored in Redis as a base64 encoded string.
+       // So, to query, we will have to pass a base64 encoded key.
+       string base64_encoded_data_item_key;
+       base64_encode(string(key, keySize), base64_encoded_data_item_key);
+
+       // Fetch the data item now.
+       string cmd = string(REDIS_HGET_CMD) + keyString + " " + base64_encoded_data_item_key;
+       redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+
+       if (redis_reply == NULL) {
+          error = DPS_REDIS_REPLY_NULL_ERROR;
+          SPLAPPTRC(L_DEBUG, "Inside getValue #2: Unable to connect to the redis server(s). " << std::string(redisPartitions[partitionIdx].rdsc->errstr), "RedisDBLayer");
+          return;
+       }
+
+       // If SUCCESS, this result can come as an empty string.
+       if (redis_reply->type == REDIS_REPLY_ERROR) {
+          error = DPS_DATA_ITEM_READ_ERROR;
+          SPLAPPTRC(L_DEBUG, "Inside getValue #3: Unable to get the requested data item from the store with the StoreId " << storeIdString + ". " + std::string(redis_reply->str), "RedisDBLayer");
+          freeReplyObject(redis_reply);
+          return;
+       }
+
+       if (redis_reply->type == REDIS_REPLY_NIL) {
+          error = DPS_REDIS_REPLY_NIL_ERROR;
+	  // Unable to get the requested data item from the cache.
+          SPLAPPTRC(L_DEBUG, "Inside getValue #4: The requested data item doesn't exist in the StoreId " << storeIdString, "RedisDBLayer");
+          freeReplyObject(redis_reply);
+          return;
+       }
+
+       // Data item value read from the store will be in this format: 'value'
+       if ((unsigned)redis_reply->len > 0) {
+          // We can allocate memory for the exact length of the data item value.
+          valueSize = redis_reply->len;
+          value = (unsigned char *) malloc(valueSize);
+
+          if (value == NULL) {
+             valueSize = 0;
+             error = DPS_GET_DATA_ITEM_MALLOC_ERROR;
+             // Unable to allocate memory to transfer the data item value.
+             SPLAPPTRC(L_DEBUG, "Inside getValue #5: Unable to allocate memory to copy the data item value for the StoreId " << storeIdString << ".", "RedisDBLayer");
+          } else {
+             // We expect the caller of this method to free the value pointer.
+             memcpy(value, redis_reply->str, valueSize);
+             error = 0;
+          }
+       } else {
+          // We got a zero length data item value.
+          // This is not very useful and it should never happen.
+          // We will raise an error for this.
+          valueSize = 0;
+          error = DPS_EMPTY_DATA_ITEM_VALUE_FOUND_ERROR; 
+          SPLAPPTRC(L_DEBUG, "Inside getValue #6: Found an empty data item value for the StoreId " << storeIdString << ".", "RedisDBLayer");
+       } // End of if ((unsigned)redis_reply->len > 0)
+
+       freeReplyObject(redis_reply);
+    } // End of getValue method.
+
   RedisDBLayerIterator::RedisDBLayerIterator() {
 
   }
