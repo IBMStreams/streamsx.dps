@@ -81,6 +81,9 @@ interface with many different back-end in-memory stores.
 #define REDIS_ZADD_CMD                                                                                          "zadd "
 #define REDIS_ZREM_CMD                                                                                          "zrem "
 #define REDIS_ZRANGE_CMD                                                                                        "zrange "
+#define REDIS_HMSET_CMD                                                                                         "hmset "
+#define REDIS_HMGET_CMD                                                                                         "hmget "
+#define REDIS_ZMSCORE_CMD                                                                                       "zmscore "
 #define CASSANDRA_DPS_KEYSPACE										"com_ibm_streamsx_dps"
 #define CASSANDRA_DPS_MAIN_TABLE									"t1"
 #define HBASE_DPS_MAIN_TABLE										"dps_t1"
@@ -221,6 +224,24 @@ interface with many different back-end in-memory stores.
 #define DPS_REDIS_REPLY_NULL_ERROR                                                              161
 #define DPS_REDIS_REPLY_NIL_ERROR                                                               162
 #define DPS_EMPTY_DATA_ITEM_VALUE_FOUND_ERROR                                                   163
+#define DPS_BULK_PUT_HSET_ERROR                                                                 164
+#define DPS_BULK_PUT_ZADD_ERROR                                                                 165
+#define DPS_BULK_GET_HMGET_ERROR                                                                166
+#define DPS_BULK_GET_HMGET_NO_REPLY_ARRAY_ERROR                                                 167
+#define DPS_BULK_GET_HMGET_MALLOC_ERROR                                                         168
+#define DPS_BULK_GET_HMGET_EMPTY_VALUE_ERROR                                                    169
+#define DPS_BULK_GET_ZMSCORE_ERROR                                                              170
+#define DPS_BULK_GET_ZMSCORE_NO_REPLY_ARRAY_ERROR                                               171
+#define DPS_BULK_GET_ZMSCORE_EMPTY_VALUE_ERROR                                                  172
+#define DPS_BULK_REMOVE_HDEL_ERROR                                                              173
+#define DPS_BULK_REMOVE_ZREM_ERROR                                                              174
+#define DPS_BULK_REMOVE_CNT_MISMATCH_ERROR                                                      175
+#define DPS_BULK_REMOVE_HDEL_NO_INTEGER_REPLY_ERROR                                             176
+#define DPS_BULK_REMOVE_ZREM_NO_INTEGER_REPLY_ERROR                                             177
+#define DPS_GET_VALUES_EMPTY_KEYS_LIST_ERROR                                                    178
+#define DPS_PUT_KV_PAIRS_KEYS_VALUES_LISTS_NOT_OF_SAME_SIZE_ERROR                               179
+#define DPS_HAS_KEYS_EMPTY_KEYS_LIST_ERROR                                                      180
+#define DPS_REMOVE_KEYS_EMPTY_KEYS_LIST_ERROR                                                   181
 
 #define DL_CONNECTION_ERROR										501
 #define DL_GET_LOCK_ID_ERROR										502

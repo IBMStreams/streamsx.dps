@@ -289,9 +289,21 @@ namespace store {
     /// @return a list containing multiple keys of a given data type.
     virtual void getKeys(uint64_t store, std::vector<unsigned char *> & keysBuffer, std::vector<uint32_t> & keysSize, int32_t keyStartPosition, int32_t numberOfKeysNeeded, PersistenceError & dbError) = 0;
 
-    /// Get value for a given key present in a given store.
-    /// @return a value for a given key of a given data type.
-    virtual void getValue(std::string const & storeIdString, char const * & key, uint32_t const & keySize, unsigned char * & value, uint32_t & valueSize, uint64_t & error) = 0;
+    /// Get values for a given list of keys present in a given store.
+    /// @return a list containing multiple values for a given list of keys of a given data type.
+    virtual void getValues(uint64_t store, std::vector<char *> const & keyData, std::vector<uint32_t> const & keySize, std::vector<unsigned char *> & valueData, std::vector<uint32_t> & valueSize, PersistenceError & dbError) = 0;
+
+    /// Put (save) K/V pairs in a given store.
+    /// @return 0 if all put operations succeeded. Else, non-zero if one or more or all put failed.
+    virtual void putKVPairs(uint64_t store, std::vector<char *> const & keyData, std::vector<uint32_t> const & keySize, std::vector<unsigned char *> const & valueData, std::vector<uint32_t> const & valueSize, PersistenceError & dbError) = 0;
+
+    /// Check for the existence of a given list of keys in a given store.
+    /// @return a list containing the key existence check true or false results.
+    virtual void hasKeys(uint64_t store, std::vector<char *> const & keyData, std::vector<uint32_t> const & keySize, std::vector<bool> & results, PersistenceError & dbError) = 0;
+
+    /// Remove a given list of keys from a given store.
+    /// @return an integer value indicating the total number of keys removed.
+    virtual void removeKeys(uint64_t store, std::vector<char *> const & keyData, std::vector<uint32_t> const & keySize, int32_t & totalKeysRemoved, PersistenceError & dbError) = 0;
 
     /// A store iterator
     class Iterator

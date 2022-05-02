@@ -10,6 +10,7 @@
 
 #include "PersistenceError.h"
 #include "DBLayer.h"
+#include "DpsConstants.h"
 
 #include <SPL/Runtime/Type/SPLType.h>
 #include <SPL/Runtime/Utility/Mutex.h>
@@ -221,35 +222,62 @@ namespace distributed
   /// Get multiple keys present in a given store.
   /// @param store The handle of the store.
   /// @param keys User provided mutable list variable. This list must be suitable for storing multiple keys found in a given store and it must be made of a given store's key data type.
-  /// @param keyStartPosition User can indicate a start position from where keys should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
+  /// @param keyStartPosition User can indicate a zero index based start position from where keys should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
   /// @param numberOfKeysNeeded User can indicate the total number of keys to be returned as available from the given key start position. It must be greater than or equal to 0 and less than or equal to 50000. If it is set to 0, then all the available keys upto a maximum of 50000 keys from the given key start position will be returned.
   /// @param keyExpression User can provide an expression made of the attributes from the key's data type. This expression will be evaluated in determining which matching keys to be returned. [This feature is not implemented at this time.]
   /// @param valueExpression User can provide an expression made of the attributes from the value's data type. This expression will be evaluated in determining which matching keys to be returned. [This feature is not implemented at this time.]
-  /// @param err Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise. 
+  /// @param err User provided mutable uint64 typed variable in which the result of this bulk get keys operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise.
   ///
   template<class T1> 
   void getKeys(SPL::uint64 store, SPL::list<T1> & keys, SPL::int32 const & keyStartPosition, SPL::int32 const & numberOfKeysNeeded, SPL::rstring const & keyExpression, SPL::rstring const & valueExpression, SPL::uint64 & err);
 
-  /// This function can be called to get values for a given list of multiple keys present in a given store.
+  /// This function can be called to get i.e. read/fetch values for a given list of multiple keys present in a given store.
   /// @param store The handle of the store.
-  /// @param keys User provided list variable that contains keys for which values need to be fetched.
-  /// @param values User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the key appeared in the user provided keys list. Before using the individual values from this list, it is recommended to make sure that a given value fetch worked with no errors.
-  /// @param errors User provided mutable list variable in which the individual success or failure value fetch result codes will be returned. This list must be of type uint64. Each list element will be 0 if no error occurs and a non-zero error code otherwise. Such value fetch result codes will be available in this list at the same index where the key appears in the user provided keys list. If a given result code doesn't indicate a successful value fetch, it is better to skip the corresponding element at the same index in the mutable values list.
+  /// @param keys User provided list variable that contains keys for which values need to be fetched. It must be made of a given store's key data type.
+  /// @param keyExistsOrNot User provided mutable list variable in which true or false status for every user given key will be returned. This is done to indicate to the user about if that key exists or not in the given store. This list must be made of a boolean data type. Status returned in this list can be used in combination with the items returned in the values list which is explained next.
+  /// @param values User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the key appeared in the user provided keys list. If a user given key is not present in the store, there will still be a default value returned in that key's index. It is better to first confirm in the keyExistsOrNot list that will carry true or false status about the existence of all the user provided keys. Depending on the key existence status found in that other list, user can decide to either consider using or ignore a value in a given index of the values list.
+  /// @param err User provided mutable uint64 typed variable in which the result of this bulk get values operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise.
   /// 
   template<class T1, class T2>
-  bool getValues(SPL::uint64 store, SPL::list<T1> const & keys, SPL::list<T2> & values, SPL::list<SPL::uint64> & errors);
+  void getValues(SPL::uint64 store, SPL::list<T1> const & keys, SPL::list<SPL::boolean> & keyExistsOrNot, SPL::list<T2> & values, SPL::uint64 & err);
 
   /// This function can be called to get multiple Key/Value (KV) pairs present in a given store.
   /// @param store The handle of the store.
   /// @param keys User provided mutable list variable in which the keys found in the store will be returned. This list must be suitable for storing multiple keys found in a given store and it must be made of a given store's key data type.
-  /// @param values User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the corresponding key appears in the keys list. Before using the individual values from this list, it is recommended to make sure that a given value fetch worked with no errors.
-  /// @param keyStartPosition User can indicate a start position from where the K/V pairs should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
+  /// @param values User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the corresponding key appears in the keys list.
+  /// @param keyStartPosition User can indicate a zero index based start position from where the K/V pairs should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
   /// @param numberOfPairsNeeded User can indicate the total number of K/V pairs to be returned as available from the given key start position. It must be greater than or equal to 0 and less than or equal to 50000. If it is set to 0, then all the available K/V pairs upto a maximum of 50000 pairs from the given key start position will be returned.
-  /// @param errors User provided mutable list variable in which the individual success or failure value fetch result codes will be returned. This list must be of type uint64. Each list element will be 0 if no error occurs and a non-zero error code otherwise. Such value fetch result codes will be available in this list at the same index where the key appears in the keys list. If a given result code doesn't indicate a successful value fetch, it is better to skip the corresponding element at the same index in the mutable values list.
-  /// @return It returns true if value fetch worked for all the keys with no errors. Else, it returns false to indicate that value fetch encountered error for one or more keys.
+  /// @param err User provided mutable uint64 typed variable in which the result of this bulk get KV pairs operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise.
   ///
   template<class T1, class T2>
-  bool getKVPairs(SPL::uint64 store, SPL::list<T1> & keys, SPL::list<T2> & values, SPL::int32 const & keyStartPosition, SPL::int32 const & numberOfPairsNeeded, SPL::list<SPL::uint64> & errors);
+  void getKVPairs(SPL::uint64 store, SPL::list<T1> & keys, SPL::list<T2> & values, SPL::int32 const & keyStartPosition, SPL::int32 const & numberOfPairsNeeded, SPL::uint64 & err);
+
+  /// This function can be called to put i.e. write/save multiple Key/Value (KV) pairs to a given store.
+  /// @param store The handle of the store.
+  /// @param keys User provided list variable that contains the keys to be written i.e. saved. This list must be made of a given store's key data type.
+  /// @param values User provided list variable that contains the values to be written i.e. saved. This list must be made of a given store's value data type. A KV pair is formed with a key and a value taken from the same index position of the keys and values lists. If the keys and values lists are not of the same size, this function will simply return back without doing any bulk put operation.
+  /// @param err User provided mutable uint64 typed variable in which the result of this bulk put operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise.
+  ///
+  template<class T1, class T2>
+  void putKVPairs(SPL::uint64 store, SPL::list<T1> const & keys, SPL::list<T2> const & values, SPL::uint64 & err);
+
+  /// This function can be called to check for the existence of a given list of keys in a given store. 
+  /// @param store The handle of the store.
+  /// @param keys User provided list variable that contains the keys to be checked for their existence in the given store. This list must be made of a given store's key data type.
+  /// @param results User provided mutable list variable in which the key existence check true or false results will be returned. This list must be made of a boolean data type.
+  /// @param err User provided mutable uint64 typed variable in which the result of this bulk has keys operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise.
+  ///
+  template<class T1>
+  void hasKeys(SPL::uint64 store, SPL::list<T1> const & keys, SPL::list<SPL::boolean> & results, SPL::uint64 & err);
+
+  /// This function can be called to remove a given list of keys from a given store.
+  /// @param store The handle of the store.
+  /// @param keys User provided list variable that contains the keys to be removed from the given store. This list must be made of a given store's key data type.
+  /// @param totalKeysRemoved User provided mutable int32 variable in which the total number of keys removed from the store will be returned.
+  /// @param err User provided mutable uint64 typed variable in which the result of this bulk remove keys operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise.
+  ///
+  template<class T1>
+  void removeKeys(SPL::uint64 store, SPL::list<T1> const & keys, SPL::int32 & totalKeysRemoved, SPL::uint64 & err);
 
     /// Serialize the items from the serialized store
     /// @param store store handle
@@ -894,150 +922,346 @@ namespace distributed
   /// Get multiple keys present in a given store.
   /// @param store The handle of the store.
   /// @param keys User provided mutable list variable. This list must be suitable for storing multiple keys found in a given store and it must be made of a given store's key data type.
-  /// @param keyStartPosition User can indicate a start position from where keys should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
+  /// @param keyStartPosition User can indicate a zero index based start position from where keys should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
   /// @param numberOfKeysNeeded User can indicate the total number of keys to be returned as available from the given key start position. It must be greater than or equal to 0 and less than or equal to 50000. If it is set to 0, then all the available keys upto a maximum of 50000 keys from the given key start position will be returned.
   /// @param keyExpression User can provide an expression made of the attributes from the key's data type. This expression will be evaluated in determining which matching keys to be returned. [This feature is not implemented at this time.]
   /// @param valueExpression User can provide an expression made of the attributes from the value's data type. This expression will be evaluated in determining which matching keys to be returned. [This feature is not implemented at this time.]
-  /// @param err Contains the error code. Will be '0' if no error occurs, and a non-zero value otherwise. 
+  /// @param err User provided mutable uint64 typed variable in which the result of this bulk get keys operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise.
   ///
   template<class T1>                 
   void DistributedProcessStore::getKeys(SPL::uint64 store, SPL::list<T1> & keys, SPL::int32 const & keyStartPosition, SPL::int32 const & numberOfKeysNeeded, SPL::rstring const & keyExpression, SPL::rstring const & valueExpression, SPL::uint64 & err) {
-    dbError_->reset();
-    std::vector<unsigned char *> keysBuffer;
-    std::vector<uint32_t> keysSize;
-    // Clear the user provided list now.
-    keys.clear();
-    // Call the underlying store implementation function to get multiple keys in a given store.
-    db_->getKeys(store, keysBuffer, keysSize, keyStartPosition, numberOfKeysNeeded, *dbError_);
-    err = dbError_->getErrorCode();
+     dbError_->reset();
+     std::vector<unsigned char *> keysBuffer;
+     std::vector<uint32_t> keysSize;
+     // Clear the user provided list now.
+     keys.clear();
+     // Call the underlying store implementation function to get multiple keys in a given store.
+     db_->getKeys(store, keysBuffer, keysSize, keyStartPosition, numberOfKeysNeeded, *dbError_);
+     err = dbError_->getErrorCode();
 
-    if(err != 0) {
-       // We got an error. Return now without populating anything in the
-       // user provided list (vector). We will free any memory allocated
-       // for the partial set of keys returned if any.
-       for (unsigned int i = 0; i < keysBuffer.size(); i++) {
-          if(keysSize.at(i) > 0) {
-             // We must free the buffer allocated by the underlying implementation that we called above.
-             free(keysBuffer.at(i));
-          }
-       } // End of for loop.
+     if(err != 0) {
+        // We got an error. Return now without populating anything in the
+        // user provided list (vector). We will free any memory allocated
+        // for the partial set of keys returned if any.
+        for (unsigned int i = 0; i < keysBuffer.size(); i++) {
+           if(keysSize.at(i) > 0) {
+              // We must free the buffer allocated by the underlying implementation that we called above.
+              free(keysBuffer.at(i));
+           }
+        } // End of for loop.
 
-       return;
-    }
+        return;
+     }
 
-    // We got multiple keys.
-    // Let us convert it to the proper key type and store them in
-    // the user provided list (vector).
-    //
-    // Populate the user provided list (vector) with the store keys.
-    for (unsigned int i = 0; i < keysBuffer.size(); i++) {
-    	SPL::NativeByteBuffer nbf_key(keysBuffer.at(i), keysSize.at(i));
+     // We got multiple keys.
+     // Let us convert it to the proper key type and store them in
+     // the user provided list (vector).
+     //
+     // Populate the user provided list (vector) with the store keys.
+     for (unsigned int i = 0; i < keysBuffer.size(); i++) {
+        SPL::NativeByteBuffer nbf_key(keysBuffer.at(i), keysSize.at(i));
         T1 tempKey;
         // Deserialize the obtained keys from their NBF format to their native SPL type. 
-    	nbf_key >> tempKey;
+        nbf_key >> tempKey;
         keys.push_back(tempKey);
 
         if(keysSize.at(i) > 0) {
            // We must free the buffer allocated by the underlying implementation that we called above.
            free(keysBuffer.at(i));
         }
-    } // End of for loop.
+     } // End of for loop.
   } // End of getKeys method.
 
-  /// This function can be called to get values for a given list of multiple keys present in a given store.
+  /// This function can be called to get i.e. read/fetch values for a given list of multiple keys present in a given store.
   /// @param store The handle of the store.
-  /// @param keys User provided list variable that contains keys for which values need to be fetched.
-  /// @param values User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the key appeared in the user provided keys list. Before using the individual values from this list, it is recommended to make sure that a given value fetch worked with no errors.
-  /// @param errors User provided mutable list variable in which the individual success or failure value fetch result codes will be returned. This list must be of type uint64. Each list element will be 0 if no error occurs and a non-zero error code otherwise. Such value fetch result codes will be available in this list at the same index where the key appears in the user provided keys list. If a given result code doesn't indicate a successful value fetch, it is better to skip the corresponding element at the same index in the mutable values list.
+  /// @param keys User provided list variable that contains keys for which values need to be fetched. It must be made of a given store's key data type.
+  /// @param keyExistsOrNot User provided mutable list variable in which true or false status for every user given key will be returned. This is done to indicate to the user about if that key exists or not in the given store. This list must be made of a boolean data type. Status returned in this list can be used in combination with the items returned in the values list which is explained next.
+  /// @param values User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the key appeared in the user provided keys list. If a user given key is not present in the store, there will still be a default value returned in that key's index. It is better to first confirm in the keyExistsOrNot list that will carry true or false status about the existence of all the user provided keys. Depending on the key existence status found in that other list, user can decide to either consider using or ignore a value in a given index of the values list.
+  /// @param err User provided mutable uint64 typed variable in which the result of this bulk get values operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise.
   /// 
   template<class T1, class T2>
-  bool DistributedProcessStore::getValues(SPL::uint64 store, SPL::list<T1> const & keys, SPL::list<T2> & values, SPL::list<SPL::uint64> & errors) {
-    dbError_->reset();
-    bool resultStatus = true;
+  void DistributedProcessStore::getValues(SPL::uint64 store, SPL::list<T1> const & keys, SPL::list<SPL::boolean> & keyExistsOrNot, SPL::list<T2> & values, SPL::uint64 & err) {
+     dbError_->reset();
 
-    // Clear the user provided mutable lists now.
-    values.clear();
-    errors.clear();
+     // Clear the user provided mutable lists now.
+     keyExistsOrNot.clear();
+     values.clear();
 
-    // Create a string form of the store id.
-    std::ostringstream storeId;
-    storeId << store;
-    std::string storeIdString = storeId.str();
+     if(keys.size() == 0) {
+        // Caller sent us no keys.
+        // Set an error code so that the caller knows that there is no real get values done by us here.
+        dbError_->set(std::string("Inside the top level getValues #1, this method was called with an empty keys list."), DPS_GET_VALUES_EMPTY_KEYS_LIST_ERROR);
+        err = dbError_->getErrorCode();
+        return;
+     }
 
-    // Populate the key buffer with the serialized key.
-    // i.e. Serialize it from the native SPL type to NBF format.
-    // Then, call the method in the underlying DB implementation layer for every key that we have.
-    for(int i=0; i<keys.size(); i++) {
-       SPL::NativeByteBuffer key_nbf;
-       key_nbf << keys.at(i);
-       char const * keyData = (char const *)key_nbf.getPtr();
-       uint32_t keySize = key_nbf.getSerializedDataSize();
+     // We will create the NBF based keys and values, store them in different lists and
+     // send it to the underlying DB layer for it to do bulk writes of the K/V pairs.
+     std::vector<char *> keyData;
+     std::vector<uint32_t> keySize;
+     std::vector<unsigned char *> valueData;
+     std::vector<uint32_t> valueSize;
 
-       unsigned char * valueData;
-       uint32_t valueSize = 0; 
-       uint64_t error = 0;
-       db_->getValue(storeIdString, keyData, keySize, valueData, valueSize, error);
+     std::vector<SPL::NativeByteBuffer> key_nbf;
 
-       // Collect the results in the user provided list.
-       T2 tempValue;
+     // We have to have NBF objects in scope at the time of calling
+     // the underlying DB layer functions. We will keep them in a vector.
+     for(int i=0; i<keys.size(); i++) {
+        // Does this kind of object instantiation require deallocating memory later?
+        // Find out the answer by doing sufficient tests.
+        key_nbf.push_back(SPL::NativeByteBuffer());
+     }
 
-       if(error == 0) {
-          SPL::NativeByteBuffer value_nbf(valueData, valueSize);
-          value_nbf >> tempValue;
-       } else {
-          // At least one error seen while fetching the value for a key.
-          resultStatus = false;
-       }
+     // Stay in a loop and keep collecting the NBF versions of the keys.
+     for(int i=0; i<keys.size(); i++) {
+        key_nbf.at(i) << keys.at(i);
+        keyData.push_back((char *)key_nbf.at(i).getPtr());
+        keySize.push_back(key_nbf.at(i).getSerializedDataSize());
+     } // End of for loop.
 
-       values.push_back(tempValue);
-       errors.push_back(error);
+     // Call the underlying DB implementation layer only once to do bulk read of the values for a given list of keys.
+     db_->getValues(store, keyData, keySize, valueData, valueSize, *dbError_);
+     err = dbError_->getErrorCode();
 
-       // We must free the memory allocated in the DB layer.
-       if(valueSize > 0) {
-          free(valueData);
-       }
-    } // End of for loop.
+     if(err != 0) {
+        // Error occurred.
+        // We will release the allocated memory buffers if any by the underlying DB layer before we return from here.
+        for(int i=0; i<valueData.size(); i++) {
+           if(valueData.at(i) != NULL && valueSize.at(i) > 0) {
+              free(valueData.at(i));
+           }
+        }
 
-    return(resultStatus);
+        return;
+     }
+
+     // We have to now turn the value data read from the backend store into proper 
+     // SPL type so that it is consumable by the caller.
+     for(int i=0; i<valueData.size(); i++) {
+        // Collect the results in the user provided list.
+        T2 tempValue;
+
+        // If the user given key is not present in the store, we will have a NULL value returned as a result for that.
+        if(valueData.at(i) != NULL) {
+           SPL::NativeByteBuffer value_nbf(valueData.at(i), valueSize.at(i));
+           value_nbf >> tempValue;
+           // We must free the memory allocated in the DB layer.
+           free(valueData.at(i));
+
+           // Indicate about the existence of the key in the user provided list.
+           keyExistsOrNot.push_back(true);
+        } else {
+           // Indicate about the non-existence of the key in the user provided list.
+           keyExistsOrNot.push_back(false);
+        }
+
+        // To the user provided values list, add either a fetched good value result for a key that exists in the 
+        // store or a default value for a key that doesn't exist in the store. 
+        values.push_back(tempValue);
+     } // End of for loop.
   } // End of getValues method.
 
   /// This function can be called to get multiple Key/Value (KV) pairs present in a given store.
   /// @param store The handle of the store.
   /// @param keys User provided mutable list variable in which the keys found in the store will be returned. This list must be suitable for storing multiple keys found in a given store and it must be made of a given store's key data type.
-  /// @param values User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the corresponding key appears in the keys list. Before using the individual values from this list, it is recommended to make sure that a given value fetch worked with no errors.
-  /// @param keyStartPosition User can indicate a start position from where the K/V pairs should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
+  /// @param values User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the corresponding key appears in the keys list.
+  /// @param keyStartPosition User can indicate a zero index based start position from where the K/V pairs should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys.
   /// @param numberOfPairsNeeded User can indicate the total number of K/V pairs to be returned as available from the given key start position. It must be greater than or equal to 0 and less than or equal to 50000. If it is set to 0, then all the available K/V pairs upto a maximum of 50000 pairs from the given key start position will be returned.
-  /// @param errors User provided mutable list variable in which the individual success or failure value fetch result codes will be returned. This list must be of type uint64. Each list element will be 0 if no error occurs and a non-zero error code otherwise. Such value fetch result codes will be available in this list at the same index where the key appears in the keys list. If a given result code doesn't indicate a successful value fetch, it is better to skip the corresponding element at the same index in the mutable values list.
-  /// @return It returns true if value fetch worked for all the keys with no errors. Else, it returns false to indicate that value fetch encountered error for one or more keys.
+  /// @param err User provided mutable uint64 typed variable in which the result of this bulk get KV pairs operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise.
   ///
   template<class T1, class T2>
-  bool DistributedProcessStore::getKVPairs(SPL::uint64 store, SPL::list<T1> & keys, SPL::list<T2> & values, SPL::int32 const & keyStartPosition, SPL::int32 const & numberOfPairsNeeded, SPL::list<SPL::uint64> & errors) {
-    // The logic in this method is going to be a combination of the two previous methods shown above.
-    // We have to first get the keys and then the values for those keys.
-    dbError_->reset();
-    bool resultStatus = true;
-    uint64_t error = 0;
-    std::string keyExpression = "";
-    std::string valueExpression = "";
+  void DistributedProcessStore::getKVPairs(SPL::uint64 store, SPL::list<T1> & keys, SPL::list<T2> & values, SPL::int32 const & keyStartPosition, SPL::int32 const & numberOfPairsNeeded, SPL::uint64 & err) {
+     // The logic in this method is going to be a combination of the two previous methods shown above.
+     // We have to first get the keys and then the values for those keys.
+     dbError_->reset();
+     std::string keyExpression = "";
+     std::string valueExpression = "";
 
-    // Clear the user provided mutable lists now.
-    keys.clear();
-    values.clear();
-    errors.clear();
+     // Clear the user provided mutable lists now.
+     keys.clear();
+     values.clear();
 
-    // Let us first get the keys available in the user specified range.
-    getKeys(store, keys, keyStartPosition, numberOfPairsNeeded, keyExpression, valueExpression, error);
+     // Let us first get the keys available in the user specified range.
+     getKeys(store, keys, keyStartPosition, numberOfPairsNeeded, keyExpression, valueExpression, err);
 
-    // If we encountered an error in getting the keys, we can return back from here.
-    if(error != 0) {
-       resultStatus = false;
-       return(resultStatus);
-    }
+     // If we encountered an error in getting the keys, we can return back from here.
+     if(err != 0) {
+        return;
+     }
 
-    // We got the keys. Let us now get the values stored for those keys.
-    resultStatus = getValues(store, keys, values, errors);
-    return(resultStatus);
+     SPL::list<SPL::boolean> keyExistsOrNot;
+
+     // We got the keys. Let us now get the values stored for those keys.
+     getValues(store, keys, keyExistsOrNot, values, err);
   } // End of getKVPairs method.
+
+  /// This function can be called to put i.e. write/save multiple Key/Value (KV) pairs to a given store.
+  /// @param store The handle of the store.
+  /// @param keys User provided list variable that contains the keys to be written i.e. saved. This list must be made of a given store's key data type.
+  /// @param values User provided list variable that contains the values to be written i.e. saved. This list must be made of a given store's value data type. A KV pair is formed with a key and a value taken from the same index position of the keys and values lists. If the keys and values lists are not of the same size, this function will simply return back without doing any bulk put operation.
+  /// @param err User provided mutable uint64 typed variable in which the result of this bulk put operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise.
+  ///
+  template<class T1, class T2>
+  void DistributedProcessStore::putKVPairs(SPL::uint64 store, SPL::list<T1> const & keys, SPL::list<T2> const & values, SPL::uint64 & err) {
+     dbError_->reset();
+
+     // Check if the two user provided keys and values lists are of the same size.
+     if(keys.size() != values.size()) {
+        // They are not of the same size. We will ignore the caller's intent and 
+        // return back from here without doing any useful work.
+        // Set an error code so that the caller knows that there is no real put KV pairs done by us here.
+        dbError_->set(std::string("Inside the top level putKVPairs #1, this method was called with keys and values lists that are made of different sizes."), DPS_PUT_KV_PAIRS_KEYS_VALUES_LISTS_NOT_OF_SAME_SIZE_ERROR);
+        err = dbError_->getErrorCode();
+        return;
+     }
+
+     // We will create the NBF based keys and values, store them in different lists and
+     // send it to the underlying DB layer for it to do bulk writes of the K/V pairs.
+     std::vector<char *> keyData;
+     std::vector<uint32_t> keySize;
+     std::vector<unsigned char *> valueData;
+     std::vector<uint32_t> valueSize;
+
+     std::vector<SPL::NativeByteBuffer> key_nbf;
+     std::vector<SPL::NativeByteBuffer> value_nbf;
+
+     // We have to have NBF objects in scope at the time of calling
+     // the underlying DB layer functions. We will keep them in a vector.
+     for(int i=0; i<keys.size(); i++) {
+        // Does this kind of object instantiation require deallocating memory later?
+        // Find out the answer by doing sufficient tests.
+        key_nbf.push_back(SPL::NativeByteBuffer());
+        value_nbf.push_back(SPL::NativeByteBuffer());
+     }
+
+     // Stay in a loop and keep collecting the NBF versions of the keys and values.
+     for(int i=0; i<keys.size(); i++) {
+        key_nbf.at(i) << keys.at(i);
+        keyData.push_back((char *)key_nbf.at(i).getPtr());
+        keySize.push_back(key_nbf.at(i).getSerializedDataSize());
+        value_nbf.at(i) << values.at(i);
+        valueData.push_back(value_nbf.at(i).getPtr());
+        valueSize.push_back(value_nbf.at(i).getSerializedDataSize());
+     } // End of for loop.
+
+     // Call the underlying DB implementation layer only once to do bulk writes of K/V pairs.
+     db_->putKVPairs(store, keyData, keySize, valueData, valueSize, *dbError_);
+     err = dbError_->getErrorCode();
+  } // End of putKVPairs method.
+
+  /// This function can be called to check for the existence of a given list of keys in a given store. 
+  /// @param store The handle of the store.
+  /// @param keys User provided list variable that contains the keys to be checked for their existence in the given store. This list must be made of a given store's key data type.
+  /// @param results User provided mutable list variable in which the key existence check true or false results will be returned. This list must be made of a boolean data type.
+  /// @param err User provided mutable uint64 typed variable in which the result of this bulk has keys operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise.
+  ///
+  template<class T1>
+  void DistributedProcessStore::hasKeys(SPL::uint64 store, SPL::list<T1> const & keys, SPL::list<SPL::boolean> & results, SPL::uint64 & err) {
+     dbError_->reset();
+
+     // Clear the user provided mutable list now.
+     results.clear();
+
+     if(keys.size() == 0) {
+        // Caller sent us no keys.
+        // Set an error code so that the caller knows that there are no existence results sent from us here.
+        dbError_->set(std::string("Inside the top level hasKeys #1, this method was called with an empty keys list."), DPS_HAS_KEYS_EMPTY_KEYS_LIST_ERROR);
+        err = dbError_->getErrorCode();
+        return;
+     }
+
+     // We will create the NBF based keys, store them in a different list and
+     // send it to the underlying DB layer for it to do bulk existence check of those keys.
+     std::vector<char *> keyData;
+     std::vector<uint32_t> keySize;
+
+     std::vector<SPL::NativeByteBuffer> key_nbf;
+
+     // We have to have NBF objects in scope at the time of calling
+     // the underlying DB layer functions. We will keep them in a vector.
+     for(int i=0; i<keys.size(); i++) {
+        // Does this kind of object instantiation require deallocating memory later?
+        // Find out the answer by doing sufficient tests.
+        key_nbf.push_back(SPL::NativeByteBuffer());
+     }
+
+     // Stay in a loop and keep collecting the NBF versions of the keys.
+     for(int i=0; i<keys.size(); i++) {
+        key_nbf.at(i) << keys.at(i);
+        keyData.push_back((char *)key_nbf.at(i).getPtr());
+        keySize.push_back(key_nbf.at(i).getSerializedDataSize());
+     } // End of for loop.
+
+     // I couldn't directly pass the user provided SPL::list<SPL::boolean> to the
+     // underlying DB implementation that expects std::vector<bool>.
+     // So, I'm having this local variable to collect the results and then
+     // transfer it to the user provided list right after the call returns back.
+     // There must be an easier way to avoid this use of two different array
+     // types to do one task. It is a waste of extra logic and memory copy. 
+     // At a later time, try to simplify it.
+     std::vector<bool> myResults;
+
+     // Call the underlying DB implementation layer only once to do bulk existence check for a given list of keys.
+     db_->hasKeys(store, keyData, keySize, myResults, *dbError_);
+     err = dbError_->getErrorCode();
+
+     // Populate the user provided SPL::list<SPL::boolean>
+     for(int i=0; i<myResults.size(); i++) {
+        if(myResults.at(i) == true) {
+           results.push_back(true);
+        } else {
+           results.push_back(false);
+        }
+     }
+  } // End of hasKeys method.
+
+  /// This function can be called to remove a given list of keys from a given store.
+  /// @param store The handle of the store.
+  /// @param keys User provided list variable that contains the keys to be removed from the given store. This list must be made of a given store's key data type.
+  /// @param totalKeysRemoved User provided mutable int32 variable in which the total number of keys removed from the store will be returned.
+  /// @param err User provided mutable uint64 typed variable in which the result of this bulk remove keys operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise.
+  ///
+  template<class T1>
+  void DistributedProcessStore::removeKeys(SPL::uint64 store, SPL::list<T1> const & keys, SPL::int32 & totalKeysRemoved, SPL::uint64 & err) {
+     dbError_->reset();
+
+     // Reset the result variable.
+     totalKeysRemoved = 0;
+
+     if(keys.size() == 0) {
+        // Caller sent us no keys.
+        // Set an error code so that the caller knows that there are no key removals done here.
+        dbError_->set(std::string("Inside the top level removeKeys #1, this method was called with an empty keys list."), DPS_REMOVE_KEYS_EMPTY_KEYS_LIST_ERROR);
+        err = dbError_->getErrorCode();
+        return;
+     }
+
+     // We will create the NBF based keys, store them in a different list and
+     // send it to the underlying DB layer for it to do bulk existence check of those keys.
+     std::vector<char *> keyData;
+     std::vector<uint32_t> keySize;
+
+     std::vector<SPL::NativeByteBuffer> key_nbf;
+
+     // We have to have NBF objects in scope at the time of calling
+     // the underlying DB layer functions. We will keep them in a vector.
+     for(int i=0; i<keys.size(); i++) {
+        // Does this kind of object instantiation require deallocating memory later?
+        // Find out the answer by doing sufficient tests.
+        key_nbf.push_back(SPL::NativeByteBuffer());
+     }
+
+     // Stay in a loop and keep collecting the NBF versions of the keys.
+     for(int i=0; i<keys.size(); i++) {
+        key_nbf.at(i) << keys.at(i);
+        keyData.push_back((char *)key_nbf.at(i).getPtr());
+        keySize.push_back(key_nbf.at(i).getSerializedDataSize());
+     } // End of for loop.
+
+     // Call the underlying DB implementation layer only once to do bulk removal of a given list of keys from the given store.
+     db_->removeKeys(store, keyData, keySize, totalKeysRemoved, *dbError_);
+     err = dbError_->getErrorCode();
+  } // End of removeKeys method.
 
   template<class T1, class T2>
   void DistributedProcessStore::serialize(SPL::uint64 store, SPL::blob & data, SPL::uint64 & err)

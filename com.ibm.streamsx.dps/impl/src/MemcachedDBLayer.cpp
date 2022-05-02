@@ -2287,11 +2287,38 @@ namespace distributed
     } // End of getKeys method.
 
     // Senthil added this on Apr/18/2022.
-    // This method will get the value for a given key from the given store without
-    // performing any checks for the existence of store, key etc. This is a slightly 
+    // This method will get the values for a given list of keys from the given store without
+    // performing any checks for the existence of store, key etc. This is a 
     // faster version of the get method above. 
-    void MemcachedDBLayer::getValue(std::string const & storeIdString, char const * & key, uint32_t const & keySize, unsigned char * & value, uint32_t & valueSize, uint64_t & error) {
-       SPLAPPTRC(L_DEBUG, "Inside getValue for store id " << storeIdString, "MemcachedDBLayer");
+    void MemcachedDBLayer::getValues(uint64_t store, std::vector<char *> const & keyData, std::vector<uint32_t> const & keySize, std::vector<unsigned char *> & valueData, std::vector<uint32_t> & valueSize, PersistenceError & dbError) {
+       SPLAPPTRC(L_DEBUG, "Inside getValues for store id " << store, "MemcachedDBLayer");
+
+       // Not implemented at this time. Simply return.
+       return;
+    }
+
+    // Senthil added this on Apr/21/2022.
+    // This method will put the given K/V pairs in a given store. 
+    void MemcachedDBLayer::putKVPairs(uint64_t store, std::vector<char *> const & keyData, std::vector<uint32_t> const & keySize, std::vector<unsigned char *> const & valueData, std::vector<uint32_t> const & valueSize, PersistenceError & dbError) {
+       SPLAPPTRC(L_DEBUG, "Inside putKVPairs for store id " << store, "MemcachedDBLayer");
+
+       // Not implemented at this time. Simply return.
+       return;
+    }
+
+    // Senthil added this on Apr/27/2022.
+    // This method checks for the existence of a given list of keys in a given store and returns the true or false results.
+    void MemcachedDBLayer::hasKeys(uint64_t store, std::vector<char *> const & keyData, std::vector<uint32_t> const & keySize, std::vector<bool> & results, PersistenceError & dbError) {
+       SPLAPPTRC(L_DEBUG, "Inside hasKeys for store id " << store, "MemcachedDBLayer");
+
+       // Not implemented at this time. Simply return.
+       return;
+    }
+
+    // Senthil added this on Apr/28/2022.
+    // This method removes a given list of keys from a given store.
+    void MemcachedDBLayer::removeKeys(uint64_t store, std::vector<char *> const & keyData, std::vector<uint32_t> const & keySize, int32_t & totalKeysRemoved, PersistenceError & dbError) {
+       SPLAPPTRC(L_DEBUG, "Inside removeKeys for store id " << store, "MemcachedDBLayer");
 
        // Not implemented at this time. Simply return.
        return;
