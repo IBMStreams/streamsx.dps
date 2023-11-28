@@ -144,6 +144,18 @@
 
 
 
+  <dt class="dt dlterm"><a class="xref" href="../tk$com.ibm.streamsx.dps/fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsGetKVPairs.uint64.list:.:T1:.:.list:.:T2:.:.int32.int32.uint64">dpsGetKVPairs(uint64, list&lt;T1&gt;, list&lt;T2&gt;, int32, int32, uint64)</a></dt>
+
+  <dd class="dd">This function can be called to get i.e. read/fetch multiple Key/Value (KV) pairs present in a given store. </dd>
+
+
+
+  <dt class="dt dlterm"><a class="xref" href="../tk$com.ibm.streamsx.dps/fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsGetKeys.uint64.list:.:T1:.:.int32.int32.rstring.rstring.uint64">dpsGetKeys(uint64, list&lt;T1&gt;, int32, int32, rstring, rstring, uint64)</a></dt>
+
+  <dd class="dd">This function can be called to get i.e. read/fetch multiple keys present in a given store. </dd>
+
+
+
   <dt class="dt dlterm"><a class="xref" href="../tk$com.ibm.streamsx.dps/fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsGetLastErrorCodeTTL">dpsGetLastErrorCodeTTL()</a></dt>
 
   <dd class="dd">Get the error code of the last error occurred involving data that was stored with a Time To Live (TTL).</dd>
@@ -216,9 +228,21 @@
 
 
 
+  <dt class="dt dlterm"><a class="xref" href="../tk$com.ibm.streamsx.dps/fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsGetValues.uint64.list:.:T1:.:.list:.:boolean:.:.list:.:T2:.:.uint64">dpsGetValues(uint64, list&lt;T1&gt;, list&lt;boolean&gt;, list&lt;T2&gt;, uint64)</a></dt>
+
+  <dd class="dd">This function can be called to get i.e. read/fetch values for a given list of multiple keys present in a given store. </dd>
+
+
+
   <dt class="dt dlterm"><a class="xref" href="../tk$com.ibm.streamsx.dps/fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsHas.uint64.T1.uint64">dpsHas(uint64, T1, uint64)</a></dt>
 
   <dd class="dd">Check if an item exists in the given store.</dd>
+
+
+
+  <dt class="dt dlterm"><a class="xref" href="../tk$com.ibm.streamsx.dps/fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsHasKeys.uint64.list:.:T1:.:.list:.:boolean:.:.uint64">dpsHasKeys(uint64, list&lt;T1&gt;, list&lt;boolean&gt;, uint64)</a></dt>
+
+  <dd class="dd">This function can be called to check for the existence of a given list of keys in a given store.</dd>
 
 
 
@@ -249,6 +273,12 @@
   <dt class="dt dlterm"><a class="xref" href="../tk$com.ibm.streamsx.dps/fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsPut.uint64.T1.T2.uint64">dpsPut(uint64, T1, T2, uint64)</a></dt>
 
   <dd class="dd">Put a new key-value pair into a store.</dd>
+
+
+
+  <dt class="dt dlterm"><a class="xref" href="../tk$com.ibm.streamsx.dps/fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsPutKVPairs.uint64.list:.:T1:.:.list:.:T2:.:.uint64">dpsPutKVPairs(uint64, list&lt;T1&gt;, list&lt;T2&gt;, uint64)</a></dt>
+
+  <dd class="dd">This function can be called to put i.e. write/save multiple Key/Value (KV) pairs to a given store. Note: You must make sure that the intended store exists before you use this function. If not, you will end up creating bulk K/V pairs in an unmanageable fashion in the backend data store which will make it less useful.  </dd>
 
 
 
@@ -285,6 +315,12 @@
   <dt class="dt dlterm"><a class="xref" href="../tk$com.ibm.streamsx.dps/fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsRemove.uint64.T1.uint64">dpsRemove(uint64, T1, uint64)</a></dt>
 
   <dd class="dd">Remove an item from the given store.</dd>
+
+
+
+  <dt class="dt dlterm"><a class="xref" href="../tk$com.ibm.streamsx.dps/fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsRemoveKeys.uint64.list:.:T1:.:.int32.uint64">dpsRemoveKeys(uint64, list&lt;T1&gt;, int32, uint64)</a></dt>
+
+  <dd class="dd">This function can be called to remove a given list of keys from a given store.</dd>
 
 
 

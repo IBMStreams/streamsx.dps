@@ -7,22 +7,22 @@
 <meta name="copyright" content="(C) Copyright 2005"/>
 <meta name="DC.rights.owner" content="(C) Copyright 2005"/>
 <meta name="DC.Type" content="reference"/>
-<meta name="DC.Title" content="Toolkit com.ibm.streamsx.dps 4.1.2"/>
+<meta name="DC.Title" content="Toolkit com.ibm.streamsx.dps 4.1.8"/>
 <meta name="DC.Format" content="XHTML"/>
 <meta name="DC.Identifier" content="spldoc_toolkit"/>
 <link rel="stylesheet" type="text/css" href="../../html/commonltr.css"/>
 <link rel="stylesheet" type="text/css" href="../../html/spldoc.css"/>
-<title>Toolkit com.ibm.streamsx.dps 4.1.2</title>
+<title>Toolkit com.ibm.streamsx.dps 4.1.8</title>
 </head>
 <body id="spldoc_toolkit">
 
 
-<h1 class="title topictitle1 spltoolkitname">Toolkit <tt class="ph tt">com.ibm.streamsx.dps 4.1.2</tt></h1>
+<h1 class="title topictitle1 spltoolkitname">Toolkit <tt class="ph tt">com.ibm.streamsx.dps 4.1.8</tt></h1>
 
 <div class="body refbody">
 <div class="section">
 <p class="p">
-<a class="xref" href="../toolkits/toolkits.html">Streams DPS Toolkit</a> &gt; com.ibm.streamsx.dps 4.1.2</p>
+<a class="xref" href="../toolkits/toolkits.html">Streams DPS Toolkit</a> &gt; com.ibm.streamsx.dps 4.1.8</p>
 
 </div>
 
@@ -45,7 +45,7 @@ The toolkit consists of a set of native functions that provide access to shared 
 <p class="p">The following diagram provides a conceptual overview of the interaction between the Streams application, the DPS toolkit, and the  distributed back-end in-memory store. Each green box represents a processing element (PE) of the application. These interconnected PEs have access to the DPS logical container as well as full access to the data store APIs.  In the logical view layer, code abstraction is done to communicate with the back-end in-memory store. Any PE, regardless of whether it originally created the store and populated it with its original contents (if any), can safely access the store (shown in the physical view layer) to save and retrieve contents. To access the store, the PE requires a valid store name or a store handle. 
 </p>
 
-<p class="p"><br/><img class="image" src="file:///homes/hny5/sen/22Nov2020/streamsx.dps/com.ibm.streamsx.dps/doc/icons/overview.png" alt=""/><br/>
+<p class="p"><br/><img class="image" src="file:///homes/hny5/sen/tmp99/28Nov2023/try-it/streamsx.dps/com.ibm.streamsx.dps/doc/icons/overview.png" alt=""/><br/>
 </p>
 
 <p class="p">As shown in the figure above, an instance of the DPS accommodates one or more user-created stores.  Each store can hold an unlimited number of data items stored as key-value pairs created using any SPL type as a key and any SPL type as a value. Additionally, a DPS instance contains a store factory that can manufacture stores on demand. Similarly, any store can be accessed concurrently by any number of PEs running on different machines.  In order to ensure safe access (i.e. store operations do not override each other), each DPS instance contains a lock factory enabling you to create shareable locks for the purpose of locking a store during a critical private operation and then releasing the lock once that critical store operation has completed.
@@ -153,7 +153,7 @@ Note: The toolkit provides the aforementioned functionality as native functions 
   
   <dt class="dt dlterm">Version</dt>
 
-  <dd class="dd">4.1.2</dd>
+  <dd class="dd">4.1.8</dd>
 
   
   
@@ -271,6 +271,10 @@ Note: The toolkit provides the aforementioned functionality as native functions 
 
 <li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsGetDetailsAboutThisMachine.rstring.rstring.rstring">dpsGetDetailsAboutThisMachine(rstring, rstring, rstring)</a></li>
 
+<li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsGetKVPairs.uint64.list:.:T1:.:.list:.:T2:.:.int32.int32.uint64">dpsGetKVPairs(uint64, list&lt;T1&gt;, list&lt;T2&gt;, int32, int32, uint64)</a></li>
+
+<li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsGetKeys.uint64.list:.:T1:.:.int32.int32.rstring.rstring.uint64">dpsGetKeys(uint64, list&lt;T1&gt;, int32, int32, rstring, rstring, uint64)</a></li>
+
 <li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsGetLastErrorCodeTTL">dpsGetLastErrorCodeTTL()</a></li>
 
 <li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsGetLastErrorStringTTL">dpsGetLastErrorStringTTL()</a></li>
@@ -295,7 +299,11 @@ Note: The toolkit provides the aforementioned functionality as native functions 
 
 <li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsGetTTL.T1.T2.uint64.boolean.boolean">dpsGetTTL(T1, T2, uint64, boolean, boolean)</a></li>
 
+<li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsGetValues.uint64.list:.:T1:.:.list:.:boolean:.:.list:.:T2:.:.uint64">dpsGetValues(uint64, list&lt;T1&gt;, list&lt;boolean&gt;, list&lt;T2&gt;, uint64)</a></li>
+
 <li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsHas.uint64.T1.uint64">dpsHas(uint64, T1, uint64)</a></li>
+
+<li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsHasKeys.uint64.list:.:T1:.:.list:.:boolean:.:.uint64">dpsHasKeys(uint64, list&lt;T1&gt;, list&lt;boolean&gt;, uint64)</a></li>
 
 <li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsHasTTL.T1.uint64">dpsHasTTL(T1, uint64)</a></li>
 
@@ -306,6 +314,8 @@ Note: The toolkit provides the aforementioned functionality as native functions 
 <li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsPersist.uint64">dpsPersist(uint64)</a></li>
 
 <li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsPut.uint64.T1.T2.uint64">dpsPut(uint64, T1, T2, uint64)</a></li>
+
+<li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsPutKVPairs.uint64.list:.:T1:.:.list:.:T2:.:.uint64">dpsPutKVPairs(uint64, list&lt;T1&gt;, list&lt;T2&gt;, uint64)</a></li>
 
 <li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsPutSafe.uint64.T1.T2.uint64">dpsPutSafe(uint64, T1, T2, uint64)</a></li>
 
@@ -318,6 +328,8 @@ Note: The toolkit provides the aforementioned functionality as native functions 
 <li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsReconnect">dpsReconnect()</a></li>
 
 <li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsRemove.uint64.T1.uint64">dpsRemove(uint64, T1, uint64)</a></li>
+
+<li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsRemoveKeys.uint64.list:.:T1:.:.int32.uint64">dpsRemoveKeys(uint64, list&lt;T1&gt;, int32, uint64)</a></li>
 
 <li class="sli"><a class="xref" href="fc$com.ibm.streamsx.store.distributed.html#spldoc_functions__dpsRemoveStore.uint64.uint64">dpsRemoveStore(uint64, uint64)</a></li>
 

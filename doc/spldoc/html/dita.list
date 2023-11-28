@@ -1,4 +1,4 @@
-#Sun Nov 22 22:01:58 EST 2020
+#Mon Nov 27 22:43:14 EST 2023
 copytosourcelist=
 hreftargetslist=spldoc/dita/tk$com.ibm.streamsx.dps/tk$com.ibm.streamsx.dps.xml,spldoc/dita/tk$com.ibm.streamsx.dps/ix$Operator.xml,spldoc/dita/references/FunctionModel.xml,spldoc/dita/tk$com.ibm.streamsx.dps/fc$com.ibm.streamsx.lock.distributed.xml,spldoc/dita/tk$com.ibm.streamsx.dps/fc$com.ibm.streamsx.store.distributed.xml,spldoc/dita/toolkits/ix$Function.xml,spldoc/dita/tk$com.ibm.streamsx.dps/ns$com.ibm.streamsx.lock.distributed.xml,spldoc/dita/toolkits/ix$Namespace.xml,spldoc/dita/toolkits/ix$Operator.xml,spldoc/dita/tk$com.ibm.streamsx.dps/tk$com.ibm.streamsx.dps$1.xml,spldoc/dita/tk$com.ibm.streamsx.dps/spl$com.ibm.streamsx.store.distributed$DpsGetTTLWithReconnect.xml,spldoc/dita/tk$com.ibm.streamsx.dps/ix$Function.xml,spldoc/dita/tk$com.ibm.streamsx.dps/op$com.ibm.streamsx.store.distributed$DPSAux.xml,spldoc/dita/toolkits/toolkits.xml,spldoc/dita/tk$com.ibm.streamsx.dps/ix$Namespace.xml,spldoc/dita/tk$com.ibm.streamsx.dps/ns$com.ibm.streamsx.store.distributed.xml,spldoc/dita/references/OperatorModel.xml,spldoc/dita/tk$com.ibm.streamsx.dps/spl$com.ibm.streamsx.store.distributed$DpsPutTTLWithReconnect.xml
 fullditatopicfile=fullditatopic.list
@@ -37,7 +37,7 @@ codereffile=coderef.list
 keylist=
 codereflist=
 user.input.file.listfile=usr.input.file.list
-user.input.dir=/homes/hny5/sen/22Nov2020/streamsx.dps/com.ibm.streamsx.dps/doc
+user.input.dir=/homes/hny5/sen/tmp99/28Nov2023/try-it/streamsx.dps/com.ibm.streamsx.dps/doc
 uplevels=../../
 tempdirToinputmapdir.relative.value=spldoc/dita/
 conrefpushfile=conrefpush.list

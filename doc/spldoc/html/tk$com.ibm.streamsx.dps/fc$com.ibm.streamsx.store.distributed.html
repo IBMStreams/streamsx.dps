@@ -22,7 +22,7 @@
 <div class="body refbody">
 <div class="section">
 <p class="p">
-<a class="xref" href="../toolkits/toolkits.html">Streams DPS Toolkit</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.dps.html">com.ibm.streamsx.dps 4.1.2</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.store.distributed.html">com.ibm.streamsx.store.distributed</a> &gt; C++ Native Functions</p>
+<a class="xref" href="../toolkits/toolkits.html">Streams DPS Toolkit</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.dps.html">com.ibm.streamsx.dps 4.1.8</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.store.distributed.html">com.ibm.streamsx.store.distributed</a> &gt; C++ Native Functions</p>
 
 </div>
 
@@ -834,6 +834,201 @@ printStringLn("=====================================================");
 
  
  
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetKVPairs.uint64.list:.:T1:.:.list:.:T2:.:.int32.int32.uint64"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful void dpsGetKVPairs(uint64 store, mutable list&lt;T1&gt; keys, mutable list&lt;T2&gt; values, int32 keyStartPosition, int32 numberOfPairsNeeded, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">This function can be called to get i.e. read/fetch multiple Key/Value (KV) pairs present in a given store.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">The handle of the store. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">keys</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided mutable list variable in which the keys found in the store will be returned. This list must be suitable for storing multiple keys found in a given store and it must be made of a given store's key data type. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">values</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the corresponding key appears in the keys list. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">keyStartPosition</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User can indicate a zero index based start position from where the K/V pairs should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">numberOfPairsNeeded</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User can indicate the total number of K/V pairs to be returned as available from the given key start position. It must be greater than or equal to 0 and less than or equal to 50000. If it is set to 0, then all the available K/V pairs upto a maximum of 50000 pairs from the given key start position will be returned. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided mutable uint64 typed variable in which the result of this bulk get KV pairs operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise. 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetKeys.uint64.list:.:T1:.:.int32.int32.rstring.rstring.uint64"><tt class="ph tt">      &lt;any T1&gt; public stateful void dpsGetKeys(uint64 store, mutable list&lt;T1&gt; keys, int32 keyStartPosition, int32 numberOfKeysNeeded, rstring keyExpression, rstring valueExpression, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">This function can be called to get i.e. read/fetch multiple keys present in a given store.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">The handle of the store. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">keys</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided mutable list variable. This list must be suitable for storing multiple keys found in a given store and it must be made of a given store's key data type. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">keyStartPosition</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User can indicate a zero index based start position from where keys should be fetched and returned. It must be greater than or equal to zero. If not, this API will return back with an empty list of keys. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">numberOfKeysNeeded</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User can indicate the total number of keys to be returned as available from the given key start position. It must be greater than or equal to 0 and less than or equal to 50000. If it is set to 0, then all the available keys upto a maximum of 50000 keys from the given key start position will be returned. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">keyExpression</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User can provide an expression made of the attributes from the key's data type. This expression will be evaluated in determining which matching keys to be returned. Due to very high logic complexity, this feature is not implemented at this time. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">valueExpression</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User can provide an expression made of the attributes from the value's data type. This expression will be evaluated in determining which matching keys to be returned. Due to very high logic complexity, this feature is not implemented at this time. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided mutable uint64 typed variable in which the result of this bulk get keys operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise. 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
    <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetLastErrorCodeTTL"><tt class="ph tt">      public stateful uint64 dpsGetLastErrorCodeTTL()      </tt>   </dt>
 
    <dd class="dd">
@@ -1409,6 +1604,87 @@ if (res == true) {
 
  
  
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsGetValues.uint64.list:.:T1:.:.list:.:boolean:.:.list:.:T2:.:.uint64"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful void dpsGetValues(uint64 store, list&lt;T1&gt; keys, mutable list&lt;boolean&gt; keyExistsOrNot, mutable list&lt;T2&gt; values, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">This function can be called to get i.e. read/fetch values for a given list of multiple keys present in a given store.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">The handle of the store. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">keys</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided list variable that contains keys for which values need to be fetched. It must be made of a given store's key data type. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">keyExistsOrNot</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided mutable list variable in which true or false status for every user given key will be returned. This is done to indicate to the user about if that key exists or not in the given store. This list must be made of a boolean data type. Status returned in this list can be used in combination with the items returned in the values list which is explained next. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">values</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided mutabe list variable in which the fetched values will be returned. This list must be suitable for storing multiple values obtained from a given store and it must be made of a given store's value data type. Fetched values will be available in this list at the same index where the key appeared in the user provided keys list. If a user given key is not present in the store, there will still be a default value returned in that key's index. It is better to first confirm in the keyExistsOrNot list that will carry true or false status about the existence of all the user provided keys. Depending on the key existence status found in that other list, user can decide to either consider using or ignore a value in a given index of the values list. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided mutable uint64 typed variable in which the result of this bulk get values operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise. 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
    <dt class="dt dlterm splpart" id="spldoc_functions__dpsHas.uint64.T1.uint64"><tt class="ph tt">      &lt;any T1&gt; public stateful boolean dpsHas(uint64 store, T1 key, mutable uint64 err)      </tt>   </dt>
 
    <dd class="dd">
@@ -1469,6 +1745,76 @@ if (res == true) {
 
 <p class="p">true if the given store does contain an item with the given key, false otherwise.
 </p>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsHasKeys.uint64.list:.:T1:.:.list:.:boolean:.:.uint64"><tt class="ph tt">      &lt;any T1&gt; public stateful void dpsHasKeys(uint64 store, list&lt;T1&gt; keys, mutable list&lt;boolean&gt; results, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">This function can be called to check for the existence of a given list of keys in a given store.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">The handle of the store. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">keys</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided list variable that contains the keys to be checked for their existence in the given store. This list must be made of a given store's key data type. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">results</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided mutable list variable in which the key existence check true or false results will be returned. This list must be made of a boolean data type. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided mutable uint64 typed variable in which the result of this bulk has keys operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise. 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
        </dd>
 
      
@@ -1801,6 +2147,76 @@ if (res == true) {
 
 
 </div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsPutKVPairs.uint64.list:.:T1:.:.list:.:T2:.:.uint64"><tt class="ph tt">      &lt;any T1, any T2&gt; public stateful void dpsPutKVPairs(uint64 store, list&lt;T1&gt; keys, list&lt;T2&gt; values, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">This function can be called to put i.e. write/save multiple Key/Value (KV) pairs to a given store. Note: You must make sure that the intended store exists before you use this function. If not, you will end up creating bulk K/V pairs in an unmanageable fashion in the backend data store which will make it less useful. 
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">The handle of the store. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">keys</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided list variable that contains the keys to be written i.e. saved. This list must be made of a given store's key data type. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">values</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided list variable that contains the values to be written i.e. saved. This list must be made of a given store's value data type. A KV pair is formed with a key and a value taken from the same index position of the keys and values lists. If the keys and values lists are not of the same size, this function will simply return back without doing any bulk put operation. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided mutable uint64 typed variable in which the result of this bulk put operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise. 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
        </dd>
 
      
@@ -2378,6 +2794,76 @@ result = dpsRemove(store_id, key, err);
 
 
 </div>
+       </dd>
+
+     
+</dl>
+
+   </dd>
+
+ 
+ 
+   <dt class="dt dlterm splpart" id="spldoc_functions__dpsRemoveKeys.uint64.list:.:T1:.:.int32.uint64"><tt class="ph tt">      &lt;any T1&gt; public stateful void dpsRemoveKeys(uint64 store, list&lt;T1&gt; keys, mutable int32 totalKeysRemoved, mutable uint64 err)      </tt>   </dt>
+
+   <dd class="dd">
+<p class="p">This function can be called to remove a given list of keys from a given store.
+</p>
+
+   <dl class="dl">
+     <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+     
+       <dt class="dt dlterm">Parameters</dt>
+
+       <dd class="dd">
+         <dl class="dl" compact="compact">
+           
+             <dt class="dt dlterm"><tt class="ph tt">store</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">The handle of the store. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">keys</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided list variable that contains the keys to be removed from the given store. This list must be made of a given store's key data type. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">totalKeysRemoved</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided mutable int32 variable in which the total number of keys removed from the store will be returned. 
+</p>
+
+             </dd>
+
+           
+           
+             <dt class="dt dlterm"><tt class="ph tt">err</tt></dt>
+
+             <dd class="dd">
+
+<p class="p">User provided mutable uint64 typed variable in which the result of this bulk remove keys operation will be returned. It will be 0 if no error occurs and a non-zero error code otherwise. 
+</p>
+
+             </dd>
+
+           
+         </dl>
+
        </dd>
 
      
