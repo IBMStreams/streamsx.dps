@@ -235,7 +235,7 @@ To specifically learn how to call the DPS APIs from SPL native functions, C++ an
 # Reference information
 [../../javadoc/dps/index.html| DPS Java API Reference]
   </info:description>
-    <info:version>4.1.7</info:version>
+    <info:version>4.1.8</info:version>
     <info:requiredProductVersion>4.2.0.0</info:requiredProductVersion>
   </info:identity>
   <info:dependencies/>

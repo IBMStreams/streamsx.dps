@@ -1,16 +1,17 @@
---- hiredis-1.0.0/sds.h.orig 2020-08-03 14:18:07.000000000 -0400
-+++ hiredis-1.0.0/sds.h 2020-10-10 13:43:56.988507551 -0400
-@@ -44,6 +44,9 @@
+--- hiredis-1.2.0/sds.h.org	2023-07-12 03:31:17.000000000 -0400
++++ hiredis-1.2.0/sds.h	2023-11-21 17:48:03.791196553 -0500
+@@ -46,6 +46,10 @@
  #include <stdarg.h>
  #include <stdint.h>
  
 +#ifdef __cplusplus
 +extern "C" {
 +#endif
++
  typedef char *sds;
  
  /* Note: sdshdr5 is never used, we just access the flags byte directly.
-@@ -275,4 +278,8 @@
+@@ -277,4 +281,8 @@
  int sdsTest(int argc, char *argv[]);
  #endif
  

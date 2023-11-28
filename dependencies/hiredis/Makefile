@@ -1,7 +1,7 @@
 include ../make.variable.include
 
 PKG_NAME := hiredis
-VERSION := 1.0.0
+VERSION := 1.2.0
 ARCHIVE := v$(VERSION).tar.gz
 ARCHIVE_INSTALL := $(PKG_NAME)-$(VERSION)-$(OS)-$(ARCH)-install-bin.tar.gz
 URL := https://github.com/redis/$(PKG_NAME)/archive/$(ARCHIVE)

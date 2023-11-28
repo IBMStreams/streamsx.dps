@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2022
+# Copyright IBM Corp. 2011, 2023
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -84,6 +84,9 @@ interface with many different back-end in-memory stores.
 #define REDIS_HMSET_CMD                                                                                         "hmset "
 #define REDIS_HMGET_CMD                                                                                         "hmget "
 #define REDIS_ZMSCORE_CMD                                                                                       "zmscore "
+#define REDIS_NX_OPTION                                                                                         "NX"
+#define REDIS_EX_OPTION                                                                                         "EX"
+#define REDIS_PX_OPTION                                                                                         "PX"    
 #define CASSANDRA_DPS_KEYSPACE										"com_ibm_streamsx_dps"
 #define CASSANDRA_DPS_MAIN_TABLE									"t1"
 #define HBASE_DPS_MAIN_TABLE										"dps_t1"

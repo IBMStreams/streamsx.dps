@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2022
+# Copyright IBM Corp. 2011, 2023
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -149,6 +149,8 @@ namespace distributed
      int targetServerPort = 0;
      int connectionTimeout = 0;
      int useTls = -1;
+     string redisClusterTlsCertFileName = "";
+     string redisClusterTlsKeyFileName = "";
      string redisClusterCACertFileName = "";
      int connectionAttemptCnt = 0;
 
@@ -228,7 +230,22 @@ namespace distributed
               } else if (tokenCnt == 6) {
                  // This must be our sixth token.
                  if (token != "") {
+                    // This is a fully qualified Redis cluster TLS cert filename.
+                    // This file name can be copied from the Redis cluster's tls-cert-file configuration.
+                    redisClusterTlsCertFileName = token;
+                 } 
+              } else if (tokenCnt == 7) {
+                 // This must be our seventh token.
+                 if (token != "") {
+                    // This is a fully qualified Redis cluster TLS key filename.
+                    // This file name can be copied from the Redis cluster's tls-key-file configuration.
+                    redisClusterTlsKeyFileName = token;
+                 } 
+              } else if (tokenCnt == 8) {
+                 // This must be our eighth token.
+                 if (token != "") {
                     // This is a fully qualified Redis cluster CA cert filename.
+                    // This file name can be copied from the Redis cluster's tls-ca-cert-file configuration.
                     redisClusterCACertFileName = token;
                  } 
               } // End of the long if-else block.
@@ -270,7 +287,7 @@ namespace distributed
               clusterPasswordUsage = "no";
            }
 
-           cout << connectionAttemptCnt << ") ThreadId=" << threadId << ". Attempting to connect to the Redis cluster node " << targetServerName << " on port " << targetServerPort << " with " << clusterPasswordUsage << " password. " << "connectionTimeout=" << connectionTimeout << ", use_tls=" << useTls << ", redisClusterCACertFileName=" << redisClusterCACertFileName  << "." << endl;
+           cout << connectionAttemptCnt << ") ThreadId=" << threadId << ". Attempting to connect to the Redis cluster node " << targetServerName << " on port " << targetServerPort << " with " << clusterPasswordUsage << " password. " << "connectionTimeout=" << connectionTimeout << ", use_tls=" << useTls << ", redisClusterTlsCertFileName=" << redisClusterTlsCertFileName << ", redisClusterTlsKeyFileName=" << redisClusterTlsKeyFileName << ", redisClusterCACertFileName=" << redisClusterCACertFileName  << "." << endl;
                           
            // Current redis cluster version as of Oct/29/2020 is 6.0.9
            // If the redis cluster node is inactive, the following statement may throw an exception.
@@ -294,6 +311,10 @@ namespace distributed
               // Set the desired TLS/SSL option.
               if(useTls == 1) {
                  connection_options.tls.enabled = true;
+                 // If TLS for the Redis Cluster is enabled, following three files must be
+                 // specified via the DPS redis-cluster-plus-plus configuration.
+                 connection_options.tls.cert = redisClusterTlsCertFileName;
+                 connection_options.tls.key = redisClusterTlsKeyFileName;
                  connection_options.tls.cacert = redisClusterCACertFileName;
               }
               
@@ -394,14 +415,18 @@ namespace distributed
      if (exists_result_value == 0) {
         // It could be that our global store id is not there now.
         // Let us create one with an initial value of 0.
-        // Redis setnx is an atomic operation. It will succeed only for the very first operator that
-        // attempts to do this setting after a redis-cluster server is started fresh. If some other operator
+        // Redis set nx is an atomic operation. It will succeed only for the very first operator that
+        // attempts to do this setting after a redis server is started fresh. If some other operator
         // already raced us ahead and created this guid_key, then our attempt below will be safely rejected.
+        // Senthil made NX related single API call code change in this method on Nov/27/2023.
         exceptionString = "";
         exceptionType = REDIS_PLUS_PLUS_NO_ERROR;
 
         try {
-           redis_cluster->setnx(keyString, string("0"));
+           // We will use the Redis SET with NX option all in a single atomic API call.
+           // A TTL valus of 0 means that we we don't want this K/V pair to expire at all.
+           std::chrono::milliseconds ttl_value = std::chrono::milliseconds(0);
+           redis_cluster->set(keyString, string("0"), ttl_value, UpdateType::NOT_EXIST);
         } catch (const ReplyError &ex) {
            // WRONGTYPE Operation against a key holding the wrong kind of value
            exceptionString = ex.what();
@@ -431,8 +456,8 @@ namespace distributed
 
         if(exceptionType != REDIS_PLUS_PLUS_NO_ERROR) {
            dbError.set(string("Unable to connect to the redis-cluster server(s). ") + 
-              string("Error in REDIS_SETNX_CMD. Exception=") + exceptionString, DPS_CONNECTION_ERROR);
-           SPLAPPTRC(L_ERROR, "Inside connectToDatabase, it failed with an error for REDIS_SETNX_CMD. Exception=" << exceptionString << ". rc=" << DPS_CONNECTION_ERROR, "RedisClusterPlusPlusDBLayer");
+              string("Error in REDIS_SET_NX_CMD. Exception=") + exceptionString, DPS_CONNECTION_ERROR);
+           SPLAPPTRC(L_ERROR, "Inside connectToDatabase, it failed with an error for REDIS_SET_NX_CMD. Exception=" << exceptionString << ". rc=" << DPS_CONNECTION_ERROR, "RedisClusterPlusPlusDBLayer");
            return;
         }
      } // End of if (exists_result_value == 0)
@@ -2801,21 +2826,26 @@ namespace distributed
   // This method will acquire a lock for a given store.
   bool RedisClusterPlusPlusDBLayer::acquireStoreLock(string const & storeIdString) {
      int32_t retryCnt = 0;
+     SPLAPPTRC(L_DEBUG, "Inside acquireStoreLock, starting one or more attempts to acquire a lock for store " << storeIdString << ".", "RedisClusterPlusPlusDBLayer");
 
      // Try to get a lock for this store.
      while (1) {
         // '4' + 'store id' + 'dps_lock' => 1
         std::string storeLockKey = string(DPS_STORE_LOCK_TYPE) + storeIdString + DPS_LOCK_TOKEN;
-        // This is an atomic activity.
+        // This is an atomic activity that does a combined set with NX and EX options all done in one API call.
         // If multiple threads attempt to do it at the same time, only one will succeed.
         // Winner will hold the lock until they release it voluntarily or
         // until the Redis back-end removes this lock entry after the DPS_AND_DL_GET_LOCK_TTL times out.
+        // Senthil made NX related single API call code change in this method on Nov/27/2023.
         string exceptionString = "";
         int exceptionType = REDIS_PLUS_PLUS_NO_ERROR;
         bool setnx_result_value = false;
 
         try {
-           setnx_result_value = redis_cluster->setnx(storeLockKey, string("1"));
+           // We will use the Redis SET with NX option all in a single atomic API call.
+           // Set the TTL value for this K/V pair in milliseconds.
+           std::chrono::milliseconds ttl_value = std::chrono::milliseconds(DPS_AND_DL_GET_LOCK_TTL * 1000);
+           setnx_result_value = redis_cluster->set(storeLockKey, string("1"), ttl_value, UpdateType::NOT_EXIST);
         } catch (const ReplyError &ex) {
            // WRONGTYPE Operation against a key holding the wrong kind of value
            exceptionString = ex.what();
@@ -2845,89 +2875,14 @@ namespace distributed
 
         // Did we encounter an exception?
         if (exceptionType != REDIS_PLUS_PLUS_NO_ERROR) {
-           // Problem in atomic creation of the store lock.
+           // Problem in atomic creation of the store lock. Let us return now.
+           SPLAPPTRC(L_DEBUG, "Inside acquireStoreLock, got a redis command execution error when acquiring a lock for a store " << storeIdString << " during attempt number " << (retryCnt+1) << ". Returning false now without making any further attempts to acquire a lock. Exception type=" << exceptionType << ", ExceptionString=" << exceptionString, "RedisClusterPlusPlusDBLayer");
            return(false);
         }
 
         if(setnx_result_value == true) {
-           // We got the lock.
-           // Set the expiration time for this lock key.
-           exceptionString = "";
-           exceptionType = REDIS_PLUS_PLUS_NO_ERROR;
-
-           try {
-              redis_cluster->expire(storeLockKey, 1);
-           } catch (const ReplyError &ex) {
-              // WRONGTYPE Operation against a key holding the wrong kind of value
-              exceptionString = ex.what();
-              // Command execution error.
-              exceptionType = REDIS_PLUS_PLUS_REPLY_ERROR;
-           } catch (const TimeoutError &ex) {
-              // Reading or writing timeout
-              exceptionString = ex.what();
-              // Connectivity related error.
-              exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;        
-           } catch (const ClosedError &ex) {
-              // Connection has been closed.
-              exceptionString = ex.what();
-              // Connectivity related error.
-              exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
-           } catch (const IoError &ex) {
-              // I/O error on the connection.
-              exceptionString = ex.what();
-              // Connectivity related error.
-              exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
-           } catch (const Error &ex) {
-              // Other errors
-              exceptionString = ex.what();
-              // Connectivity related error.
-              exceptionType = REDIS_PLUS_PLUS_OTHER_ERROR;
-           }
-
-           // Did we encounter an exception?
-           if (exceptionType != REDIS_PLUS_PLUS_NO_ERROR) {
-              // Problem in setting the lock expiry time.
-              SPLAPPTRC(L_ERROR, "b) Inside acquireStoreLock, it failed  with an exception. Error=" << exceptionString, "RedisClusterPlusPlusDBLayer");
-              // We already got an exception. There is not much use in the code block below.
-              // In any case, we will give it a try.
-              // Delete the erroneous lock data item we created.
-              exceptionString = "";
-              exceptionType = REDIS_PLUS_PLUS_NO_ERROR;
-
-              try {
-                 redis_cluster->del(storeLockKey);
-              } catch (const ReplyError &ex) {
-                 // WRONGTYPE Operation against a key holding the wrong kind of value
-                 exceptionString = ex.what();
-                 // Command execution error.
-                 exceptionType = REDIS_PLUS_PLUS_REPLY_ERROR;
-              } catch (const TimeoutError &ex) {
-                 // Reading or writing timeout
-                 exceptionString = ex.what();
-                 // Connectivity related error.
-                 exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;        
-              } catch (const ClosedError &ex) {
-                 // Connection has been closed.
-                 exceptionString = ex.what();
-                 // Connectivity related error.
-                 exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
-              } catch (const IoError &ex) {
-                 // I/O error on the connection.
-                 exceptionString = ex.what();
-                 // Connectivity related error.
-                 exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
-              } catch (const Error &ex) {
-                 // Other errors
-                 exceptionString = ex.what();
-                 // Connectivity related error.
-                 exceptionType = REDIS_PLUS_PLUS_OTHER_ERROR;
-              }
-
-              // We couldn't get a lock.
-              return(false);
-           } 
-
-           // We got the lock.
+           // We got an exclusive lock with an expiry time set for it.
+           SPLAPPTRC(L_DEBUG, "Inside acquireStoreLock, acquired a lock for store " << storeIdString << " in " << (retryCnt+1) << " attempt(s).", "RedisClusterPlusPlusDBLayer");
            return(true);
         } // End of if(setnx_result_value == true)
 
@@ -2935,6 +2890,7 @@ namespace distributed
         retryCnt++;
 
         if (retryCnt >= DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT) {
+           SPLAPPTRC(L_DEBUG, "Inside acquireStoreLock, it is not able to acquire a lock for store " << storeIdString << " after " << retryCnt << " retry attempts.", "RedisClusterPlusPlusDBLayer");
            return(false);
         }
 
@@ -3792,21 +3748,26 @@ namespace distributed
   // provide thread safety. There are other lock acquisition/release methods once someone has a valid store id or lock id.
   bool RedisClusterPlusPlusDBLayer::acquireGeneralPurposeLock(string const & entityName) {
      int32_t retryCnt = 0;
+     SPLAPPTRC(L_DEBUG, "Inside acquireGeneralPurposeLock, starting one or more attempts to acquire a lock for a generic id " << entityName << ".", "RedisClusterPlusPlusDBLayer");
 
      //Try to get a lock for this generic entity.
      while (1) {
         // '501' + 'entity name' + 'generic_lock' => 1
         std::string genericLockKey = GENERAL_PURPOSE_LOCK_TYPE + entityName + GENERIC_LOCK_TOKEN;
-        // This is an atomic activity.
+        // This is an atomic activity that does a combined set with NX and EX options all done in one API call.
         // If multiple threads attempt to do it at the same time, only one will succeed.
         // Winner will hold the lock until they release it voluntarily or
         // until the Redis back-end removes this lock entry after the DPS_AND_DL_GET_LOCK_TTL times out.
+        // Senthil made NX related single API call code change in this method on Nov/27/2023.
         string exceptionString = "";
         int exceptionType = REDIS_PLUS_PLUS_NO_ERROR;
         bool setnx_result_value = false;
 
         try {
-           setnx_result_value = redis_cluster->setnx(genericLockKey, string("1"));
+           // We will use the Redis SET with NX option all in a single atomic API call.
+           // Set the TTL value for this K/V pair in milliseconds.
+           std::chrono::milliseconds ttl_value = std::chrono::milliseconds(DPS_AND_DL_GET_LOCK_TTL * 1000);
+           setnx_result_value = redis_cluster->set(genericLockKey, string("1"), ttl_value, UpdateType::NOT_EXIST);
         } catch (const ReplyError &ex) {
            // WRONGTYPE Operation against a key holding the wrong kind of value
            exceptionString = ex.what();
@@ -3834,87 +3795,30 @@ namespace distributed
            exceptionType = REDIS_PLUS_PLUS_OTHER_ERROR;
         }
 
-        // Did we encounter a redis-cluster server connection error?
-        if (exceptionType == REDIS_PLUS_PLUS_CONNECTION_ERROR) {
-           SPLAPPTRC(L_ERROR, "a) Inside acquireGeneralPurposeLock, it failed with a Redis connection error for REDIS_SETNX_CMD. Exception: " << exceptionString << ". Application code may call the DPS reconnect API and then retry the failed operation. " << DPS_CONNECTION_ERROR, "RedisClusterPlusPlusDBLayer");
-           return(false);
-        }
-
-        // Did we encounter a redis reply error?
-        if (exceptionType == REDIS_PLUS_PLUS_REPLY_ERROR || 
-           exceptionType == REDIS_PLUS_PLUS_OTHER_ERROR) {
-           // Problem in atomic creation of the general purpose lock.
+        // Did we encounter an exception?
+        if (exceptionType != REDIS_PLUS_PLUS_NO_ERROR) {
+           SPLAPPTRC(L_DEBUG, "Inside acquireGeneralPurposeLock, got a redis command execution error when acquiring a lock for a generic id " << entityName << " during attempt number " << (retryCnt+1) << ". Returning false now without making any further attempts to acquire a lock. Exception type=" << exceptionType << ", ExceptionString=" << exceptionString, "RedisClusterPlusPlusDBLayer");
            return(false);
         }
 
         if(setnx_result_value == true) {
-           // We got the lock.
-           // Set the expiration time for this lock key.
-           exceptionString = "";
-           exceptionType = REDIS_PLUS_PLUS_NO_ERROR;
-
-           try {
-              redis_cluster->expire(genericLockKey, DPS_AND_DL_GET_LOCK_TTL);
-           } catch (const ReplyError &ex) {
-              // WRONGTYPE Operation against a key holding the wrong kind of value
-              exceptionString = ex.what();
-              // Command execution error.
-              exceptionType = REDIS_PLUS_PLUS_REPLY_ERROR;
-           } catch (const TimeoutError &ex) {
-              // Reading or writing timeout
-              exceptionString = ex.what();
-              // Connectivity related error.
-              exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;        
-           } catch (const ClosedError &ex) {
-              // Connection has been closed.
-              exceptionString = ex.what();
-              // Connectivity related error.
-              exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
-           } catch (const IoError &ex) {
-              // I/O error on the connection.
-              exceptionString = ex.what();
-              // Connectivity related error.
-              exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
-           } catch (const Error &ex) {
-              // Other errors
-              exceptionString = ex.what();
-              // Connectivity related error.
-              exceptionType = REDIS_PLUS_PLUS_OTHER_ERROR;
-           }
-
-           // Did we encounter an exception?
-           if (exceptionType != REDIS_PLUS_PLUS_NO_ERROR) {
-              // Problem in setting the lock expiry time.
-              SPLAPPTRC(L_ERROR, "b) Inside acquireGeneralPurposeLock, it failed with an exception for REDIS_EXPIRE_CMD. Exception: " << exceptionString << ".", "RedisClusterPlusPlusDBLayer");
-
-              // We already got an exception. There is not much use in the code block below.
-              // In any case, we will give it a try.
-              // Delete the erroneous lock data item we created.
-              try {
-                 redis_cluster->del(genericLockKey);
-              } catch (const Error &ex) {
-                 // It is not good if this one fails. We can't do much about that.
-                 SPLAPPTRC(L_ERROR, "c) Inside acquireGeneralPurposeLock, it failed with an exception for REDIS_DEL_CMD. Exception: " << ex.what() << ".", "RedisClusterPlusPlusDBLayer");
-              }
-
-              return(false);
-           }
-
-           // We got the lock with proper expiry time set.
+           // We got an exclusive lock with an expiry time set for it.
+           SPLAPPTRC(L_DEBUG, "Inside acquireGeneralPurposeLock, acquired a lock for a generic id " << entityName << " in " << (retryCnt+1) << " attempt(s).", "RedisClusterPlusPlusDBLayer");
            return(true);
-        } // End of if(setnx_result_value == true).
+        } // End of if(setnx_result_value == true)
 
-        // Someone else is holding on to the lock of this entity. Wait for a while before trying again.
+        // Someone else is holding on to the lock of this store. Wait for a while before trying again.
         retryCnt++;
 
         if (retryCnt >= DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT) {
+           SPLAPPTRC(L_DEBUG, "Inside acquireGeneralPurposeLock, it is not able to acquire a general purpose lock id " << entityName << " after " << retryCnt << " retry attempts.", "RedisClusterPlusPlusDBLayer");
            return(false);
         }
 
         // Yield control to other threads. Wait here with patience by doing an exponential back-off delay.
         usleep(DPS_AND_DL_GET_LOCK_SLEEP_TIME *
            (retryCnt%(DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT/DPS_AND_DL_GET_LOCK_BACKOFF_DELAY_MOD_FACTOR)));
-     } // End of while loop.
+     } // End of the while loop.
 
      return(false);
   } // End of acquireGeneralPurposeLock.
@@ -4794,7 +4698,7 @@ namespace distributed
           if(totalKeysRemoved != total_zrem_cnt) {
              // Remove cnt mismatch between the store and the zset.
              dbError.set(std::string("Inside removeKeys #7, key, member removal cnt mismatch between HDEL and ZREM."), DPS_BULK_REMOVE_CNT_MISMATCH_ERROR);
-             SPLAPPTRC(L_DEBUG, "Inside removeKeys #7, it failed with a key, member  removal cnt mismatch between HDEL and ZREM. " << DPS_BULK_REMOVE_CNT_MISMATCH_ERROR, "RedisDBLayer");
+             SPLAPPTRC(L_DEBUG, "Inside removeKeys #7, it failed with a key, member  removal cnt mismatch between HDEL and ZREM. " << DPS_BULK_REMOVE_CNT_MISMATCH_ERROR, "RedisClusterPlusPlusDBLayer");
              return;
           }
        } catch (const ReplyError &ex) {
@@ -5557,21 +5461,25 @@ namespace distributed
      time_t startTime, timeNow;
      // Get the start time for our lock acquisition attempts.
      time(&startTime);
+     SPLAPPTRC(L_DEBUG, "Inside acquireLock, starting one or more attempts to acquire a lock id " << lockIdString << ".", "RedisClusterPlusPlusDBLayer");
 
      // Try to get a distributed lock.
      while(1) {
-        // This is an atomic activity.
+        // This is an atomic activity that does a combined set with NX and PX options all done in one API call.
         // If multiple threads attempt to do it at the same time, only one will succeed.
         // Winner will hold the lock until they release it voluntarily or
         // until the Redis back-end removes this lock entry after the lease time ends.
         // We will add the lease time to the current timestamp i.e. seconds elapsed since the epoch.
+        // Senthil made NX related single API call code change in this method on Nov/27/2023.
         time_t new_lock_expiry_time = time(0) + (time_t)leaseTime;
         string exceptionString = "";
         int exceptionType = REDIS_PLUS_PLUS_NO_ERROR;
         bool setnx_result_value = false;
 
         try {
-           setnx_result_value = redis_cluster->setnx(distributedLockKey, string("1"));
+           // Set the TTL value for this K/V pair in milliseconds.
+           std::chrono::milliseconds ttl_value = std::chrono::milliseconds((int64_t)leaseTime * 1000);
+           setnx_result_value = redis_cluster->set(distributedLockKey, string("1"), ttl_value, UpdateType::NOT_EXIST);
         } catch (const ReplyError &ex) {
            // WRONGTYPE Operation against a key holding the wrong kind of value
            exceptionString = ex.what();
@@ -5599,80 +5507,22 @@ namespace distributed
            exceptionType = REDIS_PLUS_PLUS_OTHER_ERROR;
         }
 
-        // Did we encounter a redis-cluster server connection error?
-        if (exceptionType == REDIS_PLUS_PLUS_CONNECTION_ERROR) {
-           SPLAPPTRC(L_ERROR, "a) Inside acquireLock, it failed with a Redis connection error for REDIS_SETNX_CMD. Exception: " << exceptionString << ". Application code may call the DPS reconnect API and then retry the failed operation. " << DL_CONNECTION_ERROR, "RedisClusterPlusPlusDBLayer");
-           return(false);
-        }
-
-        // Did we encounter a redis reply error?
-        if (exceptionType == REDIS_PLUS_PLUS_REPLY_ERROR || 
-           exceptionType == REDIS_PLUS_PLUS_OTHER_ERROR) {
-           // Problem in atomic creation of the distributed lock.
-            SPLAPPTRC(L_ERROR, "b) Inside acquireLock, it failed with an error for REDIS_SETNX_CMD. Exception: " << exceptionString << ".", "RedisClusterPlusPlusDBLayer");
+        // Did we encounter an exception?
+        if (exceptionType != REDIS_PLUS_PLUS_NO_ERROR) {
+           SPLAPPTRC(L_DEBUG, "b) Inside acquireLock, got a redis command execution error when acquiring a lock id " << lockIdString << " during attempt number " << (retryCnt+1) << ". Returning false now without making any further attempts to acquire a lock. Exception type=" << exceptionType << ", ExceptionString=" << exceptionString, "RedisClusterPlusPlusDBLayer");
            return(false);
         }
 
         if(setnx_result_value == true) {
-           // We got the lock.
-           // Set the expiration time for this lock key.
-           ostringstream expiryTimeInMillis;
-           expiryTimeInMillis << (leaseTime*1000.00);
-           long long ttlInMillis = streams_boost::lexical_cast<uint64_t>(expiryTimeInMillis.str());
-           exceptionString = "";
-           exceptionType = REDIS_PLUS_PLUS_NO_ERROR;
-
-           try {
-              redis_cluster->psetex(distributedLockKey, ttlInMillis, "2");
-           } catch (const ReplyError &ex) {
-              // WRONGTYPE Operation against a key holding the wrong kind of value
-              exceptionString = ex.what();
-              // Command execution error.
-              exceptionType = REDIS_PLUS_PLUS_REPLY_ERROR;
-           } catch (const TimeoutError &ex) {
-              // Reading or writing timeout
-              exceptionString = ex.what();
-              // Connectivity related error.
-              exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;        
-           } catch (const ClosedError &ex) {
-              // Connection has been closed.
-              exceptionString = ex.what();
-              // Connectivity related error.
-              exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
-           } catch (const IoError &ex) {
-              // I/O error on the connection.
-              exceptionString = ex.what();
-              // Connectivity related error.
-              exceptionType = REDIS_PLUS_PLUS_CONNECTION_ERROR;
-           } catch (const Error &ex) {
-              // Other errors
-              exceptionString = ex.what();
-              // Connectivity related error.
-              exceptionType = REDIS_PLUS_PLUS_OTHER_ERROR;
-           }
-
-           // Is there an exception?
-           if(exceptionType != REDIS_PLUS_PLUS_NO_ERROR) {
-              SPLAPPTRC(L_ERROR, "c) Inside acquireLock, it failed with an exception for REDIS_PSETEX_CMD. Exception: " << exceptionString << ".", "RedisClusterPlusPlusDBLayer");
-              // In any case, let us try the following code block which may also fail.
-              // Delete the erroneous lock data item we created.
-              try {
-                 redis_cluster->del(distributedLockKey);
-              } catch (const Error &ex) {
-                 // It is not good if this one fails. We can't do much about that.
-              }
-
-              return(false);
-           }
-
-           // We got the lock.
+           // We got an exclusive lock with an expiry time set for it.
            // Let us update the lock information now.
            if(updateLockInformation(lockIdString, lkError, 1, new_lock_expiry_time, getpid()) == true) {
-              return(true);
+              SPLAPPTRC(L_DEBUG, "a) Inside acquireLock, acquired a lock id " << lockIdString << " in " << (retryCnt+1) << " attempt(s).", "RedisClusterPlusPlusDBLayer");
+               return(true);
            } else {
               // Some error occurred while updating the lock information.
               // It will be in an inconsistent state. Let us release the lock.
-              // After than, we will continue in the while loop.
+              SPLAPPTRC(L_DEBUG, "c) Inside acquireLock, acquired a lock id " << lockIdString << " in " << (retryCnt+1) << " attempt(s). However, update lock information failed. We will continue the retry to get this lock.", "RedisClusterPlusPlusDBLayer");
               releaseLock(lock, lkError);
            }
         } else {
@@ -5686,7 +5536,8 @@ namespace distributed
            pid_t _lockOwningPid = 0;
 
            if (readLockInformation(lockIdString, lkError, _lockUsageCnt, _lockExpirationTime, _lockOwningPid, _lockName) == false) {
-              SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed for lock id " << lockIdString << ". " << lkError.getErrorCode(), "RedisClusterPlusPlusDBLayer");
+              SPLAPPTRC(L_DEBUG, "d) Inside acquireLock, it failed for lock id " << lockIdString << " while reading lock information. We will continue the retry to get this lock. Attempt number=" << (retryCnt+1) << ". Lock Error=" << lkError.getErrorCode(), "RedisClusterPlusPlusDBLayer");
+;
            } else {
               // Is current time greater than the lock expiration time?
               if ((_lockExpirationTime > 0) && (time(0) > (time_t)_lockExpirationTime)) {
@@ -5701,8 +5552,8 @@ namespace distributed
         retryCnt++;
 
         if (retryCnt >= DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT) {
+           SPLAPPTRC(L_DEBUG, "e) Inside acquireLock, it is not able to acquire a lock id " << lockIdString << " after " << retryCnt << " retry attempts. Caller will see a lock error code of " << DL_GET_LOCK_ERROR << ".", "RedisClusterPlusPlusDBLayer");
            lkError.set("Unable to acquire the lock named " + lockIdString + ".", DL_GET_LOCK_ERROR);
-           SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed for a lock named " << lockIdString << ". " << DL_GET_LOCK_ERROR, "RedisClusterPlusPlusDBLayer");
            // Our caller can check the error code and try to acquire the lock again.
            return(false);
         }
@@ -5711,8 +5562,7 @@ namespace distributed
         time(&timeNow);
         if (difftime(startTime, timeNow) > maxWaitTimeToAcquireLock) {
            lkError.set("Unable to acquire the lock named " + lockIdString + " within the caller specified wait time.", DL_GET_LOCK_TIMEOUT_ERROR);
-           SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed to acquire the lock named " << lockIdString <<
-              " within the caller specified wait time." << DL_GET_LOCK_TIMEOUT_ERROR, "RedisClusterPlusPlusDBLayer");
+           SPLAPPTRC(L_DEBUG, "f) Inside acquireLock, it failed to acquire the lock named " << lockIdString << " within the caller specified wait time. Attempt number=" << retryCnt << ". Caller will see a lock error code of " << DL_GET_LOCK_TIMEOUT_ERROR << ".", "RedisClusterPlusPlusDBLayer");
            // Our caller can check the error code and try to acquire the lock again.
            return(false);
         }
@@ -5720,7 +5570,9 @@ namespace distributed
         // Yield control to other threads. Wait here with patience by doing an exponential back-off delay.
         usleep(DPS_AND_DL_GET_LOCK_SLEEP_TIME *
            (retryCnt%(DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT/DPS_AND_DL_GET_LOCK_BACKOFF_DELAY_MOD_FACTOR)));
-     } // End of while(1)
+     } // End of while loop.
+
+     return(false);
   } // End of acquireLock.
 
   void RedisClusterPlusPlusDBLayer::releaseLock(uint64_t lock, PersistenceError & lkError) {

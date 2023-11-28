@@ -1,6 +1,6 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2022
+# Copyright IBM Corp. 2011, 2023
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
@@ -666,15 +666,20 @@ namespace distributed
      if (redis_reply->integer == (int)0) {
         // It could be that our global store id is not there now.
         // Let us create one with an initial value of 0.
-        // Redis setnx is an atomic operation. It will succeed only for the very first operator that
+        // Redis set nx is an atomic operation. It will succeed only for the very first operator that
         // attempts to do this setting after a redis server is started fresh. If some other operator
         // already raced us ahead and created this guid_key, then our attempt below will be safely rejected.
+        // Senthil made NX related single API call code change in this method on Nov/25/2023.
         freeReplyObject(redis_reply);
-        cmd = string(REDIS_SETNX_CMD) + keyString + string(" ") + string("0");
+        cmd = string(REDIS_SET_CMD) + keyString + string(" ") + string("0") + 
+           string(" ") + string(REDIS_NX_OPTION);
         redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
      }
 
-     freeReplyObject(redis_reply);
+     if(redis_reply != NULL) {
+        freeReplyObject(redis_reply);
+     }
+
      SPLAPPTRC(L_DEBUG, "Inside connectToDatabase done", "RedisDBLayer");
   }
 
@@ -2189,79 +2194,65 @@ namespace distributed
   bool RedisDBLayer::acquireStoreLock(string const & storeIdString) {
 	  int32_t retryCnt = 0;
 	  string cmd = "";
+          SPLAPPTRC(L_DEBUG, "Inside acquireStoreLock, starting one or more attempts to acquire a lock for store " << storeIdString << ".", "RedisDBLayer");
 
 	  //Try to get a lock for this store.
 	  while (1) {
-		// '4' + 'store id' + 'dps_lock' => 1
-		std::string storeLockKey = string(DPS_STORE_LOCK_TYPE) + storeIdString + DPS_LOCK_TOKEN;
-		int32_t partitionIdx = getRedisServerPartitionIndex(storeLockKey);
+             // '4' + 'store id' + 'dps_lock' => 1
+             std::string storeLockKey = string(DPS_STORE_LOCK_TYPE) + storeIdString + DPS_LOCK_TOKEN;
+             int32_t partitionIdx = getRedisServerPartitionIndex(storeLockKey);
 
-                // Return now if there is no valid connection to the Redis server.
-                if (redisPartitions[partitionIdx].rdsc == NULL) {
+             // Return now if there is no valid connection to the Redis server.
+             if (redisPartitions[partitionIdx].rdsc == NULL) {
+                return(false);
+             }
+
+             // This is an atomic activity that does a combined set with NX and EX options all done in one API call.
+             // If multiple threads attempt to do it at the same time, only one will succeed.
+             // Winner will hold the lock until they release it voluntarily or
+             // until the Redis back-end removes this lock entry after the DPS_AND_DL_GET_LOCK_TTL times out.
+             // Senthil made NX related single API call code change in this method on Nov/27/2023.
+             std::ostringstream expiry_time_stream;
+             expiry_time_stream << string("") << DPS_AND_DL_GET_LOCK_TTL;
+             cmd = string(REDIS_SET_CMD) + storeLockKey + string(" ") + string("1") + 
+                string(" ") + string(REDIS_NX_OPTION) + string(" ") + string(REDIS_EX_OPTION) + 
+                string(" ") + expiry_time_stream.str();
+             redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+
+             if (redis_reply == NULL) {
+                // A NULL redis reply could be connection related error. Let us return now.
+               SPLAPPTRC(L_DEBUG, "Inside acquireStoreLock, got a null redis_reply error when acquiring a lock for a store " << storeIdString << " during attempt number " << (retryCnt+1) << ". Returning false now without making any further attempts to acquire a lock.", "RedisDBLayer");
                    return(false);
+             }
+
+             string redis_reply_string = "";
+             int redis_reply_type = redis_reply->type;
+
+             if (redis_reply_type == REDIS_REPLY_STATUS) {
+                redis_reply_string = string(redis_reply->str, redis_reply->len);
+
+                if(redis_reply_string == string("OK")) {
+                   // We got an exclusive lock with an expiry time set for it.
+                   freeReplyObject(redis_reply);
+                   SPLAPPTRC(L_DEBUG, "Inside acquireStoreLock, acquired a lock for store " << storeIdString << " in " << (retryCnt+1) << " attempt(s).", "RedisDBLayer");
+                   return(true);
                 }
+             }
 
-		// This is an atomic activity.
-		// If multiple threads attempt to do it at the same time, only one will succeed.
-		// Winner will hold the lock until they release it voluntarily or
-		// until the Redis back-end removes this lock entry after the DPS_AND_DL_GET_LOCK_TTL times out.
-		cmd = string(REDIS_SETNX_CMD) + storeLockKey + " " + "1";
-		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+             freeReplyObject(redis_reply);
+             // Someone else is holding on to the lock of this store. Wait for a while before trying again.
+             retryCnt++;
 
-		if (redis_reply == NULL) {
-			return(false);
-		}
+             if (retryCnt >= DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT) {
+                SPLAPPTRC(L_DEBUG, "Inside acquireStoreLock, it is not able to acquire a lock for store " << storeIdString << " after " << retryCnt << " retry attempts. Redis server reply type=" << redis_reply_type << ". Redis server reply string=" << redis_reply_string, "RedisDBLayer");
 
-		if (redis_reply->type == REDIS_REPLY_ERROR) {
-			// Problem in atomic creation of the store lock.
-			freeReplyObject(redis_reply);
-			return(false);
-		}
+                return(false);
+             }
 
-		if (redis_reply->integer == (int)1) {
-			// We got the lock.
-			// Set the expiration time for this lock key.
-			freeReplyObject(redis_reply);
-			std::ostringstream cmd_stream;
-			cmd_stream << string(REDIS_EXPIRE_CMD) << storeLockKey << " " << DPS_AND_DL_GET_LOCK_TTL;
-			cmd = cmd_stream.str();
-			redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-
-			if (redis_reply == NULL) {
-				// Delete the erroneous lock data item we created.
-				cmd = string(REDIS_DEL_CMD) + " " + storeLockKey;
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-				freeReplyObject(redis_reply);
-				return(false);
-			}
-
-			if (redis_reply->type == REDIS_REPLY_ERROR) {
-				// Problem in atomic creation of the store lock.
-				freeReplyObject(redis_reply);
-				// Delete the erroneous lock data item we created.
-				cmd = string(REDIS_DEL_CMD) + " " + storeLockKey;
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-				freeReplyObject(redis_reply);
-				return(false);
-			}
-
-			freeReplyObject(redis_reply);
-			return(true);
-		}
-
-		freeReplyObject(redis_reply);
-		// Someone else is holding on to the lock of this store. Wait for a while before trying again.
-		retryCnt++;
-
-		if (retryCnt >= DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT) {
-
-			return(false);
-		}
-
-		// Yield control to other threads. Wait here with patience by doing an exponential back-off delay.
-		usleep(DPS_AND_DL_GET_LOCK_SLEEP_TIME *
-			  (retryCnt%(DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT/DPS_AND_DL_GET_LOCK_BACKOFF_DELAY_MOD_FACTOR)));
-	  }
+             // Yield control to other threads. Wait here with patience by doing an exponential back-off delay.
+             usleep(DPS_AND_DL_GET_LOCK_SLEEP_TIME *
+                (retryCnt%(DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT/DPS_AND_DL_GET_LOCK_BACKOFF_DELAY_MOD_FACTOR)));
+          } // End of while loop.
 
 	  return(false);
   }
@@ -2890,12 +2881,13 @@ namespace distributed
 	  }
   }
 
-  // This method will acquire a lock for any given generic/arbitrary identifier passed as a string..
+  // This method will acquire a lock for any given generic/arbitrary identifier passed as a string.
   // This is typically used inside the createStore, createOrGetStore, createOrGetLock methods to
   // provide thread safety. There are other lock acquisition/release methods once someone has a valid store id or lock id.
   bool RedisDBLayer::acquireGeneralPurposeLock(string const & entityName) {
 	  int32_t retryCnt = 0;
 	  string cmd = "";
+          SPLAPPTRC(L_DEBUG, "Inside acquireGeneralPurposeLock, starting one or more attempts to acquire a lock for a generic id " << entityName << ".", "RedisDBLayer");
 
 	  //Try to get a lock for this generic entity.
 	  while (1) {
@@ -2908,68 +2900,52 @@ namespace distributed
                    return(false);
                 }
 
-		// This is an atomic activity.
+		// This is an atomic activity that does a combined set with NX and EX options all done in one API call.
 		// If multiple threads attempt to do it at the same time, only one will succeed.
 		// Winner will hold the lock until they release it voluntarily or
 		// until the Redis back-end removes this lock entry after the DPS_AND_DL_GET_LOCK_TTL times out.
-		cmd = string(REDIS_SETNX_CMD) + genericLockKey + " " + "1";
-
+                // Senthil made NX related single API call code change in this method on Nov/27/2023.
+                std::ostringstream expiry_time_stream;
+                expiry_time_stream << string("") << DPS_AND_DL_GET_LOCK_TTL;
+		cmd = string(REDIS_SET_CMD) + genericLockKey + string(" ") + string("1") + 
+                   string(" ") + string(REDIS_NX_OPTION) + string(" ") + string(REDIS_EX_OPTION) + 
+                   string(" ") + expiry_time_stream.str();
 		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 
 		if (redis_reply == NULL) {
-			return(false);
+                   // A NULL redis reply could be connection related error. Let us return now.
+                   SPLAPPTRC(L_DEBUG, "Inside acquireGeneralPurposeLock, got a null redis_reply error when acquiring a lock for a generic id " << entityName << " during attempt number " << (retryCnt+1) << ". Returning false now without making any further attempts to acquire a lock.", "RedisDBLayer");
+                   return(false);
 		}
 
-		if (redis_reply->type == REDIS_REPLY_ERROR) {
-			// Problem in atomic creation of the general purpose lock.
-			freeReplyObject(redis_reply);
-			return(false);
-		}
+                string redis_reply_string = "";
+                int redis_reply_type = redis_reply->type;
 
-		if (redis_reply->integer == (int)1) {
-			// We got the lock.
-			// Set the expiration time for this lock key.
-			freeReplyObject(redis_reply);
-			std::ostringstream cmd_stream;
-			cmd_stream << string(REDIS_EXPIRE_CMD) << genericLockKey << " " << DPS_AND_DL_GET_LOCK_TTL;
-			cmd = cmd_stream.str();
-			redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+		if (redis_reply_type == REDIS_REPLY_STATUS) {
+                        redis_reply_string = string(redis_reply->str, redis_reply->len);
 
-			if (redis_reply == NULL) {
-				// Delete the erroneous lock data item we created.
-				cmd = string(REDIS_DEL_CMD) + " " + genericLockKey;
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-				freeReplyObject(redis_reply);
-				return(false);
-			}
-
-			if (redis_reply->type == REDIS_REPLY_ERROR) {
-				// Problem in atomic creation of the general purpose lock.
-				freeReplyObject(redis_reply);
-				// Delete the erroneous lock data item we created.
-				cmd = string(REDIS_DEL_CMD) + " " + genericLockKey;
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-				freeReplyObject(redis_reply);
-				return(false);
-			}
-
-			freeReplyObject(redis_reply);
-			return(true);
+                        if(redis_reply_string == string("OK")) {
+			   // We got an exclusive lock with an expiry time set for it.
+			   freeReplyObject(redis_reply);
+                           SPLAPPTRC(L_DEBUG, "Inside acquireGeneralPurposeLock, acquired a lock for a generic id " << entityName << " in " << (retryCnt+1) << " attempt(s).", "RedisDBLayer");
+			   return(true);
+                        }
 		}
 
 		freeReplyObject(redis_reply);
-		// Someone else is holding on to the lock of this entity. Wait for a while before trying again.
+		// Someone else is holding on to the lock of this generic id. Wait for a while before trying again.
 		retryCnt++;
 
 		if (retryCnt >= DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT) {
+                   SPLAPPTRC(L_DEBUG, "Inside acquireGeneralPurposeLock, it is not able to acquire a lock for a generic id " << entityName << " after " << retryCnt << " retry attempts. Redis server reply type=" << redis_reply_type << ". Redis server reply string=" << redis_reply_string, "RedisDBLayer");
 
-			return(false);
+                   return(false);
 		}
 
 		// Yield control to other threads. Wait here with patience by doing an exponential back-off delay.
 		usleep(DPS_AND_DL_GET_LOCK_SLEEP_TIME *
 			  (retryCnt%(DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT/DPS_AND_DL_GET_LOCK_BACKOFF_DELAY_MOD_FACTOR)));
-	  }
+	  } // End of while loop.
 
 	  return(false);
   }
@@ -4157,7 +4133,7 @@ namespace distributed
 			  SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed to check for the existence of lock id " << lockIdString << ". " << lkError.getErrorCode(), "RedisDBLayer");
 		  } else {
 			  lkError.set("No lock exists for the LockId " + lockIdString + ".", DL_INVALID_LOCK_ID_ERROR);
-			  SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed for lock id " << lockIdString << ". " << DL_INVALID_LOCK_ID_ERROR, "RedisDBLayer");
+			  SPLAPPTRC(L_DEBUG, "Inside acquireLock, no lock exists for lock id " << lockIdString << ". " << DL_INVALID_LOCK_ID_ERROR, "RedisDBLayer");
 		  }
 
 		  return(false);
@@ -4171,120 +4147,111 @@ namespace distributed
           // Return now if there is no valid connection to the Redis server.
           if (redisPartitions[partitionIdx].rdsc == NULL) {
              lkError.set("There is no valid connection to the Redis server at this time.", DPS_CONNECTION_ERROR);
-             SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed for distributedLockKey " << distributedLockKey << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
+             SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed for lock id " << lockIdString << ". There is no valid connection to the Redis server at this time. " << DPS_CONNECTION_ERROR, "RedisDBLayer");
              return(false);
           }
 
 	  time_t startTime, timeNow;
 	  // Get the start time for our lock acquisition attempts.
 	  time(&startTime);
+          SPLAPPTRC(L_DEBUG, "Inside acquireLock, starting one or more attempts to acquire a lock id " << lockIdString << ".", "RedisDBLayer");
 
 	  //Try to get a distributed lock.
 	  while(1) {
-		  // This is an atomic activity.
-		  // If multiple threads attempt to do it at the same time, only one will succeed.
-		  // Winner will hold the lock until they release it voluntarily or
-		  // until the Redis back-end removes this lock entry after the lease time ends.
-		  // We will add the lease time to the current timestamp i.e. seconds elapsed since the epoch.
-		  time_t new_lock_expiry_time = time(0) + (time_t)leaseTime;
-		  cmd = string(REDIS_SETNX_CMD) + distributedLockKey + " " + "1";
-		  redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+		// This is an atomic activity that does a combined set with NX and PX options all done in one API call.
+		// If multiple threads attempt to do it at the same time, only one will succeed.
+		// Winner will hold the lock until they release it voluntarily or
+                // until the Redis back-end removes this lock entry after the lease time ends.
+                // We will add the lease time to the current timestamp i.e. seconds elapsed since the epoch.
+                // Senthil made NX related single API call code change in this method on Nov/27/2023.
+                time_t new_lock_expiry_time = time(0) + (time_t)leaseTime;
+                ostringstream expiryTimeInMillis;
+                expiryTimeInMillis << string("") << (leaseTime*1000.00);
+		cmd = string(REDIS_SET_CMD) + distributedLockKey + string(" ") + string("1") + 
+                   string(" ") + string(REDIS_NX_OPTION) + string(" ") + string(REDIS_PX_OPTION) + 
+                   string(" ") + expiryTimeInMillis.str();
+		redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
 
-			if (redis_reply == NULL) {
-				return(false);
-			}
+		if (redis_reply == NULL) {
+                   // A NULL redis reply could be connection related error. Let us return now.
+                   SPLAPPTRC(L_DEBUG, "Inside acquireLock, got a null redis_reply error when acquiring a lock id " << lockIdString << " during attempt number " << (retryCnt+1) << ". Returning false now without making any further attempts to acquire a lock.", "RedisDBLayer");
+                   return(false);
+		}
 
-			if (redis_reply->type == REDIS_REPLY_ERROR) {
-				// Problem in atomic creation of the distributed lock.
-				freeReplyObject(redis_reply);
-				return(false);
-			}
+                string redis_reply_string = "";
+                int redis_reply_type = redis_reply->type;
+                bool redisReplyObjectFreed = false;
 
-			if (redis_reply->integer == (int)1) {
-				// We got the lock.
-				// Set the expiration time for this lock key.
-				freeReplyObject(redis_reply);
-				ostringstream expiryTimeInMillis;
-				expiryTimeInMillis << (leaseTime*1000.00);
-				cmd = string(REDIS_PSETEX_CMD) + distributedLockKey + " " + expiryTimeInMillis.str() + " " + "2";
-				redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
+                if (redis_reply_type == REDIS_REPLY_STATUS) {
+                        redis_reply_string = string(redis_reply->str, redis_reply->len);
+                        freeReplyObject(redis_reply);
+                        redisReplyObjectFreed = true;
 
-				if (redis_reply == NULL) {
-					// Delete the erroneous lock data item we created.
-					cmd = string(REDIS_DEL_CMD) + " " + distributedLockKey;
-					redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-					freeReplyObject(redis_reply);
-					return(false);
-				}
+                        if(redis_reply_string == string("OK")) {
+                           // We got an exclusive lock with an expiry time set for it.
+                           // Let us update the lock information now.
+                           if(updateLockInformation(lockIdString, lkError, 1, new_lock_expiry_time, getpid()) == true) {
+                              SPLAPPTRC(L_DEBUG, "Inside acquireLock, acquired a lock id " << lockIdString << " in " << (retryCnt+1) << " attempt(s).", "RedisDBLayer");
+                              return(true);
+                           } else {
+                              // Some error occurred while updating the lock information.
+                              // It will be in an inconsistent state. Let us release the lock.
+                              SPLAPPTRC(L_DEBUG, "Inside acquireLock, acquired a lock id " << lockIdString << " in " << (retryCnt+1) << " attempt(s). However, update lock information failed. We will continue the retry to get this lock.", "RedisDBLayer");
+                              releaseLock(lock, lkError);
+                           }
+                        }
+                }
 
-				if (redis_reply->type == REDIS_REPLY_ERROR) {
-					// Problem in atomic creation of the general purpose lock.
-					freeReplyObject(redis_reply);
-					// Delete the erroneous lock data item we created.
-					cmd = string(REDIS_DEL_CMD) + " " + distributedLockKey;
-					redis_reply = (redisReply*)redisCommand(redisPartitions[partitionIdx].rdsc, cmd.c_str());
-					freeReplyObject(redis_reply);
-					return(false);
-				}
+                if(redisReplyObjectFreed == false) {
+                   // It was not freed in the previous if block. Let us free it now.
+                   freeReplyObject(redis_reply);
+                }
 
-				freeReplyObject(redis_reply);
+                // We didn't get the lock.
+                // Let us check if the previous owner of this lock simply forgot to release it.
+                // In that case, we will release this expired lock.
+                // Read the time at which this lock is expected to expire.
+                uint32_t _lockUsageCnt = 0;
+                int32_t _lockExpirationTime = 0;
+                std::string _lockName = "";
+                pid_t _lockOwningPid = 0;
 
-				// We got the lock.
-				// Let us update the lock information now.
-				if(updateLockInformation(lockIdString, lkError, 1, new_lock_expiry_time, getpid()) == true) {
-					return(true);
-				} else {
-					// Some error occurred while updating the lock information.
-					// It will be in an inconsistent state. Let us release the lock.
-					releaseLock(lock, lkError);
-				}
-			} else {
-				// We didn't get the lock.
-				// Let us check if the previous owner of this lock simply forgot to release it.
-				// In that case, we will release this expired lock.
-				// Read the time at which this lock is expected to expire.
-				freeReplyObject(redis_reply);
-				uint32_t _lockUsageCnt = 0;
-				int32_t _lockExpirationTime = 0;
-				std::string _lockName = "";
-				pid_t _lockOwningPid = 0;
+                if (readLockInformation(lockIdString, lkError, _lockUsageCnt, _lockExpirationTime, _lockOwningPid, _lockName) == false) {
+                   SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed for lock id " << lockIdString << " while reading lock information. We will continue the retry to get this lock. Attempt number=" << (retryCnt+1) << ". Lock Error=" << lkError.getErrorCode(), "RedisDBLayer");
+                } else {
+                   // Is current time greater than the lock expiration time?
+                   if ((_lockExpirationTime > 0) && (time(0) > (time_t)_lockExpirationTime)) {
+                      // Time has passed beyond the lease of this lock.
+                      // Lease expired for this lock. Original owner forgot to release the lock and simply left it hanging there without a valid lease.
+                      releaseLock(lock, lkError);
+                   }
+                }
 
-				if (readLockInformation(lockIdString, lkError, _lockUsageCnt, _lockExpirationTime, _lockOwningPid, _lockName) == false) {
-					SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed for lock id " << lockIdString << ". " << lkError.getErrorCode(), "RedisDBLayer");
-				} else {
-					// Is current time greater than the lock expiration time?
-					if ((_lockExpirationTime > 0) && (time(0) > (time_t)_lockExpirationTime)) {
-						// Time has passed beyond the lease of this lock.
-						// Lease expired for this lock. Original owner forgot to release the lock and simply left it hanging there without a valid lease.
-						releaseLock(lock, lkError);
-					}
-				}
-			}
+		// Someone else is holding on to the lock we are trying to acquire. Wait for a while before trying again.
+		retryCnt++;
 
-			// Someone else is holding on to this distributed lock. Wait for a while before trying again.
-			retryCnt++;
+                if (retryCnt >= DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT) {
+                   SPLAPPTRC(L_DEBUG, "Inside acquireLock, it is not able to acquire a lock id " << lockIdString << " after " << retryCnt << " retry attempts. Redis server reply type=" << redis_reply_type << ". Redis server reply string=" << redis_reply_string << ". Caller will see a lock error code of " << DL_GET_LOCK_ERROR << ".", "RedisDBLayer");
+                   lkError.set("Unable to acquire the lock named " + lockIdString + ".", DL_GET_LOCK_ERROR);
+                   // Our caller can check the lock error code and try to acquire the lock again.
+                   return(false);
+                }
 
-			if (retryCnt >= DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT) {
-				lkError.set("Unable to acquire the lock named " + lockIdString + ".", DL_GET_LOCK_ERROR);
-				SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed for a lock named " << lockIdString << ". " << DL_GET_LOCK_ERROR, "RedisDBLayer");
-				// Our caller can check the error code and try to acquire the lock again.
-				return(false);
-			}
+                // Check if we have gone past the maximum wait time the caller was willing to wait in order to acquire this lock.
+                time(&timeNow);
+                if (difftime(startTime, timeNow) > maxWaitTimeToAcquireLock) {
+                   lkError.set("Unable to acquire the lock named " + lockIdString + " within the caller specified wait time.", DL_GET_LOCK_TIMEOUT_ERROR);
+                   SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed to acquire the lock named " << lockIdString << " within the caller specified wait time. Attempt number=" << retryCnt << ". Caller will see a lock error code of " << DL_GET_LOCK_TIMEOUT_ERROR << ".", "RedisDBLayer");
+                   // Our caller can check the lock error code and try to acquire the lock again.
+                   return(false);
+                }
 
-			// Check if we have gone past the maximum wait time the caller was willing to wait in order to acquire this lock.
-			time(&timeNow);
-			if (difftime(startTime, timeNow) > maxWaitTimeToAcquireLock) {
-				lkError.set("Unable to acquire the lock named " + lockIdString + " within the caller specified wait time.", DL_GET_LOCK_TIMEOUT_ERROR);
-				SPLAPPTRC(L_DEBUG, "Inside acquireLock, it failed to acquire the lock named " << lockIdString <<
-					" within the caller specified wait time." << DL_GET_LOCK_TIMEOUT_ERROR, "RedisDBLayer");
-				// Our caller can check the error code and try to acquire the lock again.
-				return(false);
-			}
+		// Yield control to other threads. Wait here with patience by doing an exponential back-off delay.
+		usleep(DPS_AND_DL_GET_LOCK_SLEEP_TIME *
+			  (retryCnt%(DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT/DPS_AND_DL_GET_LOCK_BACKOFF_DELAY_MOD_FACTOR)));
+	  } // End of while loop.
 
-			// Yield control to other threads. Wait here with patience by doing an exponential back-off delay.
-			usleep(DPS_AND_DL_GET_LOCK_SLEEP_TIME *
-				(retryCnt%(DPS_AND_DL_GET_LOCK_MAX_RETRY_CNT/DPS_AND_DL_GET_LOCK_BACKOFF_DELAY_MOD_FACTOR)));
-	  } // End of while(1)
+	  return(false);
   }
 
   void RedisDBLayer::releaseLock(uint64_t lock, PersistenceError & lkError) {

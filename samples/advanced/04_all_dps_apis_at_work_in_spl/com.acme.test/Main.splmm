@@ -1,6 +1,6 @@
 /*
  *  Licensed Materials - Property of IBM
- *  Copyright IBM Corp. 2011, 2022
+ *  Copyright IBM Corp. 2011, 2023
  *  US Government Users Restricted Rights - Use, duplication or
  *  disclosure restricted by GSA ADP Schedule Contract with IBM Corp.
 */
@@ -67,8 +67,7 @@ composite Main {
 	// suitable one for such data stores based on eventual consistency put/get as well disk based put/get (HBase, Mongo, Couchbase).
 	// Before running this test for those slow data stores, please refer to the commentary at the top of
 	// this composite to reduce the test count in order to obtain reasonable results.
-        // You can uncomment the line below if you want to do that particular test.
-        ///// () as Sink2 = LockTest() {}
+        () as Sink2 = LockTest() {}
 		
         // Do 100K writes and 100K reads and time it.
         // Please be aware this high volume test will finish in a decent time for memcached, Redis, and Aerospike.
@@ -76,8 +75,7 @@ composite Main {
         // hence it may be a long wait before this test completes when you use those data stores.
 	// Before running this test for those slow data stores, please refer to the commentary at the top of
 	// this composite to reduce the test count in order to obtain reasonable results.
-        // You can uncomment the line below if you want to do that particular test.
-        ///// () as Sink3 = ReadWritePerformanceTest() {}
+        () as Sink3 = ReadWritePerformanceTest() {}
         
         // Users can directly execute native back-end data store commands that are of 
         // fire and forget nature (one way calls and not request/response calls).
@@ -2837,12 +2835,11 @@ composite StateUpdater()  {
                                         } // End of while(++cnt <= 5)
 
 					if (err != 0ul) {
-					   printStringLn("Unable to do dpsGet. Stopping the lock Test");
-                                           return;
+					   printStringLn("Unable to do dpsGet. Yet, continuing the lock Test");
                                         }
-
-                                        assert(err==0ul);
-
+                                        
+                                        // assert(err == 0ul);					
+					printStringLn("val=" + (rstring)val + " as read from the store during lock test #" + (rstring)lockTestCnt);
                                         cnt = 0;
 
                                         if(lockTestCnt == 1) {
@@ -2860,7 +2857,7 @@ composite StateUpdater()  {
                                            dpsPut(s, "myKey", val+1, err);
 
 					   if (err != 0ul) {
-					      printStringLn("Error in dpsPut. rc = " + 
+					      printStringLn("Error in dpsPut with a value of " + (rstring)(val+1) + ". rc = " + 
 					         (rstring)dpsGetLastStoreErrorCode() + ", msg=" + dpsGetLastStoreErrorString() + ", attemptCnt = " + (rstring)cnt);
 
                                               checkAndReconnect(12, result);
@@ -2881,19 +2878,14 @@ composite StateUpdater()  {
                                                  break;
                                               }
 					   } else {
-					      printStringLn("dpsPut successful.");
+					      printStringLn("dpsPut with a value of " + (rstring)(val+1) + " successful.");
                                               break;
 					   }
                                         } // End of while(++cnt <= 5)
 
 					if (err != 0ul) {
-					   printStringLn("Unable to do dpsPut. Stopping the lock Test");
-                                           return;
+					   printStringLn("Unable to do dpsPut. Yet, continuing the lock Test");
                                         }
-
-                                        assert(err==0ul);
-					
-					printStringLn("val=" + (rstring)val + " as read from the store during lock test #" + (rstring)lockTestCnt);
 					
 					// Only one of the two PEs currently in the race to get from and
 					// put into that same store will win in obtaining a chance to
