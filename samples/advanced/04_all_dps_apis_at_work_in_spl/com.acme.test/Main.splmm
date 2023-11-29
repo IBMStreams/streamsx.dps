@@ -1117,6 +1117,19 @@ composite GeneralTest()
 						}
 					}
 
+                                        // We can perform the following bulk operations only for the
+                                        // K/V stores such as redis and redis-cluster-plus-plus.
+                                        // We can skip it for the other K/V stores.
+                                        if (dbProductName != "redis" && dbProductName != "redis-cluster-plus-plus") {
+                                           printStringLn("");
+                                           printStringLn("NOTE: We are now going to skip performing the bulk operations as they are not supported in the currently configured K/V DB name of " + dbProductName + ".");
+                                           printStringLn("");                                  
+                                           // Signal the next operator to read and write using the two presidential stores we created above.
+                                           mutable NextBeat _beat = {};
+                                           submit(_beat, NextBeat);                                           
+                                           return;
+                                        }
+
                                         // <<<<<<< BEGIN BULK dpsGetKeys API TEST >>>>>>>
                                         // Let us do a quick run to show how to obtain multiple keys in a given store.
                                         printStringLn("");
@@ -2830,6 +2843,7 @@ composite StateUpdater()  {
                                               }
 					   } else {
 					      printStringLn("dpsGet successful.");
+                                              printStringLn("val=" + (rstring)val + " as read from the store during lock test #" + (rstring)lockTestCnt);
                                               break;
 					   }
                                         } // End of while(++cnt <= 5)
@@ -2839,7 +2853,6 @@ composite StateUpdater()  {
                                         }
                                         
                                         // assert(err == 0ul);					
-					printStringLn("val=" + (rstring)val + " as read from the store during lock test #" + (rstring)lockTestCnt);
                                         cnt = 0;
 
                                         if(lockTestCnt == 1) {

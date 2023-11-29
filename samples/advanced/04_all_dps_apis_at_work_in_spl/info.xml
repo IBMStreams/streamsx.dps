@@ -4,7 +4,7 @@
  <info:identity>
    <info:name>04_all_dps_apis_at_work_in_spl</info:name>
    <info:description></info:description>
-   <info:version>1.0.7</info:version>
+   <info:version>1.0.8</info:version>
    <info:requiredProductVersion>4.2.0.0</info:requiredProductVersion>
  </info:identity>
  <info:dependencies>
