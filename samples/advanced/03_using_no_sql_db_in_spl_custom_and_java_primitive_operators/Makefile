@@ -25,7 +25,7 @@
 # Since the DPS toolkit version you are using could be more
 # recent than the one in the IBM Streams installation directory,
 # you may want to ensure that the following DPS toolkit path is correct.
-DPS_TOOLKIT_HOME ?= $(HOME)/streamsx.dps/com.ibm.streamsx.dps
+DPS_TOOLKIT_HOME ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.dps
 
 # The dps-helper is copied from the DPS toolkit directory to the 
 # impl/java/lib directory of this application to ensure it is 
