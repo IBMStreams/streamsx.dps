@@ -1,7 +1,7 @@
 include ../make.variable.include
 
 PKG_NAME := redis-plus-plus
-VERSION := 1.3.10
+VERSION := 1.3.12
 ARCHIVE := $(PKG_NAME)-$(VERSION).tar.gz
 ARCHIVE_INSTALL := $(PKG_NAME)-$(VERSION)-$(OS)-$(ARCH)-install-bin.tar.gz
 PKG_DIR = $(PKG_NAME)-$(VERSION)
