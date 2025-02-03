@@ -19,8 +19,16 @@ DPS toolkit for the purpose of sharing application state in a distributed manner
 <li>Mongo</li>
 <li>Couchbase</li>
 <li>Redis-Cluster   [New cluster feature is available in Redis version 3 and above]</li>
+<li>Valkey</li>
 </ol>
 
+#### Feb/03/2025: Note about Redis and Valkey. ####
+In Mar/2024, the Redis company switched the licensing for the Redis core code repository from the free of cost BSD license to for-fee proprietary licenses. This is in effect for any Redis version higher than 7.2.5. This prompted a large portion of the user and developer community, led by the Linux Foundation, to fork the Redis code v7.2.5 under the new name Valkey, retaining the BSD license. Valkey looks and works exactly like redis except for its name.
+
+DPS toolkit supports redis as before for the free versions up to v7.2.5 and any redis proprietary paid versions higher than v7.2.5. In Feb/2025, DPS toolkit's primary lead engineer Senthil Nathan completed the testing to ensure that DPS toolkit also supports Valkey v8.0.2 and higher. DPS toolkit users can install Valkey single server or a cluster with TLS or non-TLS and password or no-password options and use the DPS toolkit configuration as before with redis or redis-cluster or redis-cluster-plus-plus as the backend database name. DPS enabled applications will work with Valkey without requiring any code change.
+
+
+## DPS toolkit origins ##
 This toolkit evolved from the early research work done at the IBM.T.J.Watson Research Center, Yorktown Heights, New York. The links below highlight the origins of this asset.
 
 [Technical Positioning](dps-technical-positioning.pdf)
