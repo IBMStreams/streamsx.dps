@@ -1,5 +1,9 @@
-## Overview ##
+## Distributed Process Store (DPS) ##
 
+## Note from the toolkit author
+This toolkit created by Senthil Nathan is a differentiator for key customers. He is now an independent software consultant. To benefit from the compelling features of this asset, for any enhancements, any need for a new powerful toolkit as well as for creating new data streaming solutions, customers can email senthil@moonraytech.com to reach him. Thank you.
+
+## Purpose
 The IBMStreams/streamsx.dps GitHub repository is home to the Streams toolkit named
 DPS (Distributed Process Store). This Streams toolkit allows a simple way for the
 SPL, C++ and Java operators belonging to a single or multiple applications to share
