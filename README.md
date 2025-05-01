@@ -1,4 +1,4 @@
-## Distributed Process Store (DPS) ##
+# Distributed Process Store (DPS)
 
 ## Note from the toolkit author
 This toolkit created by Senthil Nathan is a differentiator for key customers. He is now an independent software consultant. To benefit from the compelling features of this asset, for any enhancements, any need for a new powerful toolkit as well as for creating new data streaming solutions, customers can email senthil@moonraytech.com to reach him. Thank you.
