@@ -1,10 +1,15 @@
 /*
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2011, 2023
+# Copyright IBM Corp. 2011, 2025
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 */
+
+/*
+The core logic in this file is a result of the focused effort made by Senthil Nathan. He wrote this code on his own initiative and with his original intellectual ideas and not out of any formally managed or funded work by IBM. He has been enhancing it ever since 2011. He also added more advanced features in this code much after IBM divested its Streams product to another company around May/2021. He is now an independent software consultant. To benefit from the compelling features of this asset, for any enhancements, any need for a new powerful toolkit as well as for creating new streaming data analytics solutions, customers can email senthil@moonraytech.com to reach him. Thank you.
+*/
+
 /*
 =====================================================================
 Here is the copyright statement for our use of the hiredis APIs:

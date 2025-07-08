@@ -1,13 +1,13 @@
 include ../make.variable.include
 
 PKG_NAME := redis-plus-plus
-VERSION := 1.3.12
+VERSION := 1.3.14
 ARCHIVE := $(PKG_NAME)-$(VERSION).tar.gz
 ARCHIVE_INSTALL := $(PKG_NAME)-$(VERSION)-$(OS)-$(ARCH)-install-bin.tar.gz
 PKG_DIR = $(PKG_NAME)-$(VERSION)
 GEN_DIR := $(shell pwd)/gen
 HIREDIS_PKG := hiredis
-HIREDIS_VERSION := 1.2.0
+HIREDIS_VERSION := 1.3.0
 HIREDIS_PKG_DIR := $(HIREDIS_PKG)-$(HIREDIS_VERSION)
 HIREDIS_SRC_DIR := $(HIREDIS_PKG)-$(HIREDIS_VERSION)-src
 
